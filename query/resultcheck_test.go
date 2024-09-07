@@ -1,7 +1,6 @@
-package test
+package query
 
 import (
-	"blockEmulator/chain"
 	"blockEmulator/core"
 	"blockEmulator/params"
 	"encoding/csv"
@@ -11,10 +10,45 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"testing"
 	"time"
-
-	"github.com/ethereum/go-ethereum/core/rawdb"
 )
+
+func TestFinalResult(t *testing.T) {
+	// check the final result after running BlockEmulator
+
+	// get the result from Dataset
+	accountBalance := loadFinalResultFromDataset()
+	acCorrect := make(map[string]bool)
+
+	// convert keys to list
+	accounts := make([]string, len(accountBalance))
+	i := 0
+	for key := range accountBalance {
+		accounts[i] = key
+		i++
+	}
+
+	// check the result from BlockEmulator
+	for sid := 0; sid < params.ShardNum; sid++ {
+		mptfp := "../" + params.DatabaseWrite_path + "mptDB/ldb/s" + strconv.FormatUint(uint64(sid), 10) + "/n0"
+		chaindbfp := "../" + params.DatabaseWrite_path + fmt.Sprintf("chainDB/S%d_N%d", sid, 0)
+		aslist := QueryAccountStateList(chaindbfp, mptfp, uint64(sid), 0, accounts)
+		for idx, as := range aslist {
+			if as != nil && as.Balance.Cmp(accountBalance[accounts[idx]]) == 0 {
+				acCorrect[accounts[idx]] = true
+			}
+		}
+	}
+	fmt.Println("Results from BlockEmulator: # of correct accounts", len(acCorrect))
+	if len(acCorrect) == len(accountBalance) {
+		fmt.Println("test pass")
+	} else if len(accountBalance)-len(acCorrect) < params.BrokerNum {
+		fmt.Printf("%d err accounts, they maybe brokers", len(accountBalance)-len(acCorrect))
+	} else {
+		log.Panic("Err, too many wrong accounts", len(accountBalance)-len(acCorrect))
+	}
+}
 
 func data2tx(data []string, nonce uint64) (*core.Transaction, bool) {
 	if data[6] == "0" && data[7] == "0" && len(data[3]) > 16 && len(data[4]) > 16 && data[3] != data[4] {
@@ -28,11 +62,9 @@ func data2tx(data []string, nonce uint64) (*core.Transaction, bool) {
 	return &core.Transaction{}, false
 }
 
-func Ttestresult(ShardNums int) {
+func loadFinalResultFromDataset() map[string]*big.Int {
 	accountBalance := make(map[string]*big.Int)
-	acCorrect := make(map[string]bool)
-
-	txfile, err := os.Open(params.DatasetFile)
+	txfile, err := os.Open("../" + params.DatasetFile)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -67,37 +99,7 @@ func Ttestresult(ShardNums int) {
 			}
 		}
 	}
-	fmt.Println(len(accountBalance))
-	for sid := 0; sid < ShardNums; sid++ {
-		fp := params.DatabaseWrite_path + "mptDB/ldb/s" + strconv.FormatUint(uint64(sid), 10) + "/n0"
-		db, err := rawdb.NewLevelDBDatabase(fp, 0, 1, "accountState", false)
-		if err != nil {
-			log.Panic(err)
-		}
-		pcc := &params.ChainConfig{
-			ChainID:        uint64(sid),
-			NodeID:         0,
-			ShardID:        uint64(sid),
-			Nodes_perShard: uint64(params.NodesInShard),
-			ShardNums:      uint64(ShardNums),
-			BlockSize:      uint64(params.MaxBlockSize_global),
-			BlockInterval:  uint64(params.Block_Interval),
-			InjectSpeed:    uint64(params.InjectSpeed),
-		}
-		CurChain, _ := chain.NewBlockChain(pcc, db)
-		for key, val := range accountBalance {
-			v := CurChain.FetchAccounts([]string{key})
-			if val.Cmp(v[0].Balance) == 0 {
-				acCorrect[key] = true
-			}
-		}
-		CurChain.CloseBlockChain()
-	}
-	fmt.Println(len(acCorrect))
-	if len(acCorrect) == len(accountBalance) {
-		fmt.Println("test pass")
-	} else {
-		fmt.Println(len(accountBalance)-len(acCorrect), "accounts errs, they may be brokers~;")
-		fmt.Println("if the number of err accounts is too large, the mechanism has bugs")
-	}
+	fmt.Println("Results from dataset file: # of accounts", len(accountBalance))
+
+	return accountBalance
 }
