@@ -1,0 +1,178 @@
+package block
+
+import (
+	"context"
+	"fmt"
+	"go.etcd.io/bbolt"
+	"log/slog"
+)
+
+const (
+	BucketBlock       = "block"
+	BucketBlockHeader = "block_header"
+	BucketNewestBlock = "newest_block"
+
+	NewestBlockKey = "newest_block"
+)
+
+// BoltStore implements block.Store.
+type BoltStore struct {
+	Store
+	db *bbolt.DB
+}
+
+func NewBoltStore(dbPath string) (*BoltStore, error) {
+	db, err := bbolt.Open(dbPath, 0600, nil)
+	if err != nil {
+		slog.Error(fmt.Sprintf("open bolt db err: %v", err))
+		return nil, err
+	}
+
+	err = db.Update(func(tx *bbolt.Tx) error {
+		var err error
+		_, err = tx.CreateBucketIfNotExists([]byte(BucketBlock))
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists([]byte(BucketBlockHeader))
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists([]byte(BucketNewestBlock))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		slog.Error(fmt.Sprintf("create bucket err: %v", err))
+		return nil, err
+	}
+
+	return &BoltStore{
+		db: db,
+	}, nil
+}
+
+func (b *BoltStore) UpdateNewestBlockHash(ctx context.Context, newBlockHash []byte) error {
+	err := b.db.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(BucketNewestBlock))
+		if bucket == nil {
+			return fmt.Errorf("fetch BucketNewestBlock failed, bucket is nil")
+		}
+		err := bucket.Put([]byte(NewestBlockKey), newBlockHash)
+		if err != nil {
+			return fmt.Errorf("put newest blockHash err: %v", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("update newest blockHash err: %v", err))
+		return err
+	}
+	return nil
+}
+
+func (b *BoltStore) GetNewestBlockHash(ctx context.Context) ([]byte, error) {
+	var result []byte
+	err := b.db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(BucketNewestBlock))
+		if bucket == nil {
+			return fmt.Errorf("fetch BucketNewestBlock failed, bucket is nil")
+		}
+		result = bucket.Get([]byte(NewestBlockKey))
+		if result == nil {
+			return fmt.Errorf("get newest blockHash failed")
+		}
+		return nil
+	})
+
+	if err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("get newest blockHash err: %v", err))
+		return nil, err
+	}
+	return result, nil
+}
+
+func (b *BoltStore) AddBlock(ctx context.Context, blockHash, encodedBlock []byte) error {
+	err := b.db.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(BucketBlock))
+		if bucket == nil {
+			return fmt.Errorf("fetch BucketBlock failed, bucket is nil")
+		}
+		err := bucket.Put(blockHash, encodedBlock)
+		if err != nil {
+			return fmt.Errorf("put block err: %v", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("add block err: %v", err))
+		return err
+	}
+	return nil
+}
+
+func (b *BoltStore) GetBlockByHash(ctx context.Context, hash []byte) ([]byte, error) {
+	var result []byte
+	err := b.db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(BucketBlock))
+		if bucket == nil {
+			return fmt.Errorf("fetch BucketBlock failed, bucket is nil")
+		}
+		result = bucket.Get(hash)
+		if result == nil {
+			return fmt.Errorf("get block by hash in BucketBlock failed")
+		}
+		return nil
+	})
+
+	if err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("get block by hash err: %v", err))
+		return nil, err
+	}
+	return result, nil
+}
+
+func (b *BoltStore) AddBlockHeader(ctx context.Context, blockHash, encodedBlockHeader []byte) error {
+	err := b.db.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(BucketBlockHeader))
+		if bucket == nil {
+			return fmt.Errorf("fetch BucketBlockHeader failed, bucket is nil")
+		}
+		err := bucket.Put(blockHash, encodedBlockHeader)
+		if err != nil {
+			return fmt.Errorf("put blockHeader err: %v", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("add blockHeader err: %v", err))
+		return err
+	}
+	return nil
+}
+
+func (b *BoltStore) GetBlockHeaderByHash(ctx context.Context, blockHash []byte) ([]byte, error) {
+	var result []byte
+	err := b.db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(BucketBlockHeader))
+		if bucket == nil {
+			return fmt.Errorf("fetch BucketBlockHeader failed, bucket is nil")
+		}
+		result = bucket.Get(blockHash)
+		if result == nil {
+			return fmt.Errorf("get blockHash in the BucketBlockHeader failed")
+		}
+		return nil
+	})
+
+	if err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("get blockHash err: %v", err))
+		return nil, err
+	}
+	return result, nil
+}

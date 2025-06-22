@@ -9,7 +9,7 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-func initStorage(dbfp string, ShardID, NodeID uint64) *storage.Storage {
+func initStorage(dbfp string, ShardID, NodeID uint64) *storage.BlobStorage {
 	pcc := &params.ChainConfig{
 		ChainID: ShardID,
 		NodeID:  NodeID,

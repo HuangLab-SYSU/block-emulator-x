@@ -24,13 +24,13 @@ import (
 )
 
 type BlockChain struct {
-	db           ethdb.Database      // the leveldb database to store in the disk, for status trie
-	triedb       *trie.Database      // the trie database which helps to store the status trie
-	ChainConfig  *params.ChainConfig // the chain configuration, which can help to identify the chain
-	CurrentBlock *core.Block         // the top block in this blockchain
-	Storage      *storage.Storage    // Storage is the bolt-db to store the blocks
-	Txpool       *core.TxPool        // the transaction pool
-	PartitionMap map[string]uint64   // the partition map which is defined by some algorithm can help account parition
+	db           ethdb.Database       // the leveldb database to store in the disk, for status trie
+	triedb       *trie.Database       // the trie database which helps to store the status trie
+	ChainConfig  *params.ChainConfig  // the chain configuration, which can help to identify the chain
+	CurrentBlock *core.Block          // the top block in this blockchain
+	Storage      *storage.BlobStorage // Storage is the bolt-db to store the blocks
+	Txpool       *core.TxPool         // the transaction pool
+	PartitionMap map[string]uint64    // the partition map which is defined by some algorithm can help account parition
 	pmlock       sync.RWMutex
 }
 
@@ -262,7 +262,7 @@ func NewBlockChain(cc *params.ChainConfig, db ethdb.Database) (*BlockChain, erro
 	curHash, err := bc.Storage.GetNewestBlockHash()
 	if err != nil {
 		fmt.Println("There is no existed blockchain in the database. ")
-		// if the Storage bolt database cannot find the newest blockhash,
+		// if the BlobStorage bolt database cannot find the newest blockhash,
 		// it means the blockchain should be built in height = 0
 		if err.Error() == "cannot find the newest block hash" {
 			genisisBlock := bc.NewGenisisBlock()

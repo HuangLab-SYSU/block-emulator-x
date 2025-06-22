@@ -1,11 +1,12 @@
-module blockEmulator
+module github.com/HuangLab-SYSU/block-emulator
 
-go 1.19
+go 1.24
 
 require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/ethereum/go-ethereum v1.11.6
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
+	go.etcd.io/bbolt v1.4.1
 )
 
 require (
@@ -48,7 +49,7 @@ require (
 	github.com/vechain/go-ecvrf v0.0.0-20220525125849-96fa0442e765
 	golang.org/x/crypto v0.1.0
 	golang.org/x/exp v0.0.0-20230206171751-46f607a40771 // indirect
-	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.6.0
 	google.golang.org/protobuf v1.28.1 // indirect
