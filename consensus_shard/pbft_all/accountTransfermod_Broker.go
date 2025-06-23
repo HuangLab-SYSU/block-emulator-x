@@ -197,7 +197,7 @@ func (cphm *CLPAPbftInsideExtraHandleMod_forBroker) proposePartition() (bool, *m
 	return true, r
 }
 
-// all nodes in a shard will do accout Transfer, to sync the state trie
+// all nodes in a shard will do accout Transfer, to sync the state mpt
 func (cphm *CLPAPbftInsideExtraHandleMod_forBroker) accountTransfer_do(atm *message.AccountTransferMsg) {
 	// change the partition Map
 	cnt := 0
@@ -206,7 +206,7 @@ func (cphm *CLPAPbftInsideExtraHandleMod_forBroker) accountTransfer_do(atm *mess
 		cphm.pbftNode.CurChain.Update_PartitionMap(key, val)
 	}
 	cphm.pbftNode.pl.Plog.Printf("%d key-vals are updated\n", cnt)
-	// add the account into the state trie
+	// add the account into the state mpt
 	cphm.pbftNode.CurChain.AddAccounts(atm.Addrs, atm.AccountState, cphm.pbftNode.view.Load())
 
 	if uint64(len(cphm.cdm.ModifiedMap)) != atm.ATid {

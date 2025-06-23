@@ -24,8 +24,8 @@ import (
 )
 
 type BlockChain struct {
-	db           ethdb.Database       // the leveldb database to store in the disk, for status trie
-	triedb       *trie.Database       // the trie database which helps to store the status trie
+	db           ethdb.Database       // the leveldb database to store in the disk, for status mpt
+	triedb       *trie.Database       // the mpt database which helps to store the status mpt
 	ChainConfig  *params.ChainConfig  // the chain configuration, which can help to identify the chain
 	CurrentBlock *core.Block          // the top block in this blockchain
 	Storage      *storage.BlobStorage // Storage is the bolt-db to store the blocks
@@ -36,7 +36,7 @@ type BlockChain struct {
 
 // Get the transaction root, this root can be used to check the transactions
 func GetTxTreeRoot(txs []*core.Transaction) []byte {
-	// use a memory trie database to do this, instead of disk database
+	// use a memory mpt database to do this, instead of disk database
 	triedb := trie.NewDatabase(rawdb.NewMemoryDatabase())
 	transactionTree := trie.NewEmpty(triedb)
 	for _, tx := range txs {
@@ -76,14 +76,14 @@ func (bc *BlockChain) SendTx2Pool(txs []*core.Transaction) {
 	bc.Txpool.AddTxs2Pool(txs)
 }
 
-// handle transactions and modify the status trie
+// handle transactions and modify the status mpt
 func (bc *BlockChain) GetUpdateStatusTrie(txs []*core.Transaction) common.Hash {
 	fmt.Printf("The len of txs is %d\n", len(txs))
 	// the empty block (length of txs is 0) condition
 	if len(txs) == 0 {
 		return common.BytesToHash(bc.CurrentBlock.Header.StateRoot)
 	}
-	// build trie from the triedb (in disk)
+	// build mpt from the triedb (in disk)
 	st, err := trie.New(trie.TrieID(common.BytesToHash(bc.CurrentBlock.Header.StateRoot)), bc.triedb)
 	if err != nil {
 		log.Panic(err)
@@ -142,12 +142,12 @@ func (bc *BlockChain) GetUpdateStatusTrie(txs []*core.Transaction) common.Hash {
 			cnt++
 		}
 	}
-	// commit the memory trie to the database in the disk
+	// commit the memory mpt to the database in the disk
 	if cnt == 0 {
 		return common.BytesToHash(bc.CurrentBlock.Header.StateRoot)
 	}
 	rt, ns := st.Commit(false)
-	// if `ns` is nil, the `err = bc.triedb.Update(trie.NewWithNodeSet(ns))` will report an error.
+	// if `ns` is nil, the `err = bc.triedb.Update(mpt.NewWithNodeSet(ns))` will report an error.
 	if ns != nil {
 		err = bc.triedb.Update(trie.NewWithNodeSet(ns))
 		if err != nil {
@@ -196,7 +196,7 @@ func (bc *BlockChain) NewGenisisBlock() *core.Block {
 	bh := &core.BlockHeader{
 		Number: 0,
 	}
-	// build a new trie database by db
+	// build a new mpt database by db
 	triedb := trie.NewDatabaseWithConfig(bc.db, &trie.Config{
 		Cache:     0,
 		Preimages: true,
@@ -248,7 +248,7 @@ func (bc *BlockChain) AddBlock(b *core.Block) {
 }
 
 // new a blockchain.
-// the ChainConfig is pre-defined to identify the blockchain; the db is the status trie database in disk
+// the ChainConfig is pre-defined to identify the blockchain; the db is the status mpt database in disk
 func NewBlockChain(cc *params.ChainConfig, db ethdb.Database) (*BlockChain, error) {
 	fmt.Println("Generating a new blockchain", db)
 	chainDBfp := params.DatabaseWrite_path + fmt.Sprintf("chainDB/S%d_N%d", cc.ShardID, cc.NodeID)
@@ -286,12 +286,12 @@ func NewBlockChain(cc *params.ChainConfig, db ethdb.Database) (*BlockChain, erro
 		Preimages: true,
 	})
 	bc.triedb = triedb
-	// check the existence of the trie database
+	// check the existence of the mpt database
 	_, err = trie.New(trie.TrieID(common.BytesToHash(curb.Header.StateRoot)), triedb)
 	if err != nil {
 		log.Panic()
 	}
-	fmt.Println("The status trie can be built")
+	fmt.Println("The status mpt can be built")
 	fmt.Println("Generated a new blockchain successfully")
 	return bc, nil
 }
@@ -338,7 +338,7 @@ func (bc *BlockChain) AddAccounts(ac []string, as []*core.AccountState, miner in
 
 		rrt, ns := st.Commit(false)
 
-		// if `ns` is nil, the `err = bc.triedb.Update(trie.NewWithNodeSet(ns))` will report an error.
+		// if `ns` is nil, the `err = bc.triedb.Update(mpt.NewWithNodeSet(ns))` will report an error.
 		if ns != nil {
 			err = bc.triedb.Update(trie.NewWithNodeSet(ns))
 			if err != nil {

@@ -120,7 +120,7 @@ func TxProofGenerateOnTheBlock(txHash []byte, block *core.Block) TxProofResult {
 
 func TxProofBatchGenerateOnBlock(txHashes [][]byte, block *core.Block) []TxProofResult {
 	txProofs := make([]TxProofResult, len(txHashes))
-	// check the tx trie first.
+	// check the tx mpt first.
 	// check the correctness of this tx Trie
 	triedb := trie.NewDatabase(rawdb.NewMemoryDatabase())
 	transactionTree := trie.NewEmpty(triedb)
