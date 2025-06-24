@@ -1,6 +1,7 @@
 # 不要上传 IDE 配置文件
 # Do not upload your IDE configurations.
 .idea
+.vscode
 
 # 不要上传实验结果！
 # Do not upload your experimental results!
