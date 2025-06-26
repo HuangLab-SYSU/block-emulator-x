@@ -6,7 +6,14 @@ import (
 )
 
 // Storage consists of  both block.Store and trie.Store.
-type Storage interface {
-	block.Store
-	trie.Store
+type Storage struct {
+	BlockStorage block.Store
+	TrieStorage  trie.Store
+}
+
+func NewStorage(b block.Store, t trie.Store) *Storage {
+	return &Storage{
+		BlockStorage: b,
+		TrieStorage:  t,
+	}
 }
