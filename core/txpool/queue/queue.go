@@ -26,11 +26,11 @@ func (t *TxPool) AddTxs(txs []transaction.Transaction) error {
 	return nil
 }
 
-func (t *TxPool) PackTxsByGivenNum(n int) ([]transaction.Transaction, error) {
+func (t *TxPool) PackTxsByGivenNum(n int64) ([]transaction.Transaction, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	length := len(t.Queue)
+	length := int64(len(t.Queue))
 	if length > n {
 		length = n
 	}
@@ -40,7 +40,7 @@ func (t *TxPool) PackTxsByGivenNum(n int) ([]transaction.Transaction, error) {
 	return ret, nil
 }
 
-func (t *TxPool) PackTxsByGivenBytes(byteNum int) ([]transaction.Transaction, error) {
+func (t *TxPool) PackTxsByGivenBytes(byteNum int64) ([]transaction.Transaction, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -50,7 +50,7 @@ func (t *TxPool) PackTxsByGivenBytes(byteNum int) ([]transaction.Transaction, er
 		if err != nil {
 			return nil, err
 		}
-		size := len(b)
+		size := int64(len(b))
 		if size < byteNum {
 			break
 		}
