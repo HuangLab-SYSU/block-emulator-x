@@ -3,6 +3,7 @@ package block
 import (
 	"context"
 	"fmt"
+	"github.com/HuangLab-SYSU/block-emulator/config"
 	"go.etcd.io/bbolt"
 	"log/slog"
 )
@@ -17,12 +18,11 @@ const (
 
 // BoltStore implements block.Store.
 type BoltStore struct {
-	Store
 	db *bbolt.DB
 }
 
-func NewBoltStore(dbPath string) (*BoltStore, error) {
-	db, err := bbolt.Open(dbPath, 0600, nil)
+func NewBoltStore(cfg *config.BoltCfg) (*BoltStore, error) {
+	db, err := bbolt.Open(cfg.FilePath, 0600, nil)
 	if err != nil {
 		slog.Error(fmt.Sprintf("open bolt db err: %v", err))
 		return nil, err

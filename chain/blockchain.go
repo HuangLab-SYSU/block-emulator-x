@@ -1,16 +1,18 @@
-// Here the blockchain structrue is defined
+// Here the blockchain structure is defined
 // each node in this system will maintain a blockchain object.
 
 package chain
 
 import (
-	"blockEmulator/core"
-	"blockEmulator/params"
-	"blockEmulator/storage"
-	"blockEmulator/utils"
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/core/block"
+	"github.com/HuangLab-SYSU/block-emulator/core/txpool"
+	"github.com/HuangLab-SYSU/block-emulator/params"
+	"github.com/HuangLab-SYSU/block-emulator/shard"
+	"github.com/HuangLab-SYSU/block-emulator/storage"
 	"log"
 	"math/big"
 	"sync"
@@ -24,20 +26,18 @@ import (
 )
 
 type BlockChain struct {
-	db           ethdb.Database       // the leveldb database to store in the disk, for status mpt
-	triedb       *trie.Database       // the mpt database which helps to store the status mpt
-	ChainConfig  *params.ChainConfig  // the chain configuration, which can help to identify the chain
-	CurrentBlock *core.Block          // the top block in this blockchain
-	Storage      *storage.BlobStorage // Storage is the bolt-db to store the blocks
-	Txpool       *core.TxPool         // the transaction pool
-	PartitionMap map[string]uint64    // the partition map which is defined by some algorithm can help account parition
-	pmlock       sync.RWMutex
+	shardResolver *shard.Resolver  // the resolver containing the relations between shards and nodes, and between shards and accounts.
+	config        *config.Config   // the configuration of blockchain
+	chainStore    *storage.Storage // the storage of blockchain, containing block storage and trie-based account storage
+	currentBlock  *block.Block     // current block at the chain's header (normally the last one)
+	txPool        *txpool.TxPool   // transaction pool
+
 }
 
 // Get the transaction root, this root can be used to check the transactions
 func GetTxTreeRoot(txs []*core.Transaction) []byte {
 	// use a memory mpt database to do this, instead of disk database
-	triedb := trie.NewDatabase(rawdb.NewMemoryDatabase())
+	triedb := trie.New()
 	transactionTree := trie.NewEmpty(triedb)
 	for _, tx := range txs {
 		transactionTree.Update(tx.TxHash, []byte{0})
