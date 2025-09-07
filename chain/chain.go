@@ -9,9 +9,9 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/core/block"
 	"github.com/HuangLab-SYSU/block-emulator/core/bloom"
-	"github.com/HuangLab-SYSU/block-emulator/core/hash"
 	"github.com/HuangLab-SYSU/block-emulator/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/storage"
+	"github.com/HuangLab-SYSU/block-emulator/utils"
 )
 
 type Chain struct {
@@ -41,7 +41,7 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 		return nil, fmt.Errorf("new bloom filter err: %w", err)
 	}
 	for _, tx := range txs {
-		txHash, err := hash.CalcHash(&tx)
+		txHash, err := utils.CalcHash(&tx)
 		if err != nil {
 			return nil, fmt.Errorf("calc hash err: %w", err)
 		}
@@ -77,7 +77,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	var err error
 	var blockHash, blockByte, headerByte []byte
 	// validate block
-	if blockHash, err = hash.CalcHash(b); err != nil {
+	if blockHash, err = utils.CalcHash(b); err != nil {
 		return fmt.Errorf("calc hash err: %w", err)
 	}
 	if blockByte, err = b.Encode(); err != nil {
@@ -194,7 +194,7 @@ func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction
 	keyBytes := make([][]byte, len(txs))
 	valBytes := make([][]byte, len(txs))
 	for i, tx := range txs {
-		keyBytes[i], err = hash.CalcHash(&tx)
+		keyBytes[i], err = utils.CalcHash(&tx)
 		if err != nil {
 			return nil, fmt.Errorf("hash err: %w", err)
 		}

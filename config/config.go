@@ -14,7 +14,6 @@ type Config struct {
 	TxPoolCfg     `json:"txpool" yaml:"txpool"`
 	ConsensusCfg  `json:"consensus" yaml:"consensus"`
 	NetworkCfg    `json:"network" yaml:"network"`
-	StorageCfg    `json:"storage" yaml:"storage"`
 }
 
 func LoadConfig(path string, config *Config) error {
