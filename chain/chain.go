@@ -3,15 +3,19 @@ package chain
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/core/block"
+	"github.com/HuangLab-SYSU/block-emulator/core/bloom"
 	"github.com/HuangLab-SYSU/block-emulator/core/hash"
 	"github.com/HuangLab-SYSU/block-emulator/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/storage"
-	"time"
 )
+
+const bloomFilterLen = 1 << 12
 
 type Chain struct {
 	curHeader *block.Header
@@ -20,6 +24,7 @@ type Chain struct {
 	cfg       config.BlockchainCfg
 }
 
+// NewChain creates a new blockchain data structure with given components.
 func NewChain(cfg config.BlockchainCfg, s storage.Storage, pool txpool.TxPool) (*Chain, error) {
 	chain := &Chain{
 		s:      s,
@@ -40,6 +45,17 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address) (*bloc
 	if err != nil {
 		return nil, fmt.Errorf("pack txs err: %w", err)
 	}
+	bf, err := bloom.NewFilter(bloomFilterLen)
+	if err != nil {
+		return nil, fmt.Errorf("new bloom filter err: %w", err)
+	}
+	for _, tx := range txs {
+		txHash, err := hash.CalcHash(&tx)
+		if err != nil {
+			return nil, fmt.Errorf("calc hash err: %w", err)
+		}
+		bf.Add(txHash)
+	}
 	stateRoot, err := c.previewUpdatedTrie(ctx, txs)
 	if err != nil {
 		return nil, fmt.Errorf("preview updated trie err: %w", err)
@@ -57,7 +73,7 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address) (*bloc
 		ParentBlockHash: parentHeader,
 		StateRoot:       stateRoot,
 		TxRoot:          txRoot,
-		Bloom:           xxx,
+		Bloom:           *bf,
 		Number:          c.curHeader.Number + 1,
 		Miner:           miner,
 		CreateTime:      time.Now(),

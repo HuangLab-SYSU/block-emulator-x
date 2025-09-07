@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/HuangLab-SYSU/block-emulator/core/account"
-	"github.com/bits-and-blooms/bitset"
 	"time"
+
+	"github.com/HuangLab-SYSU/block-emulator/core/account"
+	"github.com/HuangLab-SYSU/block-emulator/core/bloom"
 )
 
 type Header struct {
 	ParentBlockHash []byte
 	StateRoot       []byte
 	TxRoot          []byte
-	Bloom           bitset.BitSet
+	Bloom           bloom.Filter
 	Number          int64
 	Miner           account.Address
 	CreateTime      time.Time
