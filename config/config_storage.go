@@ -2,6 +2,7 @@ package config
 
 type StorageCfg struct {
 	BoltCfg
+	EthStorageCfg
 }
 
 type BoltCfg struct {

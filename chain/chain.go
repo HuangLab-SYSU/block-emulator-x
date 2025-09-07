@@ -11,24 +11,20 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/core/bloom"
 	"github.com/HuangLab-SYSU/block-emulator/core/hash"
 	"github.com/HuangLab-SYSU/block-emulator/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/storage"
-	"github.com/HuangLab-SYSU/block-emulator/storage/trie"
 )
-
-const bloomFilterLen = 1 << 12
 
 type Chain struct {
 	curHeader *block.Header
 	s         storage.Storage
-	txPool    txpool.TxPool
+	cfg       *config.BlockchainCfg
 }
 
 // NewChain creates a new blockchain data structure with given components.
-func NewChain(s storage.Storage, pool txpool.TxPool) (*Chain, error) {
+func NewChain(cfg *config.BlockchainCfg, s storage.Storage) (*Chain, error) {
 	chain := &Chain{
-		s:      s,
-		txPool: pool,
+		s:   s,
+		cfg: cfg,
 	}
 	genesisBlock, err := chain.initWithGenesisBlock()
 	if err != nil {
@@ -39,12 +35,8 @@ func NewChain(s storage.Storage, pool txpool.TxPool) (*Chain, error) {
 	return chain, nil
 }
 
-func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address) (*block.Block, error) {
-	txs, err := c.txPool.PackTxs()
-	if err != nil {
-		return nil, fmt.Errorf("pack txs err: %w", err)
-	}
-	bf, err := bloom.NewFilter(bloomFilterLen)
+func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []transaction.Transaction) (*block.Block, error) {
+	bf, err := bloom.NewFilter(c.cfg.BloomFilterCfg)
 	if err != nil {
 		return nil, fmt.Errorf("new bloom filter err: %w", err)
 	}
@@ -112,7 +104,7 @@ func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 	var b *block.Block
 	var err error
 	ctx := context.Background()
-	if b, err = c.GenerateBlock(ctx, genesisMiner); err != nil {
+	if b, err = c.GenerateBlock(ctx, genesisMiner, []transaction.Transaction{}); err != nil {
 		return nil, fmt.Errorf("generate block err: %w", err)
 	}
 	if err = c.AddBlock(ctx, b); err != nil {
@@ -198,10 +190,7 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 }
 
 func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
-	txTrie, err := trie.NewEthereumDefaultTrieDB(&config.EthStorageCfg{IsMemoryDB: true}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create memory trieDB err: %w", err)
-	}
+	var err error
 	keyBytes := make([][]byte, len(txs))
 	valBytes := make([][]byte, len(txs))
 	for i, tx := range txs {
@@ -215,7 +204,7 @@ func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction
 		}
 	}
 
-	root, err := txTrie.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
+	root, err := c.s.TrieStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
 	if err != nil {
 		return nil, fmt.Errorf("generate root err: %w", err)
 	}

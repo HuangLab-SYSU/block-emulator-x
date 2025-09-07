@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/bits-and-blooms/bitset"
 )
 
@@ -21,14 +22,14 @@ type Filter struct {
 	bfHashFs []bfHashFunc
 }
 
-func NewFilter(n uint) (*Filter, error) {
-	if n > maxBitsetLen {
-		return nil, fmt.Errorf("n must be <= %d", maxBitsetLen)
+func NewFilter(cfg config.BloomFilterCfg) (*Filter, error) {
+	if cfg.BitsetLen > maxBitsetLen {
+		return nil, fmt.Errorf("length of Bitset must be <= %d", maxBitsetLen)
 	}
 	return &Filter{
-		bitLen:   n,
-		b:        bitset.New(n),
-		bfHashFs: getFilterHashFs(),
+		bitLen:   uint(cfg.BitsetLen),
+		b:        bitset.New(uint(cfg.BitsetLen)),
+		bfHashFs: getFilterHashFs(cfg.FilterHashFunc),
 	}, nil
 }
 
@@ -47,8 +48,21 @@ func (f *Filter) Contains(hash []byte) bool {
 	return true
 }
 
-func getFilterHashFs() []bfHashFunc {
-	return defaultFilterFs
+func getFilterHashFs(hashFuncStrList []string) []bfHashFunc {
+	ret := make([]bfHashFunc, len(hashFuncStrList))
+	for i, hashFuncStr := range hashFuncStrList {
+		switch hashFuncStr {
+		case "sha256":
+			ret[i] = Sha256
+		case "sha512":
+			ret[i] = Sha512
+		case "sha1":
+			ret[i] = Sha1
+		default:
+			return defaultFilterFs
+		}
+	}
+	return ret
 }
 
 func byte2uint(b []byte) uint {

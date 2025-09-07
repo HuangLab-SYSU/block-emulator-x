@@ -3,13 +3,15 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
 	BlockchainCfg `json:"blockchain" yaml:"blockchain"`
+	TxPoolCfg     `json:"txpool" yaml:"txpool"`
 	ConsensusCfg  `json:"consensus" yaml:"consensus"`
 	NetworkCfg    `json:"network" yaml:"network"`
 	StorageCfg    `json:"storage" yaml:"storage"`
