@@ -6,9 +6,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/HuangLab-SYSU/block-emulator/core/account"
 	"math/big"
 	"time"
+
+	"github.com/HuangLab-SYSU/block-emulator/core/account"
 )
 
 type Signature []byte

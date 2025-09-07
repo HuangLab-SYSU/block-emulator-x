@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/HuangLab-SYSU/block-emulator/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/utils"
-	"log/slog"
 )
 
 type FixNumShardResolver struct {
@@ -30,100 +30,79 @@ func NewFixNumShardResolver(shardNum int64) (*FixNumShardResolver, error) {
 	return f, nil
 }
 
-func (f *FixNumShardResolver) GetShardByShardId(ctx context.Context, shardId TypeShardId) (*Shard, error) {
+func (f *FixNumShardResolver) GetShardByShardId(_ context.Context, shardId TypeShardId) (*Shard, error) {
 	if !f.validateShardId(shardId) {
-		retErr := fmt.Errorf("GetShardByShardId failed, get invalid TypeShardId=%d", shardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return nil, retErr
+		return nil, fmt.Errorf("validate shard id failed, shardId=%d", shardId)
 	}
 	if f.shardList[shardId] == nil {
-		retErr := fmt.Errorf("GetShardByShardId failed, shardId=%d not found", shardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return nil, retErr
+		return nil, fmt.Errorf("shard id not found, shardId=%d", shardId)
 	}
 	return f.shardList[shardId], nil
 }
 
-func (f *FixNumShardResolver) GetNodeIdsInShard(ctx context.Context, shardId TypeShardId) ([]TypeNodeId, error) {
+func (f *FixNumShardResolver) GetNodeIdsInShard(_ context.Context, shardId TypeShardId) ([]TypeNodeId, error) {
 	if !f.validateShardId(shardId) {
-		retErr := fmt.Errorf("GetNodesInShard failed, get invalid TypeShardId=%d", shardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return nil, retErr
+		return nil, fmt.Errorf("validate shard id failed, shardId=%d", shardId)
 	}
 
 	nodeIds := f.shardNodeBiMap.GetByKey(shardId)
 	return nodeIds, nil
 }
 
-func (f *FixNumShardResolver) AddShard(ctx context.Context, shard Shard) error {
+func (f *FixNumShardResolver) AddShard(_ context.Context, shard Shard) error {
 	shardId := shard.Id
 	if !f.validateShardId(shardId) {
-		retErr := fmt.Errorf("AddShard failed, get invalid TypeShardId=%d", shardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return retErr
+		return fmt.Errorf("validate shard id failed, shardId=%d", shardId)
 	}
-
 	if f.shardList[shardId] != nil {
-		retErr := fmt.Errorf("AddShard failed, TypeShardId %d already exists", shardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return retErr
+		return fmt.Errorf("shard exists, shardId=%d", shardId)
 	}
 
 	f.shardList[shardId] = &shard
 	return nil
 }
 
-func (f *FixNumShardResolver) CloseShard(ctx context.Context, shardId TypeShardId) error {
+func (f *FixNumShardResolver) CloseShard(_ context.Context, shardId TypeShardId) error {
 	if !f.validateShardId(shardId) {
-		retErr := fmt.Errorf("CloseShard failed, get invalid TypeShardId=%d", shardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return retErr
+		return fmt.Errorf("validate shard id failed, shardId=%d", shardId)
 	}
 
 	f.shardList[shardId] = nil
 	f.shardNodeBiMap.RemoveByKey(shardId)
-	slog.InfoContext(ctx, fmt.Sprintf("CloseShard success: shardId %d", shardId))
 	return nil
 }
 
-func (f *FixNumShardResolver) GetNodeByNodeId(ctx context.Context, nodeId TypeNodeId) (*Node, error) {
-	if node, ok := f.nodeId2Node[nodeId]; ok {
-		return node, nil
+func (f *FixNumShardResolver) GetNodeByNodeId(_ context.Context, nodeId TypeNodeId) (*Node, error) {
+	if _, ok := f.nodeId2Node[nodeId]; !ok {
+		return nil, fmt.Errorf("node not exists, nodeId=%d", nodeId)
 	}
-	retErr := fmt.Errorf("GetNodeByNodeId TypeNodeId %d not found", nodeId)
-	slog.ErrorContext(ctx, retErr.Error())
-	return nil, retErr
+	return f.nodeId2Node[nodeId], nil
 }
 
-func (f *FixNumShardResolver) GetLocShardIdsByNodeId(ctx context.Context, nodeId TypeNodeId) ([]TypeShardId, error) {
+func (f *FixNumShardResolver) GetLocShardIdsByNodeId(_ context.Context, nodeId TypeNodeId) ([]TypeShardId, error) {
 	shardIds := f.shardNodeBiMap.GetByValue(nodeId)
 	return shardIds, nil
 }
 
-func (f *FixNumShardResolver) AddNodeToShard(ctx context.Context, node Node, destShardId TypeShardId) error {
+func (f *FixNumShardResolver) AddNodeToShard(_ context.Context, node Node, destShardId TypeShardId) error {
 	if !f.validateShardId(destShardId) {
-		retErr := fmt.Errorf("AddNodeToShard failed, get invalid TypeShardId=%d", destShardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return retErr
+		return fmt.Errorf("validate shard id failed, shardId=%d", destShardId)
 	}
 	if _, exist := f.nodeId2Node[node.Id]; exist {
-		retErr := fmt.Errorf("AddNodeToShard failed, TypeShardId %d already exists", node.Id)
-		slog.ErrorContext(ctx, retErr.Error())
-		return retErr
+		return fmt.Errorf("node exists, nodeId=%d", node.Id)
 	}
 	f.nodeId2Node[node.Id] = &node
 	f.shardNodeBiMap.Add(destShardId, node.Id)
 	return nil
 }
 
-func (f *FixNumShardResolver) DeleteNode(ctx context.Context, nodeId TypeNodeId) error {
+func (f *FixNumShardResolver) DeleteNode(_ context.Context, nodeId TypeNodeId) error {
 	f.nodeId2Node[nodeId] = nil
 	f.shardNodeBiMap.RemoveByValue(nodeId)
-	slog.InfoContext(ctx, fmt.Sprintf("DeleteNode success: nodeId %d", nodeId))
 	return nil
 }
 
-func (f *FixNumShardResolver) GetLocShardsIdByAccountAddr(ctx context.Context, addr account.Address) ([]TypeShardId, error) {
+func (f *FixNumShardResolver) GetLocShardsIdByAccountAddr(_ context.Context, addr account.Address) ([]TypeShardId, error) {
 	shardIds := f.shardAccountBiMap.GetByValue(addr)
 	if len(shardIds) == 0 {
 		return []TypeShardId{f.getDefaultShard(addr)}, nil
@@ -131,21 +110,17 @@ func (f *FixNumShardResolver) GetLocShardsIdByAccountAddr(ctx context.Context, a
 	return shardIds, nil
 }
 
-func (f *FixNumShardResolver) AddAccountToShard(ctx context.Context, addr account.Address, destShardId TypeShardId) error {
+func (f *FixNumShardResolver) AddAccountToShard(_ context.Context, addr account.Address, destShardId TypeShardId) error {
 	if !f.validateShardId(destShardId) {
-		retErr := fmt.Errorf("AddAccount failed, get invalid TypeShardId=%d", destShardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return retErr
+		return fmt.Errorf("validate shard id failed, shardId=%d", destShardId)
 	}
 	f.shardAccountBiMap.Add(destShardId, addr)
 	return nil
 }
 
-func (f *FixNumShardResolver) DeleteAccountInShard(ctx context.Context, addr account.Address, shardId TypeShardId) error {
+func (f *FixNumShardResolver) DeleteAccountInShard(_ context.Context, addr account.Address, shardId TypeShardId) error {
 	if !f.validateShardId(shardId) {
-		retErr := fmt.Errorf("DeleteAccount failed, get invalid TypeShardId=%d", shardId)
-		slog.ErrorContext(ctx, retErr.Error())
-		return retErr
+		return fmt.Errorf("validate shard id failed, shardId=%d", shardId)
 	}
 	f.shardAccountBiMap.RemoveByValue(addr)
 	return nil

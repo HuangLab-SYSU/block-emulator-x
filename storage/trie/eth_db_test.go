@@ -2,9 +2,10 @@ package trie
 
 import (
 	"context"
+	"testing"
+
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/ethereum/go-ethereum/core/types"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )

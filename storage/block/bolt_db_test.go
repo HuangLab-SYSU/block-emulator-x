@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/HuangLab-SYSU/block-emulator/config"
 )
 
 func TestBoltDb(t *testing.T) {
@@ -19,7 +21,9 @@ func TestBoltDb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	boltDb, err := NewBoltStore(filepath.Join(testDbDir, testDbFile))
+	boltDb, err := NewBoltStore(&config.BoltCfg{
+		FilePath: filepath.Join(testDbDir, testDbFile),
+	})
 	if err != nil {
 		t.Fatal("newBoltStore failed, err: ", err)
 	}

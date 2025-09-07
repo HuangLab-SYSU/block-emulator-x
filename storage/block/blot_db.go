@@ -3,9 +3,9 @@ package block
 import (
 	"context"
 	"fmt"
+
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"go.etcd.io/bbolt"
-	"log/slog"
 )
 
 const (
@@ -24,8 +24,7 @@ type BoltStore struct {
 func NewBoltStore(cfg *config.BoltCfg) (*BoltStore, error) {
 	db, err := bbolt.Open(cfg.FilePath, 0600, nil)
 	if err != nil {
-		slog.Error(fmt.Sprintf("open bolt db err: %v", err))
-		return nil, err
+		return nil, fmt.Errorf("open bolt db err: %w", err)
 	}
 
 	err = db.Update(func(tx *bbolt.Tx) error {
@@ -45,8 +44,7 @@ func NewBoltStore(cfg *config.BoltCfg) (*BoltStore, error) {
 		return nil
 	})
 	if err != nil {
-		slog.Error(fmt.Sprintf("create bucket err: %v", err))
-		return nil, err
+		return nil, fmt.Errorf("init db bucket err: %w", err)
 	}
 
 	return &BoltStore{
@@ -54,7 +52,7 @@ func NewBoltStore(cfg *config.BoltCfg) (*BoltStore, error) {
 	}, nil
 }
 
-func (b *BoltStore) UpdateNewestBlockHash(ctx context.Context, newBlockHash []byte) error {
+func (b *BoltStore) UpdateNewestBlockHash(_ context.Context, newBlockHash []byte) error {
 	err := b.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketNewestBlock))
 		if bucket == nil {
@@ -62,19 +60,18 @@ func (b *BoltStore) UpdateNewestBlockHash(ctx context.Context, newBlockHash []by
 		}
 		err := bucket.Put([]byte(NewestBlockKey), newBlockHash)
 		if err != nil {
-			return fmt.Errorf("put newest blockHash err: %v", err)
+			return fmt.Errorf("put newest blockHash err: %w", err)
 		}
 		return nil
 	})
 
 	if err != nil {
-		slog.ErrorContext(ctx, fmt.Sprintf("update newest blockHash err: %v", err))
 		return err
 	}
 	return nil
 }
 
-func (b *BoltStore) GetNewestBlockHash(ctx context.Context) ([]byte, error) {
+func (b *BoltStore) GetNewestBlockHash(_ context.Context) ([]byte, error) {
 	var result []byte
 	err := b.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketNewestBlock))
@@ -89,13 +86,12 @@ func (b *BoltStore) GetNewestBlockHash(ctx context.Context) ([]byte, error) {
 	})
 
 	if err != nil {
-		slog.ErrorContext(ctx, fmt.Sprintf("get newest blockHash err: %v", err))
 		return nil, err
 	}
 	return result, nil
 }
 
-func (b *BoltStore) AddBlockHeader(ctx context.Context, blockHash, encodedBlockHeader []byte) error {
+func (b *BoltStore) AddBlockHeader(_ context.Context, blockHash, encodedBlockHeader []byte) error {
 	err := b.db.Update(func(tx *bbolt.Tx) error {
 		// add block header first
 		headerBucket := tx.Bucket([]byte(BucketBlockHeader))
@@ -104,7 +100,7 @@ func (b *BoltStore) AddBlockHeader(ctx context.Context, blockHash, encodedBlockH
 		}
 		err := headerBucket.Put(blockHash, encodedBlockHeader)
 		if err != nil {
-			return fmt.Errorf("put blockHeader err: %v", err)
+			return fmt.Errorf("put blockHeader err: %w", err)
 		}
 
 		// update the newest block hash
@@ -114,20 +110,19 @@ func (b *BoltStore) AddBlockHeader(ctx context.Context, blockHash, encodedBlockH
 		}
 		err = newestBlockBucket.Put([]byte(NewestBlockKey), blockHash)
 		if err != nil {
-			return fmt.Errorf("update newest blockHash err: %v", err)
+			return fmt.Errorf("update newest blockHash err: %w", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		slog.ErrorContext(ctx, fmt.Sprintf("add blockHeader err: %v", err))
 		return err
 	}
 	return nil
 }
 
-func (b *BoltStore) GetBlockHeaderByHash(ctx context.Context, blockHash []byte) ([]byte, error) {
+func (b *BoltStore) GetBlockHeaderByHash(_ context.Context, blockHash []byte) ([]byte, error) {
 	var result []byte
 	err := b.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketBlockHeader))
@@ -142,13 +137,12 @@ func (b *BoltStore) GetBlockHeaderByHash(ctx context.Context, blockHash []byte) 
 	})
 
 	if err != nil {
-		slog.ErrorContext(ctx, fmt.Sprintf("get blockHash err: %v", err))
 		return nil, err
 	}
 	return result, nil
 }
 
-func (b *BoltStore) AddBlock(ctx context.Context, blockHash, encodedBlock, encodedBlockHeader []byte) error {
+func (b *BoltStore) AddBlock(_ context.Context, blockHash, encodedBlock, encodedBlockHeader []byte) error {
 	err := b.db.Update(func(tx *bbolt.Tx) error {
 		// add block first
 		blockBucket := tx.Bucket([]byte(BucketBlock))
@@ -157,7 +151,7 @@ func (b *BoltStore) AddBlock(ctx context.Context, blockHash, encodedBlock, encod
 		}
 		err := blockBucket.Put(blockHash, encodedBlock)
 		if err != nil {
-			return fmt.Errorf("put block err: %v", err)
+			return fmt.Errorf("put block err: %w", err)
 		}
 
 		// add block header
@@ -167,7 +161,7 @@ func (b *BoltStore) AddBlock(ctx context.Context, blockHash, encodedBlock, encod
 		}
 		err = headerBucket.Put(blockHash, encodedBlockHeader)
 		if err != nil {
-			return fmt.Errorf("put blockHeader err: %v", err)
+			return fmt.Errorf("put blockHeader err: %w", err)
 		}
 
 		// update the newest block hash
@@ -177,19 +171,18 @@ func (b *BoltStore) AddBlock(ctx context.Context, blockHash, encodedBlock, encod
 		}
 		err = newestBlockBucket.Put([]byte(NewestBlockKey), blockHash)
 		if err != nil {
-			return fmt.Errorf("update newest blockHash err: %v", err)
+			return fmt.Errorf("update newest blockHash err: %w", err)
 		}
 		return nil
 	})
 
 	if err != nil {
-		slog.ErrorContext(ctx, fmt.Sprintf("add block err: %v", err))
 		return err
 	}
 	return nil
 }
 
-func (b *BoltStore) GetBlockByHash(ctx context.Context, hash []byte) ([]byte, error) {
+func (b *BoltStore) GetBlockByHash(_ context.Context, hash []byte) ([]byte, error) {
 	var result []byte
 	err := b.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketBlock))
@@ -204,7 +197,6 @@ func (b *BoltStore) GetBlockByHash(ctx context.Context, hash []byte) ([]byte, er
 	})
 
 	if err != nil {
-		slog.ErrorContext(ctx, fmt.Sprintf("get block by hash err: %v", err))
 		return nil, err
 	}
 	return result, nil

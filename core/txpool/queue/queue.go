@@ -2,9 +2,10 @@ package queue
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/core/transaction"
-	"sync"
 )
 
 type packTxFunc func(q []transaction.Transaction, n int64) ([]transaction.Transaction, []transaction.Transaction, error)
@@ -50,7 +51,7 @@ func (t *TxPool) PackTxs() ([]transaction.Transaction, error) {
 	var err error
 	packed, q, err = t.pf(t.queue, t.limit)
 	if err != nil {
-		return nil, fmt.Errorf("packTxs err: %w", err)
+		return nil, fmt.Errorf("call pack tx func err: %w", err)
 	}
 	t.queue = q
 	return packed, nil

@@ -3,8 +3,13 @@ package account
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"math/big"
+)
+
+var (
+	NotEnoughBalanceErr = errors.New("not enough balance")
 )
 
 // State record the details of an account, and it will be saved in the mpt.
@@ -24,7 +29,7 @@ func (s *State) Credit(value *big.Int) {
 // Debit reduce the balance of an account
 func (s *State) Debit(val *big.Int) error {
 	if s.Balance.Cmp(val) < 0 {
-		return fmt.Errorf("debit failed: account=%x, balance=%d, debit_value=%d", s.Account.Addr, s.Balance, val)
+		return NotEnoughBalanceErr
 	}
 	s.Balance.Sub(s.Balance, val)
 	return nil

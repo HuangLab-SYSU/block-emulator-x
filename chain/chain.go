@@ -13,6 +13,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/storage"
+	"github.com/HuangLab-SYSU/block-emulator/storage/trie"
 )
 
 const bloomFilterLen = 1 << 12
@@ -21,17 +22,15 @@ type Chain struct {
 	curHeader *block.Header
 	s         storage.Storage
 	txPool    txpool.TxPool
-	cfg       config.BlockchainCfg
 }
 
 // NewChain creates a new blockchain data structure with given components.
-func NewChain(cfg config.BlockchainCfg, s storage.Storage, pool txpool.TxPool) (*Chain, error) {
+func NewChain(s storage.Storage, pool txpool.TxPool) (*Chain, error) {
 	chain := &Chain{
 		s:      s,
 		txPool: pool,
-		cfg:    cfg,
 	}
-	genesisBlock, err := chain.newGenesisBlock()
+	genesisBlock, err := chain.initWithGenesisBlock()
 	if err != nil {
 		return nil, fmt.Errorf("create genesis block err: %w", err)
 	}
@@ -82,12 +81,10 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address) (*bloc
 }
 
 func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
+	// TODO: AddBlock should be atomic
 	var err error
-	if _, err = c.updateTrie(ctx, b.Body.TxList); err != nil {
-		return fmt.Errorf("updateTrie err: %w", err)
-	}
-
 	var blockHash, blockByte, headerByte []byte
+	// validate block
 	if blockHash, err = hash.CalcHash(b); err != nil {
 		return fmt.Errorf("calc hash err: %w", err)
 	}
@@ -97,6 +94,12 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	if blockHash, err = b.Header.Encode(); err != nil {
 		return fmt.Errorf("encode block err: %w", err)
 	}
+
+	// update trie in db
+	if _, err = c.updateTrie(ctx, b.Body.TxList); err != nil {
+		return fmt.Errorf("update trie err: %w", err)
+	}
+	// add to storage
 	err = c.s.BlockStorage.AddBlock(ctx, blockHash, blockByte, headerByte)
 	if err != nil {
 		return fmt.Errorf("failed to add block to storage: %w", err)
@@ -104,7 +107,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	return nil
 }
 
-func (c *Chain) newGenesisBlock() (*block.Block, error) {
+func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 	genesisMiner := account.Address{}
 	var b *block.Block
 	var err error
@@ -123,7 +126,11 @@ func (c *Chain) previewUpdatedTrie(ctx context.Context, txs []transaction.Transa
 	if err != nil {
 		return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
 	}
-	return c.s.TrieStorage.MAddAccountStatesPreview(ctx, keys, values)
+	root, err := c.s.TrieStorage.MAddAccountStatesPreview(ctx, keys, values)
+	if err != nil {
+		return nil, fmt.Errorf("preview updated accounts err: %w", err)
+	}
+	return root, nil
 }
 
 func (c *Chain) updateTrie(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
@@ -131,7 +138,11 @@ func (c *Chain) updateTrie(ctx context.Context, txs []transaction.Transaction) (
 	if err != nil {
 		return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
 	}
-	return c.s.TrieStorage.MAddAccountStatesAndCommit(ctx, keys, values)
+	root, err := c.s.TrieStorage.MAddAccountStatesAndCommit(ctx, keys, values)
+	if err != nil {
+		return nil, fmt.Errorf("commit updated accounts err: %w", err)
+	}
+	return root, nil
 }
 
 func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.Transaction) ([][]byte, [][]byte, error) {
@@ -187,9 +198,12 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 }
 
 func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
+	txTrie, err := trie.NewEthereumDefaultTrieDB(&config.EthStorageCfg{IsMemoryDB: true}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create memory trieDB err: %w", err)
+	}
 	keyBytes := make([][]byte, len(txs))
 	valBytes := make([][]byte, len(txs))
-	var err error
 	for i, tx := range txs {
 		keyBytes[i], err = hash.CalcHash(&tx)
 		if err != nil {
@@ -201,5 +215,9 @@ func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction
 		}
 	}
 
-	return c.s.TrieStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
+	root, err := txTrie.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
+	if err != nil {
+		return nil, fmt.Errorf("generate root err: %w", err)
+	}
+	return root, nil
 }

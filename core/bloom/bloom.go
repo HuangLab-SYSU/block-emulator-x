@@ -12,12 +12,13 @@ const (
 	maxBitsetLen = 1 << (8 * hashByteLen)
 )
 
-type hashFunc func([]byte) []byte
+// bfHashFunc is the wrapped hash function for bloom filter.
+type bfHashFunc func([]byte) []byte
 
 type Filter struct {
-	b      *bitset.BitSet
-	bitLen uint
-	hashFs []hashFunc
+	b        *bitset.BitSet
+	bitLen   uint
+	bfHashFs []bfHashFunc
 }
 
 func NewFilter(n uint) (*Filter, error) {
@@ -25,24 +26,29 @@ func NewFilter(n uint) (*Filter, error) {
 		return nil, fmt.Errorf("n must be <= %d", maxBitsetLen)
 	}
 	return &Filter{
-		bitLen: n,
-		b:      bitset.New(n),
+		bitLen:   n,
+		b:        bitset.New(n),
+		bfHashFs: getFilterHashFs(),
 	}, nil
 }
 
 func (f *Filter) Add(element []byte) {
-	for _, h := range f.hashFs {
+	for _, h := range f.bfHashFs {
 		f.b.Set(byte2uint(h(element)) / f.bitLen)
 	}
 }
 
 func (f *Filter) Contains(hash []byte) bool {
-	for _, h := range f.hashFs {
+	for _, h := range f.bfHashFs {
 		if !f.b.Test(byte2uint(h(hash)) / f.bitLen) {
 			return false
 		}
 	}
 	return true
+}
+
+func getFilterHashFs() []bfHashFunc {
+	return defaultFilterFs
 }
 
 func byte2uint(b []byte) uint {

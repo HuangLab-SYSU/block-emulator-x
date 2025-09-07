@@ -5,7 +5,6 @@ go 1.24
 require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/ethereum/go-ethereum v1.16.0
-	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	go.etcd.io/bbolt v1.4.1
 	gopkg.in/yaml.v3 v3.0.1
