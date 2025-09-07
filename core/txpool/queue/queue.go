@@ -1,19 +1,36 @@
 package queue
 
 import (
+	"fmt"
+	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/core/transaction"
 	"sync"
 )
 
+type packTxFunc func(q []transaction.Transaction, n int64) ([]transaction.Transaction, []transaction.Transaction, error)
+
 type TxPool struct {
-	Queue []transaction.Transaction
+	queue []transaction.Transaction
+	limit int64
+	pf    packTxFunc
 	lock  sync.Mutex
 }
 
-func NewTxPool() *TxPool {
-	return &TxPool{
-		Queue: make([]transaction.Transaction, 0),
+func NewTxPool(cfg config.TxPoolCfg) (*TxPool, error) {
+	var pf packTxFunc
+	switch cfg.Type {
+	case "byte":
+		pf = packTxsByGivenBytes
+	case "number":
+		pf = packTxsByGivenNum
+	default:
+		return nil, fmt.Errorf("unknown tx pool type: %s", cfg.Type)
 	}
+	return &TxPool{
+		queue: make([]transaction.Transaction, 0),
+		pf:    pf,
+		limit: cfg.Limit,
+	}, nil
 }
 
 func (t *TxPool) AddTxs(txs []transaction.Transaction) error {
@@ -21,45 +38,52 @@ func (t *TxPool) AddTxs(txs []transaction.Transaction) error {
 	defer t.lock.Unlock()
 
 	for _, tx := range txs {
-		t.Queue = append(t.Queue, tx)
+		t.queue = append(t.queue, tx)
 	}
 	return nil
 }
 
-func (t *TxPool) PackTxsByGivenNum(n int64) ([]transaction.Transaction, error) {
+func (t *TxPool) PackTxs() ([]transaction.Transaction, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+	var packed, q []transaction.Transaction
+	var err error
+	packed, q, err = t.pf(t.queue, t.limit)
+	if err != nil {
+		return nil, fmt.Errorf("packTxs err: %w", err)
+	}
+	t.queue = q
+	return packed, nil
+}
 
-	length := int64(len(t.Queue))
+func packTxsByGivenNum(q []transaction.Transaction, n int64) ([]transaction.Transaction, []transaction.Transaction, error) {
+	length := int64(len(q))
 	if length > n {
 		length = n
 	}
 	ret := make([]transaction.Transaction, length)
-	copy(ret, t.Queue[:length]) // deep copy
-	t.Queue = t.Queue[length:]
-	return ret, nil
+	copy(ret, q[:length]) // deep copy
+	q = q[length:]
+	return ret, q, nil
 }
 
-func (t *TxPool) PackTxsByGivenBytes(byteNum int64) ([]transaction.Transaction, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+func packTxsByGivenBytes(q []transaction.Transaction, n int64) ([]transaction.Transaction, []transaction.Transaction, error) {
 	endIdx := 0
-	for i, tx := range t.Queue {
+	for i, tx := range q {
 		b, err := tx.Encode()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		size := int64(len(b))
-		if size < byteNum {
+		if size < n {
 			break
 		}
-		byteNum -= size
+		n -= size
 		endIdx = i + 1
 	}
 
 	ret := make([]transaction.Transaction, endIdx)
-	copy(ret, t.Queue[:endIdx]) // deep copy
-	t.Queue = t.Queue[endIdx:]
-	return ret, nil
+	copy(ret, q[:endIdx]) // deep copy
+	q = q[endIdx:]
+	return ret, q, nil
 }

@@ -5,16 +5,14 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/HuangLab-SYSU/block-emulator/core/account"
-	"github.com/HuangLab-SYSU/block-emulator/core/hash"
-	"github.com/HuangLab-SYSU/block-emulator/core/mpt"
 	"github.com/bits-and-blooms/bitset"
 	"time"
 )
 
 type Header struct {
-	ParentBlockHash hash.Hash
-	StateRoot       mpt.NodeKey
-	TxRoot          mpt.NodeKey
+	ParentBlockHash []byte
+	StateRoot       []byte
+	TxRoot          []byte
 	Bloom           bitset.BitSet
 	Number          int64
 	Miner           account.Address

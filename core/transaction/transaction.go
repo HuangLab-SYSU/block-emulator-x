@@ -14,15 +14,15 @@ import (
 type Signature []byte
 
 type Transaction struct {
-	Sender       account.Address
-	Recipient    account.Address
+	Sender       account.Account
+	Recipient    account.Account
 	Value        *big.Int
 	Nonce        int64
 	Signature    Signature
 	ProposedTime time.Time
 }
 
-func NewTransaction(sender, recipient account.Address, value *big.Int, nonce int64, proposeTime time.Time) *Transaction {
+func NewTransaction(sender, recipient account.Account, value *big.Int, nonce int64, proposeTime time.Time) *Transaction {
 	tx := &Transaction{
 		Sender:       sender,
 		Recipient:    recipient,
