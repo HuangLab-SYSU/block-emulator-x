@@ -1,6 +1,9 @@
 package storage
 
 import (
+	"fmt"
+
+	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/storage/block"
 	"github.com/HuangLab-SYSU/block-emulator/storage/trie"
 )
@@ -11,9 +14,23 @@ type Storage struct {
 	TrieStorage  trie.Store
 }
 
-func NewStorage(b block.Store, t trie.Store) *Storage {
-	return &Storage{
-		BlockStorage: b,
-		TrieStorage:  t,
+func NewStorage(cfg config.StorageCfg) (*Storage, error) {
+	s := &Storage{}
+	var err error
+	switch cfg.BlockStorageType {
+	default:
+		s.BlockStorage, err = block.NewBoltStore(cfg.BoltCfg)
+		if err != nil {
+			return nil, fmt.Errorf("NewBoltStore: %v", err)
+		}
 	}
+
+	switch cfg.TrieStorageType {
+	default:
+		s.TrieStorage, err = trie.NewEthereumDefaultTrieDB(cfg.EthStorageCfg)
+		if err != nil {
+			return nil, fmt.Errorf("NewEthereumDefaultTrieDB: %v", err)
+		}
+	}
+	return s, nil
 }

@@ -13,13 +13,12 @@ const (
 	maxBitsetLen = 1 << (8 * hashByteLen)
 )
 
-// bfHashFunc is the wrapped hash function for bloom filter.
-type bfHashFunc func([]byte) []byte
+// FilterHashFunc is the wrapped hash function for bloom filter.
+type FilterHashFunc func([]byte) []byte
 
 type Filter struct {
-	b        *bitset.BitSet
-	bitLen   uint
-	bfHashFs []bfHashFunc
+	B            *bitset.BitSet
+	FilterHashFs []string
 }
 
 func NewFilter(cfg config.BloomFilterCfg) (*Filter, error) {
@@ -27,30 +26,33 @@ func NewFilter(cfg config.BloomFilterCfg) (*Filter, error) {
 		return nil, fmt.Errorf("length of Bitset must be <= %d", maxBitsetLen)
 	}
 	return &Filter{
-		bitLen:   uint(cfg.BitsetLen),
-		b:        bitset.New(uint(cfg.BitsetLen)),
-		bfHashFs: getFilterHashFs(cfg.FilterHashFunc),
+		B:            bitset.New(uint(cfg.BitsetLen)),
+		FilterHashFs: cfg.FilterHashFunc,
 	}, nil
 }
 
-func (f *Filter) Add(element []byte) {
-	for _, h := range f.bfHashFs {
-		f.b.Set(byte2uint(h(element)) / f.bitLen)
+func (f *Filter) Add(elements ...[]byte) {
+	filterFunc := f.getFilterHashFs()
+	for _, element := range elements {
+		for _, h := range filterFunc {
+			f.B.Set(byte2uint(h(element)) / f.B.Len())
+		}
 	}
 }
 
 func (f *Filter) Contains(hash []byte) bool {
-	for _, h := range f.bfHashFs {
-		if !f.b.Test(byte2uint(h(hash)) / f.bitLen) {
+	filterFunc := f.getFilterHashFs()
+	for _, h := range filterFunc {
+		if !f.B.Test(byte2uint(h(hash)) / f.B.Len()) {
 			return false
 		}
 	}
 	return true
 }
 
-func getFilterHashFs(hashFuncStrList []string) []bfHashFunc {
-	ret := make([]bfHashFunc, len(hashFuncStrList))
-	for i, hashFuncStr := range hashFuncStrList {
+func (f *Filter) getFilterHashFs() []FilterHashFunc {
+	ret := make([]FilterHashFunc, len(f.FilterHashFs))
+	for i, hashFuncStr := range f.FilterHashFs {
 		switch hashFuncStr {
 		case "sha256":
 			ret[i] = Sha256

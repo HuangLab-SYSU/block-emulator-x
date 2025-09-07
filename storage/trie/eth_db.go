@@ -23,7 +23,7 @@ type EthereumDefaultTrieDB struct {
 	curStateRoot common.Hash
 }
 
-func NewEthereumDefaultTrieDB(cfg *config.EthStorageCfg, oldStateRoot []byte) (*EthereumDefaultTrieDB, error) {
+func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg) (*EthereumDefaultTrieDB, error) {
 	var db ethdb.Database
 	if cfg.IsMemoryDB {
 		db = rawdb.NewMemoryDatabase()
@@ -48,15 +48,14 @@ func NewEthereumDefaultTrieDB(cfg *config.EthStorageCfg, oldStateRoot []byte) (*
 
 	trieId := trie.TrieID(types.EmptyRootHash)
 	// if there are existing merkle, try to re-build it.
-	if oldStateRoot != nil {
-		trieId = trie.TrieID(common.BytesToHash(oldStateRoot))
+	if cfg.OldStateRoot != nil {
+		trieId = trie.TrieID(common.BytesToHash(cfg.OldStateRoot))
 		// make sure that the old trie can be built.
 		_, err := trie.New(trieId, trieDb)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create old eth trie: %w", err)
 		}
 	}
-
 	return &EthereumDefaultTrieDB{trieDB: trieDb, curStateRoot: trieId.StateRoot}, nil
 }
 
@@ -120,6 +119,10 @@ func (e *EthereumDefaultTrieDB) MAddAccountStatesAndCommit(_ context.Context, ke
 	}
 
 	newRoot, nodeSet := curTrie.Commit(true)
+	if nodeSet == nil {
+		// no dirty nodes
+		return e.curStateRoot.Bytes(), nil
+	}
 	err = e.trieDB.Update(newRoot, e.curStateRoot, 0, trienode.NewWithNodeSet(nodeSet), nil)
 	if err != nil {
 		return nil, fmt.Errorf("update trie db failed, err=%w", err)
@@ -144,4 +147,8 @@ func (e *EthereumDefaultTrieDB) MGetAccountStates(_ context.Context, keys [][]by
 		}
 	}
 	return ret, nil
+}
+
+func (e *EthereumDefaultTrieDB) Close() error {
+	return e.trieDB.Close()
 }

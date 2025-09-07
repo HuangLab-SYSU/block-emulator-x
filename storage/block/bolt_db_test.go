@@ -16,12 +16,8 @@ func TestBoltDb(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.WriteFile(filepath.Join(testDbDir, testDbFile), nil, os.ModePerm)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	boltDb, err := NewBoltStore(&config.BoltCfg{
+	boltDb, err := NewBoltStore(config.BoltCfg{
 		FilePath: filepath.Join(testDbDir, testDbFile),
 	})
 	if err != nil {

@@ -21,7 +21,7 @@ type BoltStore struct {
 	db *bbolt.DB
 }
 
-func NewBoltStore(cfg *config.BoltCfg) (*BoltStore, error) {
+func NewBoltStore(cfg config.BoltCfg) (*BoltStore, error) {
 	db, err := bbolt.Open(cfg.FilePath, 0600, nil)
 	if err != nil {
 		return nil, fmt.Errorf("open bolt db err: %w", err)
@@ -200,4 +200,8 @@ func (b *BoltStore) GetBlockByHash(_ context.Context, hash []byte) ([]byte, erro
 		return nil, err
 	}
 	return result, nil
+}
+
+func (b *BoltStore) Close() error {
+	return b.db.Close()
 }

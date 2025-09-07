@@ -11,6 +11,8 @@ type BlockchainCfg struct {
 }
 
 type StorageCfg struct {
+	BlockStorageType string
+	TrieStorageType  string
 	BoltCfg
 	EthStorageCfg
 }
@@ -24,6 +26,7 @@ type EthStorageCfg struct {
 	LevelFilePath string `json:"level_file_path" yaml:"level_file_path"`
 	LevelCache    int    `json:"level_cache" yaml:"level_cache"`
 	LevelHandler  int    `json:"level_handler" yaml:"level_handler"`
+	OldStateRoot  []byte
 }
 
 type BloomFilterCfg struct {

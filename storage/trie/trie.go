@@ -12,4 +12,5 @@ type Store interface {
 	MGetAccountStates(ctx context.Context, keys [][]byte) ([][]byte, error)
 	MAddAccountStatesAndCommit(ctx context.Context, keys [][]byte, values [][]byte) ([]byte, error)
 	MAddAccountStatesPreview(ctx context.Context, keys [][]byte, values [][]byte) ([]byte, error)
+	Close() error
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +15,7 @@ func TestEthereumDefaultTrieBasicFlow(t *testing.T) {
 	ctx := context.Background()
 
 	// 构造内存 trie DB
-	tdb, err := NewEthereumDefaultTrieDB(&config.EthStorageCfg{IsMemoryDB: true}, nil)
+	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true})
 	assert.NoError(t, err)
 
 	// 初始 root 应该是空的
@@ -54,7 +55,7 @@ func TestEthereumDefaultTrieBasicFlow(t *testing.T) {
 
 func TestEthereumDefaultTrieEmptyAndMismatchInputs(t *testing.T) {
 	// 构造内存 trie DB
-	tdb, err := NewEthereumDefaultTrieDB(&config.EthStorageCfg{IsMemoryDB: true}, nil)
+	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true})
 	assert.NoError(t, err)
 	ctx := context.Background()
 
@@ -70,11 +71,13 @@ func TestEthereumDefaultTrieEmptyAndMismatchInputs(t *testing.T) {
 	assert.Error(t, err)
 	_, err = tdb.MAddAccountStatesPreview(ctx, [][]byte{[]byte("a")}, [][]byte{})
 	assert.Error(t, err)
+
+	require.NoError(t, tdb.Close())
 }
 
 func TestEthereumDefaultTrieGetUnknownKey(t *testing.T) {
 	// 构造内存 trie DB
-	tdb, err := NewEthereumDefaultTrieDB(&config.EthStorageCfg{IsMemoryDB: true}, nil)
+	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true})
 	assert.NoError(t, err)
 	ctx := context.Background()
 	vals, err := tdb.MGetAccountStates(ctx, [][]byte{[]byte("unknown")})

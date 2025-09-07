@@ -32,4 +32,6 @@ type Store interface {
 	// GetNewestBlockHash gets the newest blockHash.
 	// Blockchain can quickly find the tail of a chain.
 	GetNewestBlockHash(ctx context.Context) ([]byte, error)
+
+	Close() error
 }

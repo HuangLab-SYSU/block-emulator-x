@@ -136,4 +136,6 @@ func RunComplianceTests(t *testing.T, store Store, clear func() error) {
 			assert.NotNil(t, headerData)
 		}
 	})
+
+	require.NoError(t, store.Close())
 }

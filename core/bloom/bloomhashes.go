@@ -6,7 +6,7 @@ import (
 	"crypto/sha512"
 )
 
-var defaultFilterFs = []bfHashFunc{Sha256, Sha512, Sha1}
+var defaultFilterFs = []FilterHashFunc{Sha256, Sha512, Sha1}
 
 func Sha256(b []byte) []byte {
 	h := sha256.Sum256(b)

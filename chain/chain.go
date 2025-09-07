@@ -3,6 +3,7 @@ package chain
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
@@ -15,16 +16,23 @@ import (
 )
 
 type Chain struct {
+	s         *storage.Storage
 	curHeader *block.Header
-	s         storage.Storage
-	cfg       *config.BlockchainCfg
+	cfg       config.BlockchainCfg
+
+	mux sync.Mutex
 }
 
 // NewChain creates a new blockchain data structure with given components.
-func NewChain(cfg *config.BlockchainCfg, s storage.Storage) (*Chain, error) {
+func NewChain(cfg config.BlockchainCfg) (*Chain, error) {
+	s, err := storage.NewStorage(cfg.StorageCfg)
+	if err != nil {
+		return nil, err
+	}
 	chain := &Chain{
-		s:   s,
-		cfg: cfg,
+		s:         s,
+		cfg:       cfg,
+		curHeader: &block.Header{},
 	}
 	genesisBlock, err := chain.initWithGenesisBlock()
 	if err != nil {
@@ -35,7 +43,12 @@ func NewChain(cfg *config.BlockchainCfg, s storage.Storage) (*Chain, error) {
 	return chain, nil
 }
 
+// GenerateBlock reads the current storage and tries to generate a block.
+// It will not affect the Chain.
 func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []transaction.Transaction) (*block.Block, error) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
 	bf, err := bloom.NewFilter(c.cfg.BloomFilterCfg)
 	if err != nil {
 		return nil, fmt.Errorf("new bloom filter err: %w", err)
@@ -72,7 +85,12 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 	return block.NewBlock(header, &block.Body{TxList: txs}), nil
 }
 
+// AddBlock adds the given block into storage.
+// It will modify the Chain.
 func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
 	// TODO: AddBlock should be atomic
 	var err error
 	var blockHash, blockByte, headerByte []byte
@@ -95,6 +113,19 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	err = c.s.BlockStorage.AddBlock(ctx, blockHash, blockByte, headerByte)
 	if err != nil {
 		return fmt.Errorf("failed to add block to storage: %w", err)
+	}
+	return nil
+}
+
+// Close closes the blockchain.
+func (c *Chain) Close() error {
+	err := c.s.BlockStorage.Close()
+	if err != nil {
+		return fmt.Errorf("close block storage err: %w", err)
+	}
+	err = c.s.BlockStorage.Close()
+	if err != nil {
+		return fmt.Errorf("close block storage err: %w", err)
 	}
 	return nil
 }
