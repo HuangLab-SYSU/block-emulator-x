@@ -4,14 +4,22 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/bits-and-blooms/bitset"
+
+	"github.com/HuangLab-SYSU/block-emulator/config"
 )
 
 const (
 	hashByteLen  = 3
 	maxBitsetLen = 1 << (8 * hashByteLen)
 )
+
+// filterFuncRegistry is the registry table of Bloom Filter functions.
+var filterFuncRegistry = map[string]FilterHashFunc{
+	"sha256": Sha256,
+	"sha512": Sha512,
+	"sha1":   Sha1,
+}
 
 // FilterHashFunc is the wrapped hash function for bloom filter.
 type FilterHashFunc func([]byte) []byte
@@ -35,7 +43,7 @@ func (f *Filter) Add(elements ...[]byte) {
 	filterFunc := f.getFilterHashFs()
 	for _, element := range elements {
 		for _, h := range filterFunc {
-			f.B.Set(byte2uint(h(element)) / f.B.Len())
+			f.B.Set(byte2uint(h(element)) % f.B.Len())
 		}
 	}
 }
@@ -43,7 +51,7 @@ func (f *Filter) Add(elements ...[]byte) {
 func (f *Filter) Contains(hash []byte) bool {
 	filterFunc := f.getFilterHashFs()
 	for _, h := range filterFunc {
-		if !f.B.Test(byte2uint(h(hash)) / f.B.Len()) {
+		if !f.B.Test(byte2uint(h(hash)) % f.B.Len()) {
 			return false
 		}
 	}
@@ -53,14 +61,9 @@ func (f *Filter) Contains(hash []byte) bool {
 func (f *Filter) getFilterHashFs() []FilterHashFunc {
 	ret := make([]FilterHashFunc, len(f.FilterHashFs))
 	for i, hashFuncStr := range f.FilterHashFs {
-		switch hashFuncStr {
-		case "sha256":
-			ret[i] = Sha256
-		case "sha512":
-			ret[i] = Sha512
-		case "sha1":
-			ret[i] = Sha1
-		default:
+		if hashFunc, ok := filterFuncRegistry[hashFuncStr]; ok {
+			ret[i] = hashFunc
+		} else {
 			return defaultFilterFs
 		}
 	}
