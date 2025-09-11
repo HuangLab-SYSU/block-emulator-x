@@ -141,10 +141,10 @@ func (e *EthereumDefaultTrieDB) MGetAccountStates(_ context.Context, keys [][]by
 	ret := make([][]byte, len(keys))
 	for i, key := range keys {
 		val, err := curTrie.Get(key)
-		ret[i] = val
 		if err != nil {
 			return nil, fmt.Errorf("get trie failed, err=%w", err)
 		}
+		ret[i] = val
 	}
 	return ret, nil
 }

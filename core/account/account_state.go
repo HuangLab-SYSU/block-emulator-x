@@ -8,22 +8,33 @@ import (
 	"math/big"
 )
 
+const initBalance = 1_000_000_000
+
 var (
 	NotEnoughBalanceErr = errors.New("not enough balance")
 )
 
 // State record the details of an account, and it will be saved in the mpt.
 type State struct {
-	Account     Account
-	Nonce       int64
-	Balance     *big.Int
-	StorageRoot []byte // storage root of contract structure
-	CodeHash    []byte // the code hash of the smart contract account
+	Account        Account
+	ShardLocations []int64
+	Nonce          int64
+	Balance        big.Int
+	StorageRoot    []byte // storage root of contract structure
+	CodeHash       []byte // the code hash of the smart contract account
+}
+
+func NewState(account Account, loc []int64) *State {
+	return &State{
+		Account:        account,
+		ShardLocations: loc,
+		Balance:        *big.NewInt(initBalance),
+	}
 }
 
 // Credit increase the balance of an account
 func (s *State) Credit(value *big.Int) {
-	s.Balance.Add(s.Balance, value)
+	s.Balance.Add(&s.Balance, value)
 }
 
 // Debit reduce the balance of an account
@@ -31,7 +42,7 @@ func (s *State) Debit(val *big.Int) error {
 	if s.Balance.Cmp(val) < 0 {
 		return NotEnoughBalanceErr
 	}
-	s.Balance.Sub(s.Balance, val)
+	s.Balance.Sub(&s.Balance, val)
 	return nil
 }
 

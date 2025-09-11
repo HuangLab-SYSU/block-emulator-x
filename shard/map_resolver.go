@@ -102,12 +102,16 @@ func (f *FixNumShardResolver) DeleteNode(_ context.Context, nodeId TypeNodeId) e
 	return nil
 }
 
-func (f *FixNumShardResolver) GetLocShardsIdByAccountAddr(_ context.Context, addr account.Address) ([]TypeShardId, error) {
-	shardIds := f.shardAccountBiMap.GetByValue(addr)
-	if len(shardIds) == 0 {
-		return []TypeShardId{f.getDefaultShard(addr)}, nil
+func (f *FixNumShardResolver) MGetLocShardsIdByAccountAddr(_ context.Context, addrList []account.Address) ([][]TypeShardId, error) {
+	ret := make([][]TypeShardId, len(addrList))
+	for i, addr := range addrList {
+		shardIds := f.shardAccountBiMap.GetByValue(addr)
+		if len(shardIds) == 0 {
+			ret[i] = []TypeShardId{}
+		}
+		ret[i] = shardIds
 	}
-	return shardIds, nil
+	return ret, nil
 }
 
 func (f *FixNumShardResolver) AddAccountToShard(_ context.Context, addr account.Address, destShardId TypeShardId) error {

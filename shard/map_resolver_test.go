@@ -66,14 +66,14 @@ func TestFixNumberMapResolver(t *testing.T) {
 	err = resolver.AddAccountToShard(ctx, addr, 2)
 	assert.NoError(t, err)
 
-	shards, err := resolver.GetLocShardsIdByAccountAddr(ctx, addr)
+	shards, err := resolver.MGetLocShardsIdByAccountAddr(ctx, []account.Address{addr})
 	assert.NoError(t, err)
-	assert.Contains(t, shards, TypeShardId(2))
+	assert.Contains(t, shards[0], TypeShardId(2))
 
 	err = resolver.DeleteAccountInShard(ctx, addr, 2)
 	assert.NoError(t, err)
 
-	shards, err = resolver.GetLocShardsIdByAccountAddr(ctx, addr)
+	shards, err = resolver.MGetLocShardsIdByAccountAddr(ctx, []account.Address{addr})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, shards) // default shard fallback
 
@@ -112,8 +112,8 @@ func TestFixNumberMapResolver(t *testing.T) {
 		assert.Contains(t, shards, TypeShardId(i%3))
 	}
 	for i, acc := range accounts {
-		shards, err := resolver.GetLocShardsIdByAccountAddr(ctx, acc)
+		shards, err := resolver.MGetLocShardsIdByAccountAddr(ctx, []account.Address{acc})
 		assert.NoError(t, err)
-		assert.Contains(t, shards, TypeShardId(i%3))
+		assert.Contains(t, shards[0], TypeShardId(i%3))
 	}
 }

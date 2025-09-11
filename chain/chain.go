@@ -2,7 +2,9 @@ package chain
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -18,7 +20,9 @@ import (
 type Chain struct {
 	s         *storage.Storage
 	curHeader *block.Header
-	cfg       config.BlockchainCfg
+	shardID   int64
+
+	cfg config.BlockchainCfg
 
 	mux sync.Mutex
 }
@@ -169,14 +173,14 @@ func (c *Chain) updateTrie(ctx context.Context, txs []transaction.Transaction) (
 }
 
 func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.Transaction) ([][]byte, [][]byte, error) {
-	account2State := make(map[account.Account]*account.State, len(txs)*2)
+	account2StateInShard := make(map[account.Account]*account.State, len(txs)*2)
 	for _, tx := range txs {
-		account2State[tx.Sender] = nil
-		account2State[tx.Recipient] = nil
+		account2StateInShard[tx.Sender] = nil
+		account2StateInShard[tx.Recipient] = nil
 	}
 
-	accountByteList := make([][]byte, 0, len(account2State))
-	for a := range account2State {
+	accountByteList := make([][]byte, 0, len(account2StateInShard))
+	for a := range account2StateInShard {
 		encodedAccount, _ := a.Encode()
 		accountByteList = append(accountByteList, encodedAccount)
 	}
@@ -191,28 +195,40 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 		if err != nil {
 			return nil, nil, fmt.Errorf("decode state err: %w", err)
 		}
-		account2State[*a] = s
+
+		// if it is a new account, init it.
+		if s == nil {
+			accountLocation := accountDefaultShard(*a, c.cfg.ShardNum)
+			s = account.NewState(*a, []int64{accountLocation})
+		}
+		// this account is not in the shard, skip it
+		if !slices.Contains(s.ShardLocations, c.shardID) {
+			continue
+		}
+		account2StateInShard[*a] = s
 	}
 
 	// update in map
 	for _, tx := range txs {
-		senderState := account2State[tx.Sender]
-		recipientState := account2State[tx.Recipient]
-		if senderState == nil || recipientState == nil {
-			return nil, nil, fmt.Errorf("sender or recipient state is nil")
-		}
-		if senderState.Debit(tx.Value) != nil {
-			// TODO: check whether to continue
+		senderState := account2StateInShard[tx.Sender]
+		recipientState := account2StateInShard[tx.Recipient]
+		// if sender exists in this shard, try to debit it. otherwise, skip debit.
+		// if the debit operation failed, skip this transaction.
+		if senderState == nil || errors.Is(senderState.Debit(tx.Value), account.NotEnoughBalanceErr) {
+			// TODO(Guang Ye): check whether to continue, or report error
 			continue
 		}
-		recipientState.Credit(tx.Value)
+		// if recipient exists in this shard, credit it.
+		if recipientState != nil {
+			recipientState.Credit(tx.Value)
+		}
 	}
 
 	// pack state list
-	stateByteList := make([][]byte, len(account2State))
+	stateByteList := make([][]byte, len(account2StateInShard))
 	for i, accountByte := range accountByteList {
 		a, _ := account.DecodeAccount(accountByte)
-		stateByteList[i], err = account2State[*a].Encode()
+		stateByteList[i], err = account2StateInShard[*a].Encode()
 		if err != nil {
 			return nil, nil, fmt.Errorf("encode account err: %w", err)
 		}

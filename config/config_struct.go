@@ -6,6 +6,8 @@ type TxPoolCfg struct {
 }
 
 type BlockchainCfg struct {
+	ShardNum int64
+	NodeNum  int64
 	BloomFilterCfg
 	StorageCfg
 }

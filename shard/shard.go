@@ -2,6 +2,7 @@ package shard
 
 import (
 	"context"
+
 	"github.com/HuangLab-SYSU/block-emulator/core/account"
 )
 
@@ -49,7 +50,7 @@ type Resolver interface {
 	// It will return a default shard if this account was not located before.
 	// Note that, an account may be located in multiple shards,
 	// e.g., BrokerChain.
-	GetLocShardsIdByAccountAddr(ctx context.Context, addr account.Address) ([]TypeShardId, error)
+	MGetLocShardsIdByAccountAddr(ctx context.Context, addr []account.Address) ([][]TypeShardId, error)
 	// AddAccountToShard adds an account into a shard.
 	AddAccountToShard(ctx context.Context, addr account.Address, destShardId TypeShardId) error
 	// DeleteAccountInShard deletes the account from the shard.
