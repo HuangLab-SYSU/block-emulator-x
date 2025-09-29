@@ -1,3 +1,6 @@
 package config
 
-type NetworkCfg struct{}
+type NetworkCfg struct {
+	BandWidth int64
+	Latency   int64
+}

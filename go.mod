@@ -3,10 +3,11 @@ module github.com/HuangLab-SYSU/block-emulator
 go 1.24
 
 require (
-	github.com/boltdb/bolt v1.3.1
 	github.com/ethereum/go-ethereum v1.16.0
 	github.com/stretchr/testify v1.10.0
 	go.etcd.io/bbolt v1.4.1
+	google.golang.org/grpc v1.75.1
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -24,7 +25,10 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/supranational/blst v0.3.14 // indirect
-	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
@@ -44,7 +48,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/time v0.9.0
 )

@@ -11,9 +11,9 @@ import (
 
 type Config struct {
 	BlockchainCfg `json:"blockchain" yaml:"blockchain"`
-	TxPoolCfg     `json:"txpool" yaml:"txpool"`
-	ConsensusCfg  `json:"consensus" yaml:"consensus"`
-	NetworkCfg    `json:"network" yaml:"network"`
+	TxPoolCfg     `json:"txpool"     yaml:"txpool"`
+	ConsensusCfg  `json:"consensus"  yaml:"consensus"`
+	NetworkCfg    `json:"network"    yaml:"network"`
 }
 
 func LoadConfig(path string, config *Config) error {

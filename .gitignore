@@ -12,5 +12,6 @@ expTest
 **.exe
 
 # 不要上传大文件
+# Do not upload large files!
 **.zip
 **.csv

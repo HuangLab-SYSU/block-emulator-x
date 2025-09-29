@@ -24,10 +24,10 @@ type BoltCfg struct {
 }
 
 type EthStorageCfg struct {
-	IsMemoryDB    bool   `json:"is_memory_db" yaml:"is_memory_db"`
+	IsMemoryDB    bool   `json:"is_memory_db"    yaml:"is_memory_db"`
 	LevelFilePath string `json:"level_file_path" yaml:"level_file_path"`
-	LevelCache    int    `json:"level_cache" yaml:"level_cache"`
-	LevelHandler  int    `json:"level_handler" yaml:"level_handler"`
+	LevelCache    int    `json:"level_cache"     yaml:"level_cache"`
+	LevelHandler  int    `json:"level_handler"   yaml:"level_handler"`
 	OldStateRoot  []byte
 }
 

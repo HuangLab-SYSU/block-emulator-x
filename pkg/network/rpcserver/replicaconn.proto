@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = ".;rpcserver";
+
+service ReplicaConn {
+  rpc HandleMessage(HandleMessageRequest) returns (HandleMessageResponse);
+}
+
+message WrappedMsg {
+  string msgType = 1;
+  bytes payload = 2;
+}
+
+message NodePosition {
+  int64 shardID = 1;
+  int64 nodeID = 2;
+}
+
+message HandleMessageRequest {
+  WrappedMsg msg = 1;
+  NodePosition from = 2;
+  NodePosition to = 3;
+};
+
+message HandleMessageResponse {
+  bool ack = 1;
+};

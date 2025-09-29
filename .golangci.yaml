@@ -1,0 +1,52 @@
+version: "2"
+run:
+  tests: false
+
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+  exclusions:
+    generated: lax
+
+linters:
+  default: all
+  disable:
+    - cyclop
+    - depguard
+    - err113
+    - errcheck
+    - errchkjson
+    - exhaustive
+    - exhaustruct
+    - forbidigo
+    - forcetypeassert
+    - funcorder
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - godox
+    - intrange
+    - ireturn
+    - lll
+    - mnd
+    - musttag
+    - nilnil
+    - nlreturn
+    - nonamedreturns
+    - perfsprint
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - spancheck
+    - tagliatelle
+    - testifylint
+    - varnamelen
+    - wrapcheck
