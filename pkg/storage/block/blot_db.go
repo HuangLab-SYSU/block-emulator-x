@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
 	"go.etcd.io/bbolt"
+
+	"github.com/HuangLab-SYSU/block-emulator/config"
 )
 
 const (

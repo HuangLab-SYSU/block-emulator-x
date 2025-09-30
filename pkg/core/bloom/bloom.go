@@ -4,8 +4,9 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/bits-and-blooms/bitset"
+
+	"github.com/HuangLab-SYSU/block-emulator/config"
 )
 
 const (
