@@ -10,7 +10,7 @@ import (
 
 const initBalance = 1_000_000_000
 
-var NotEnoughBalanceErr = errors.New("not enough balance")
+var ErrNotEnoughBalance = errors.New("not enough balance")
 
 // State record the details of an account, and it will be saved in the mpt.
 type State struct {
@@ -38,7 +38,7 @@ func (s *State) Credit(value *big.Int) {
 // Debit reduce the balance of an account.
 func (s *State) Debit(val *big.Int) error {
 	if s.Balance.Cmp(val) < 0 {
-		return NotEnoughBalanceErr
+		return ErrNotEnoughBalance
 	}
 
 	s.Balance.Sub(s.Balance, val)

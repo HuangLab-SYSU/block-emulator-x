@@ -116,6 +116,7 @@ func (n *Node) run() {
 		for _, m := range ms {
 			// handle messages in order one by one
 			ctx := context.Background()
+
 			err := n.handleMessage(ctx, m)
 			if err != nil {
 				n.logger.ErrorContext(ctx, "handleMessage", "msg", m, "err", err)
@@ -125,6 +126,7 @@ func (n *Node) run() {
 		// if this node is the leader and not proposed yet, try to propose one block
 		if n.localProc.info.NodeID == n.localProc.leader && !n.localProc.proposed {
 			ctx := context.Background()
+
 			err := n.propose(ctx)
 			if err != nil {
 				n.logger.ErrorContext(ctx, "propose", "err", err)

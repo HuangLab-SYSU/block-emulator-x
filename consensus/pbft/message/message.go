@@ -61,6 +61,7 @@ func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
 	var buf bytes.Buffer
 
 	encoder := gob.NewEncoder(&buf)
+
 	err := encoder.Encode(msg)
 	if err != nil {
 		return nil, fmt.Errorf("encode failed for message: %w", err)

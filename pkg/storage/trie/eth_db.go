@@ -60,7 +60,7 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg) (*EthereumDefaultTrieDB,
 	return &EthereumDefaultTrieDB{trieDB: trieDb, curStateRoot: trieId.StateRoot}, nil
 }
 
-func (_ *EthereumDefaultTrieDB) GenerateRootByGivenBytes(_ context.Context, keys, values [][]byte) ([]byte, error) {
+func (*EthereumDefaultTrieDB) GenerateRootByGivenBytes(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf("bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d", len(keys), len(values))

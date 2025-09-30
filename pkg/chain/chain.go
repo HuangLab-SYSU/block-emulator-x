@@ -132,7 +132,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 		return fmt.Errorf("encode block err: %w", err)
 	}
 
-	if blockHash, err = b.Header.Encode(); err != nil {
+	if headerByte, err = b.Header.Encode(); err != nil {
 		return fmt.Errorf("encode block err: %w", err)
 	}
 
@@ -220,6 +220,7 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 	}
 
 	accountByteList := make([][]byte, 0, len(account2StateInShard))
+
 	for a := range account2StateInShard {
 		encodedAccount, _ := a.Encode()
 		accountByteList = append(accountByteList, encodedAccount)
@@ -235,6 +236,7 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 		osb := originStateByteList[i]
 
 		var s *account.State = nil
+
 		if osb != nil {
 			if s, err = account.DecodeState(osb); err != nil {
 				return nil, nil, fmt.Errorf("decode state err: %w", err)
@@ -260,7 +262,7 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 		recipientState := account2StateInShard[tx.Recipient]
 		// if sender exists in this shard, try to debit it. otherwise, skip debit.
 		// if the debit operation failed, skip this transaction.
-		if senderState == nil || errors.Is(senderState.Debit(tx.Value), account.NotEnoughBalanceErr) {
+		if senderState == nil || errors.Is(senderState.Debit(tx.Value), account.ErrNotEnoughBalance) {
 			// TODO(Guang Ye): check whether to continue, or report error
 			continue
 		}
@@ -274,12 +276,14 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 	retAccountByteList := make([][]byte, 0, len(account2StateInShard))
 
 	stateByteList := make([][]byte, 0, len(account2StateInShard))
+
 	for k, v := range account2StateInShard {
 		if v == nil { // this account is not in the shard
 			continue
 		}
 
 		var kByte, vByte []byte
+
 		if kByte, err = k.Encode(); err != nil {
 			return nil, nil, fmt.Errorf("encode account from map err: %w", err)
 		}
@@ -301,6 +305,7 @@ func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction
 	keyBytes := make([][]byte, len(txs))
 
 	valBytes := make([][]byte, len(txs))
+
 	for i, tx := range txs {
 		keyBytes[i], err = utils.CalcHash(&tx)
 		if err != nil {
