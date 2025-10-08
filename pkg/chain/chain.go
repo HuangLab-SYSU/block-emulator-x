@@ -245,8 +245,7 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 
 		// if it is a new account, init it.
 		if s == nil {
-			accountLocation := accountDefaultShard(*a, c.cfg.ShardNum)
-			s = account.NewState(*a, []int64{accountLocation})
+			s = generateInitAccountState(*a, c.cfg.ShardNum)
 		}
 		// this account is not in the shard, skip it
 		if !slices.Contains(s.ShardLocations, c.shardID) {

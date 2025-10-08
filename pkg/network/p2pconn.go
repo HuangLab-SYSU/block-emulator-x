@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"google.golang.org/grpc"
 
@@ -18,6 +19,8 @@ type clientConnection struct {
 }
 
 type P2PConn struct {
+	mux sync.Mutex
+
 	me         nodetopo.NodeInfo
 	info2Host  map[nodetopo.NodeInfo]string
 	clientPool map[nodetopo.NodeInfo]*clientConnection
@@ -36,6 +39,9 @@ func NewP2PConn(me nodetopo.NodeInfo, info2Host map[nodetopo.NodeInfo]string) *P
 }
 
 func (p *P2PConn) HandleMessage(ctx context.Context, req *rpcserver.HandleMessageRequest) (*rpcserver.HandleMessageResponse, error) {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
 	select {
 	case p.msgBuffer <- req.GetMsg():
 	default:
@@ -46,6 +52,9 @@ func (p *P2PConn) HandleMessage(ctx context.Context, req *rpcserver.HandleMessag
 }
 
 func (p *P2PConn) ReadMsgBuffer() []*rpcserver.WrappedMsg {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
 	ret := make([]*rpcserver.WrappedMsg, 0)
 
 	for {
@@ -56,10 +65,6 @@ func (p *P2PConn) ReadMsgBuffer() []*rpcserver.WrappedMsg {
 			return ret
 		}
 	}
-}
-
-func (p *P2PConn) GetMyInfo() nodetopo.NodeInfo {
-	return p.me
 }
 
 func (p *P2PConn) SendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) error {

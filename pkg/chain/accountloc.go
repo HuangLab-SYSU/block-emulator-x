@@ -6,7 +6,11 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 )
 
-func accountDefaultShard(account account.Account, shardNum int64) int64 {
-	u32 := binary.BigEndian.Uint32(account.Addr[len(account.Addr)-4:])
-	return int64(u32) % shardNum
+// generateInitAccountState generates an account state with some balances.
+func generateInitAccountState(a account.Account, shardNum int64) *account.State {
+	u32 := binary.BigEndian.Uint32(a.Addr[len(a.Addr)-4:])
+	sid := int64(u32) % shardNum
+	s := account.NewState(a, []int64{sid})
+
+	return s
 }

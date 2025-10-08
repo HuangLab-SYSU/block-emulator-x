@@ -6,4 +6,13 @@ type ConsensusCfg struct {
 
 	HandlerBufferSize int64
 	BlockInterval     int64 // ms
+
+	LocalSetting
+}
+
+type LocalSetting struct {
+	NodeID     int64
+	ShardID    int64
+	WalletAddr [20]byte
+	Host       string
 }
