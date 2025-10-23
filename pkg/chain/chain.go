@@ -13,6 +13,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/bloom"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/partition"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/storage"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
@@ -245,7 +246,8 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 
 		// if it is a new account, init it.
 		if s == nil {
-			s = generateInitAccountState(*a, c.cfg.ShardNum)
+			ssid := partition.DefaultAccountLoc(a.Addr, c.cfg.ShardNum)
+			s = account.NewState(*a, []int64{ssid})
 		}
 		// this account is not in the shard, skip it
 		if !slices.Contains(s.ShardLocations, c.shardID) {
