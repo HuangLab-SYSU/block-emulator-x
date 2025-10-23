@@ -39,7 +39,7 @@ type consensusMeta struct {
 	proposed    bool                           // this node has proposed in this round or not
 	seq         int64                          // sequence id of PBFT consensus.
 	view        int64                          // view of PBFT consensus.
-	stage       int64                          // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
+	stage       int                            // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
 	curProposal *message.PreprepareMsg         // preprepare message in this round.
 	prepareSet  map[nodetopo.NodeInfo]struct{} // prepareSet collects the nodes sending prepare message.
 	commitSet   map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
@@ -69,24 +69,38 @@ func newConsensusMeta(cfg config.ConsensusCfg) *consensusMeta {
 
 // curateMsg counts the number of valid messages in the msgPool.
 func (c *consensusMeta) curateMsg() {
-	if ppMsg := c.msgPool.ReadPreprepareMsg(c.view, c.seq); len(ppMsg) > 0 {
-		c.curProposal = ppMsg[0]
+	if c.curProposal == nil {
+		ppMsgList := c.msgPool.ReadPreprepareMsg(c.view, c.seq)
+		for _, ppMsg := range ppMsgList {
+			if ppMsg.View != c.view || ppMsg.Seq != c.seq || ppMsg.NodeID != c.leader {
+				// if the message is invalid (wrong seq/view or wrong leader), drop it
+				continue
+			}
+
+			c.curProposal = ppMsg
+
+			break
+		}
 	}
 
-	pMsgList := c.msgPool.ReadPrepareMsg(c.stage, c.seq)
+	if c.curProposal == nil {
+		return
+	}
+
+	pMsgList := c.msgPool.ReadPrepareMsg(c.view, c.seq)
 	for _, pMsg := range pMsgList {
-		if !bytes.Equal(pMsg.Digest, c.curProposal.Digest) {
-			// if the message is invalid (wrong digest), drop it
+		if pMsg.View != c.view || pMsg.Seq != c.seq || !bytes.Equal(pMsg.Digest, c.curProposal.Digest) {
+			// if the message is invalid (wrong seq/view or wrong digest), drop it
 			continue
 		}
 
 		c.prepareSet[nodetopo.NodeInfo{NodeID: pMsg.NodeID, ShardID: pMsg.ShardID}] = struct{}{}
 	}
 
-	cMsgList := c.msgPool.ReadCommitMsg(c.stage, c.seq)
+	cMsgList := c.msgPool.ReadCommitMsg(c.view, c.seq)
 	for _, cMsg := range cMsgList {
-		if !bytes.Equal(cMsg.Digest, c.curProposal.Digest) {
-			// if the message is invalid (wrong digest), drop it
+		if cMsg.View != c.view || cMsg.Seq != c.seq || !bytes.Equal(cMsg.Digest, c.curProposal.Digest) {
+			// if the message is invalid (wrong seq/view or wrong digest), drop it
 			continue
 		}
 
