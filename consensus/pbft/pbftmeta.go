@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/message"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/pool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 )
 

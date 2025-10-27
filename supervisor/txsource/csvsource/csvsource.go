@@ -13,6 +13,8 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 )
 
+const CSVSourceKey = "CSVSource"
+
 // CSVSource implements TxSource.
 // The csv file format supported by this implementation is like those from XBlock (https://xblock.pro/xblock-eth.html).
 type CSVSource struct {
@@ -22,7 +24,7 @@ type CSVSource struct {
 	done  bool
 }
 
-func NewDatasetSource(filename string) (*CSVSource, error) {
+func NewCSVSource(filename string) (*CSVSource, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open dataset file: %w", err)

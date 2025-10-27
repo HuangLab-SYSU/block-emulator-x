@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	RandomSourceKey          = "RandomSource"
 	upperBoundTransferAmount = 1000
 )
 

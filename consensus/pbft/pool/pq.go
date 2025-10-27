@@ -3,7 +3,7 @@ package pool
 import (
 	"container/heap"
 
-	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/message"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 )
 
 // LessFunc 定义比较函数类型

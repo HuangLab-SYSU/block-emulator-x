@@ -3,7 +3,7 @@ package pool
 import (
 	"testing"
 
-	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/message"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/stretchr/testify/require"
 )
 

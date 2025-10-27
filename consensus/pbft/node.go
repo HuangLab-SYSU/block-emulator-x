@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"

@@ -1,5 +1,13 @@
 package config
 
+type SupervisorCfg struct {
+	ShardNum     int64
+	TxSource     string
+	TxSourceFile string
+
+	TxInjectionSpeed int64 // transactions per second
+}
+
 type ConsensusCfg struct {
 	ShardNum int64
 	NodeNum  int64

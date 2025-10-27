@@ -8,6 +8,6 @@ type TxSource interface {
 
 type NoOperationTxSource struct{}
 
-func (NoOperationTxSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
+func (NoOperationTxSource) ReadTxs(int64) ([]transaction.Transaction, error) {
 	return nil, nil
 }

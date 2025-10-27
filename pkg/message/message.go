@@ -46,6 +46,26 @@ type ReceiveTxsMsg struct {
 
 // WrapMsg encodes different types of messages.
 func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
+	msgType, err := getMsgType(msg)
+	if err != nil {
+		return nil, fmt.Errorf("getMsgType failed: %w", err)
+	}
+
+	var buf bytes.Buffer
+
+	encoder := gob.NewEncoder(&buf)
+
+	if err = encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("encoder failed: %w", err)
+	}
+
+	return &rpcserver.WrappedMsg{
+		MsgType: msgType,
+		Payload: buf.Bytes(),
+	}, nil
+}
+
+func getMsgType(msg any) (string, error) {
 	var msgType string
 
 	switch msg.(type) {
@@ -57,21 +77,13 @@ func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
 		msgType = CommitMessageType
 	case *ReceiveTxsMsg:
 		msgType = ReceiveTxsMessageType
+	case *RelayBlockInfoMsg:
+		msgType = RelayBlockInfoMessageType
+	case *BrokerBlockInfoMsg:
+		msgType = BrokerBlockInfoMessageType
 	default:
-		return nil, fmt.Errorf("unknown msg type: %T", msg)
+		return "", fmt.Errorf("unknown msg type: %T", msg)
 	}
 
-	var buf bytes.Buffer
-
-	encoder := gob.NewEncoder(&buf)
-
-	err := encoder.Encode(msg)
-	if err != nil {
-		return nil, fmt.Errorf("encode failed for message: %w", err)
-	}
-
-	return &rpcserver.WrappedMsg{
-		MsgType: msgType,
-		Payload: buf.Bytes(),
-	}, nil
+	return msgType, nil
 }

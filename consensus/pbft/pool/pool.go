@@ -1,7 +1,7 @@
 package pool
 
 import (
-	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/message"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 )
 
 type MsgPool struct {
