@@ -21,6 +21,14 @@ type Transaction struct {
 	Nonce        int64
 	Signature    Signature
 	ProposedTime time.Time
+
+	BrokerTxOpt
+}
+
+type BrokerTxOpt struct {
+	FirstBroker                       bool
+	OriginalHash                      []byte
+	OriginalSender, OriginalRecipient account.Account
 }
 
 func NewTransaction(sender, recipient account.Account, value *big.Int, nonce int64, proposeTime time.Time) *Transaction {
