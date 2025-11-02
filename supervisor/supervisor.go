@@ -2,7 +2,7 @@ package supervisor
 
 import (
 	"fmt"
-	"log/slog"
+	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
@@ -13,7 +13,6 @@ import (
 )
 
 type Supervisor struct {
-	logger   slog.Logger         // logger logs the information.
 	r        nodetopo.NodeMapper // r give the information of other nodes.
 	txSource txsource.TxSource   // txSource brings the txs into the blockchain system.
 	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
@@ -44,4 +43,18 @@ func NewSupervisor(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Supe
 		txSource: ts,
 		cfg:      cfg,
 	}, nil
+}
+
+func (s *Supervisor) Start() error {
+	txSendTicker := time.NewTicker(time.Second)
+	defer txSendTicker.Stop()
+
+	for range txSendTicker.C {
+		_, err := s.txSource.ReadTxs(s.cfg.TxInjectionSpeed)
+		if err != nil {
+			return fmt.Errorf("failed to read txs: %w", err)
+		}
+	}
+
+	return nil
 }

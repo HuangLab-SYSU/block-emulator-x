@@ -15,29 +15,36 @@ import (
 type Signature []byte
 
 type Transaction struct {
-	Sender       account.Account
-	Recipient    account.Account
-	Value        *big.Int
-	Nonce        int64
-	Signature    Signature
-	ProposedTime time.Time
+	Sender     account.Account
+	Recipient  account.Account
+	Value      *big.Int
+	Nonce      int64
+	Signature  Signature
+	CreateTime time.Time
 
+	RelayTxOpt
 	BrokerTxOpt
 }
 
+type RelayTxOpt struct {
+	RelayStage    int
+	ROriginalHash []byte
+}
+
 type BrokerTxOpt struct {
-	FirstBroker                       bool
-	OriginalHash                      []byte
+	BrokerStage                       int
+	BOriginalHash                     []byte
+	OriginalTxCreateTime              time.Time
 	OriginalSender, OriginalRecipient account.Account
 }
 
 func NewTransaction(sender, recipient account.Account, value *big.Int, nonce int64, proposeTime time.Time) *Transaction {
 	tx := &Transaction{
-		Sender:       sender,
-		Recipient:    recipient,
-		Value:        value,
-		Nonce:        nonce,
-		ProposedTime: proposeTime,
+		Sender:     sender,
+		Recipient:  recipient,
+		Value:      value,
+		Nonce:      nonce,
+		CreateTime: proposeTime,
 	}
 
 	return tx
