@@ -1,7 +1,5 @@
 package partition
 
-import "fmt"
-
 // Vertex 图中的结点，即区块链网络中参与交易的账户
 type Vertex struct {
 	Addr string // 账户地址
@@ -60,20 +58,4 @@ func (g *Graph) CopyGraph(src Graph) {
 			copy(g.EdgeSet[v], src.EdgeSet[v])
 		}
 	}
-}
-
-// PrintGraph 输出图
-func (g *Graph) PrintGraph() {
-	for v := range g.VertexSet {
-		fmt.Print(v.Addr, " ")
-		fmt.Print("edge:")
-
-		for _, u := range g.EdgeSet[v] {
-			fmt.Print(u.Addr)
-		}
-
-		fmt.Println()
-	}
-
-	fmt.Println()
 }

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"log"
+	"log/slog"
 	"math"
 	"strconv"
 
@@ -83,22 +83,6 @@ func (cs *CLPAState) CopyCLPA(src CLPAState) {
 	cs.MinEdges2Shard = src.MinEdges2Shard
 	cs.MaxIterations = src.MaxIterations
 	cs.ShardNum = src.ShardNum
-}
-
-// PrintCLPA 输出CLPA
-func (cs *CLPAState) PrintCLPA() {
-	cs.NetGraph.PrintGraph()
-	println(cs.MinEdges2Shard)
-
-	for v, item := range cs.PartitionMap {
-		print(v.Addr, " ", item, "\t")
-	}
-
-	for _, item := range cs.Edges2Shard {
-		print(item, " ")
-	}
-
-	println()
 }
 
 // ComputeEdges2Shard 根据当前划分，计算 Wk，即 Edges2Shard
@@ -246,7 +230,7 @@ func (cs *CLPAState) getShardScore(v Vertex, uShard int) float64 {
 // CLPAPartition CLPA 划分算法
 func (cs *CLPAState) CLPAPartition() (map[string]uint64, int) {
 	cs.ComputeEdges2Shard()
-	fmt.Println("Before running CLPA, cross-shard edge number:", cs.CrossShardEdgeNum)
+	slog.Info("Before running CLPA", "cross-shard edge number: ", cs.CrossShardEdgeNum)
 
 	res := make(map[string]uint64)
 	updateThreshold := make(map[string]int)
@@ -287,11 +271,11 @@ func (cs *CLPAState) CLPAPartition() (map[string]uint64, int) {
 	}
 
 	for sid, n := range cs.VertexNumInShard {
-		fmt.Printf("%d has vertexs: %d\n", sid, n)
+		slog.Info("Vertex number in shard", "sharID", sid, "vertex number", n)
 	}
 
 	cs.ComputeEdges2Shard()
-	fmt.Println("After running CLPA, cross-shard edge number:", cs.CrossShardEdgeNum)
+	slog.Info("After running CLPA", "cross-shard edge number", cs.CrossShardEdgeNum)
 
 	return res, cs.CrossShardEdgeNum
 }

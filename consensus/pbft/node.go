@@ -30,7 +30,6 @@ type Node struct {
 	resolver   nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
 	chain      *chain.Chain        // chain is the data-structure of blockchain.
 	txPool     txpool.TxPool       // txPool is the transactions pool.
-	logger     slog.Logger         // logger logs the information.
 	pbftMeta   *consensusMeta      // pbftMeta is the current consensus procedure
 	msgHandler map[string]messageHandleFunc
 }
@@ -83,7 +82,7 @@ func (n *Node) run() {
 		for _, msg := range msgList {
 			err := n.handleMessage(ctx, msg)
 			if err != nil {
-				n.logger.ErrorContext(ctx, "handleMessage", "err", err)
+				slog.ErrorContext(ctx, "handleMessage", "err", err)
 			}
 		}
 
@@ -93,7 +92,7 @@ func (n *Node) run() {
 		// try to step into the next process
 		for {
 			if err := n.step2NextStage(ctx); err != nil {
-				n.logger.ErrorContext(ctx, "step2NextStage", "err", err)
+				slog.ErrorContext(ctx, "step2NextStage", "err", err)
 				break
 			}
 		}
@@ -102,7 +101,7 @@ func (n *Node) run() {
 		if n.pbftMeta.stage == stagePreprepare && n.pbftMeta.info.NodeID == n.pbftMeta.leader && !n.pbftMeta.proposed {
 			err := n.propose(ctx)
 			if err != nil {
-				n.logger.ErrorContext(ctx, "propose", "err", err)
+				slog.ErrorContext(ctx, "propose", "err", err)
 			}
 
 			n.pbftMeta.proposed = true
@@ -141,7 +140,7 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 
 	// ignore the out-of-date message
 	if ppMsg.View < n.pbftMeta.view || ppMsg.Seq < n.pbftMeta.seq {
-		n.logger.InfoContext(ctx, "handle out-of-date Preprepare", "view", ppMsg.View, "seq", ppMsg.Seq)
+		slog.InfoContext(ctx, "handle out-of-date Preprepare", "view", ppMsg.View, "seq", ppMsg.Seq)
 		return nil
 	}
 
@@ -158,7 +157,7 @@ func (n *Node) handlePrepare(ctx context.Context, payload []byte) error {
 
 	// ignore the out-of-date message
 	if pMsg.View < n.pbftMeta.view || pMsg.Seq < n.pbftMeta.seq {
-		n.logger.InfoContext(ctx, "handle out-of-date Prepare", "view", pMsg.View, "seq", pMsg.Seq)
+		slog.InfoContext(ctx, "handle out-of-date Prepare", "view", pMsg.View, "seq", pMsg.Seq)
 		return nil
 	}
 
@@ -175,7 +174,7 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 
 	// ignore the out-of-date message
 	if cMsg.View < n.pbftMeta.view || cMsg.Seq < n.pbftMeta.seq {
-		n.logger.InfoContext(ctx, "handle out-of-date Preprepare", "view", cMsg.View, "seq", cMsg.Seq)
+		slog.InfoContext(ctx, "handle out-of-date Preprepare", "view", cMsg.View, "seq", cMsg.Seq)
 		return nil
 	}
 
@@ -234,7 +233,7 @@ func (n *Node) propose(ctx context.Context) error {
 		return fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
 
-	n.logger.InfoContext(ctx, "block generated", "block height", b.Header.Number, "block create time", b.Header.CreateTime)
+	slog.InfoContext(ctx, "block generated", "block height", b.Header.Number, "block create time", b.Header.CreateTime)
 
 	// wrap and encode msg
 	digest, err := utils.CalcHash(b)
@@ -313,7 +312,7 @@ func (n *Node) broadcast2Nodes(ctx context.Context, dest []nodetopo.NodeInfo, ms
 		go func(nb nodetopo.NodeInfo) {
 			err := n.conn.SendMessage(ctx, nb, msg)
 			if err != nil {
-				n.logger.ErrorContext(ctx, "sub-goroutine: broadcast", "err", err)
+				slog.ErrorContext(ctx, "sub-goroutine: broadcast", "err", err)
 			}
 		}(neighbor)
 	}
