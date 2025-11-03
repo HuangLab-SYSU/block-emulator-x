@@ -1,11 +1,28 @@
 package config
 
+const (
+	StaticRelayConsensus  = "static_relay"
+	StaticBrokerConsensus = "static_broker"
+	CLPARelayConsensus    = "clpa_relay"
+	CLPABrokerConsensus   = "clpa_broker"
+)
+
 type SupervisorCfg struct {
-	ShardNum     int64
-	TxSource     string
-	TxSourceFile string
+	ShardNum int64
+	TxNumber int64
+
+	TxSourceCfg
 
 	TxInjectionSpeed int64 // transactions per second
+
+	ConsensusType string
+
+	ResultOutputDir string
+}
+
+type TxSourceCfg struct {
+	TxSource     string
+	TxSourceFile string
 }
 
 type ConsensusCfg struct {
