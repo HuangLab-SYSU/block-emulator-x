@@ -13,6 +13,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor/committee"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor/measure"
+	"github.com/HuangLab-SYSU/block-emulator/supervisor/measure/brokerstats"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor/measure/relaystats"
 )
 
@@ -44,6 +45,27 @@ func NewSupervisor(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Supe
 		com, err = committee.NewStaticRelayCommittee(conn, r, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init a StaticRelayCommittee: %w", err)
+		}
+	case config.StaticBrokerConsensus:
+		ms = brokerstats.NewBrokerStats()
+
+		com, err = committee.NewStaticBrokerCommittee(conn, r, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to init a StaticBrokerCommittee: %w", err)
+		}
+	case config.CLPARelayConsensus:
+		ms = relaystats.NewRelayStats()
+
+		com, err = committee.NewCLPARelayCommittee(conn, r, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to init a CLPARelayCommittee: %w", err)
+		}
+	case config.CLPABrokerConsensus:
+		ms = brokerstats.NewBrokerStats()
+
+		com, err = committee.NewCLPABrokerCommittee(conn, r, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to init a CLPABrokerCommittee: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("undefined consensus type: %s", cfg.ConsensusType)

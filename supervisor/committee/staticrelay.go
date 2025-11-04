@@ -59,7 +59,7 @@ func (s *StaticRelayCommittee) SendTxsAndConsensus(ctx context.Context) error {
 	return nil
 }
 
-func (s *StaticRelayCommittee) HandleMsg(ctx context.Context, msg *rpcserver.WrappedMsg) error {
+func (s *StaticRelayCommittee) HandleMsg(_ context.Context, msg *rpcserver.WrappedMsg) error {
 	if msg.GetMsgType() != message.RelayBlockInfoMessageType {
 		return fmt.Errorf("unexpected msg type: %s", msg.GetMsgType())
 	}

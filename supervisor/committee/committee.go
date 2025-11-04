@@ -14,6 +14,11 @@ type Committee interface {
 
 const stopThresholdPerShard = 5
 
+const (
+	clpaWeightPenalty = 0.5
+	clpaMaxIterations = 100
+)
+
 type stopLogic struct {
 	stopThreshold int64
 	stopCnt       int64
