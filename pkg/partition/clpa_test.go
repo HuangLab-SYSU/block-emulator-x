@@ -1,0 +1,45 @@
+package partition
+
+import (
+	"crypto/rand"
+	"math/big"
+	"testing"
+)
+
+const (
+	edgesNum      = 10000
+	vertexNum     = 100
+	w             = 0.5
+	maxIterations = 100
+	shardNum      = 4
+)
+
+func TestCLPA(t *testing.T) {
+	edges := generateRandomEdges()
+	c := NewCLPAState(w, maxIterations, shardNum)
+	for _, e := range edges {
+		c.AddEdge(e[0], e[1])
+	}
+	c.CLPAPartition()
+}
+
+func generateRandomEdges() [][]Vertex {
+	vertexes := make([]Vertex, vertexNum)
+	for i := range vertexes {
+		var addr [20]byte
+		_, _ = rand.Read(addr[:])
+		vertexes[i] = Vertex{Addr: addr}
+	}
+
+	ret := make([][]Vertex, edgesNum)
+	for i := 0; i < edgesNum; i++ {
+		a, _ := rand.Int(rand.Reader, big.NewInt(int64(vertexNum)))
+		b, _ := rand.Int(rand.Reader, big.NewInt(int64(vertexNum)))
+		if a.Int64() == b.Int64() {
+			i-- // 避免自环
+			continue
+		}
+		ret[i] = []Vertex{vertexes[a.Int64()], vertexes[b.Int64()]}
+	}
+	return ret
+}

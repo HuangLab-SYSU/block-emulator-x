@@ -46,7 +46,6 @@ func NewCLPARelayCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg con
 }
 
 func (c *CLPARelayCommittee) SendTxsAndConsensus(ctx context.Context) error {
-
 	// TODO implement me
 	panic("implement me")
 }
@@ -72,9 +71,11 @@ func (c *CLPARelayCommittee) HandleMsg(_ context.Context, msg *rpcserver.Wrapped
 	for _, tx := range bInfo.InnerShardTxs {
 		c.clpa.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
 	}
+
 	for _, tx := range bInfo.Relay2Txs {
 		c.clpa.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
 	}
+
 	return nil
 }
 

@@ -22,14 +22,14 @@ func (NoOperationTxSource) ReadTxs(int64) ([]transaction.Transaction, error) {
 func NewTxSource(cfg config.TxSourceCfg) (TxSource, error) {
 	var ts TxSource
 	switch cfg.TxSource {
-	case csvsource.CSVSourceKey:
+	case csvsource.Key:
 		cs, err := csvsource.NewCSVSource(cfg.TxSourceFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create CSV source: %w", err)
 		}
 
 		ts = cs
-	case randomsource.RandomSourceKey:
+	case randomsource.Key:
 		ts = randomsource.NewRandomSource()
 	default:
 		ts = NoOperationTxSource{}

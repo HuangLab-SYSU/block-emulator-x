@@ -2,7 +2,6 @@ package csvsource
 
 import (
 	"encoding/csv"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
@@ -11,9 +10,10 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
-const CSVSourceKey = "CSVSource"
+const Key = "CSVSource"
 
 // CSVSource implements TxSource.
 // The csv file format supported by this implementation is like those from XBlock (https://xblock.pro/xblock-eth.html).
@@ -90,18 +90,8 @@ func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 		return nil, fmt.Errorf("failed to parse value, val=%s", line[8])
 	}
 
-	senderHex, err := hex.DecodeString(line[3][2:])
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode sender hex: %w", err)
-	}
-
-	receiverHex, err := hex.DecodeString(line[4][2:])
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode receiver hex: %w", err)
-	}
-
-	sender := account.Account{Addr: [20]byte(senderHex)}
-	receiver := account.Account{Addr: [20]byte(receiverHex)}
+	sender := account.Account{Addr: [20]byte(utils.Hex2Bytes(line[3][2:]))}
+	receiver := account.Account{Addr: [20]byte(utils.Hex2Bytes(line[4][2:]))}
 
 	tx := transaction.NewTransaction(sender, receiver, val, count, time.Now())
 
