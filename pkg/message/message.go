@@ -81,6 +81,8 @@ func getMsgType(msg any) (string, error) {
 		msgType = RelayBlockInfoMessageType
 	case *BrokerBlockInfoMsg:
 		msgType = BrokerBlockInfoMessageType
+	case *CLPARepartitionStartMsg:
+		msgType = CLPARepartitionStartMessageType
 	default:
 		return "", fmt.Errorf("unknown msg type: %T", msg)
 	}

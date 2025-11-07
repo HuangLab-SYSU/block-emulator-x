@@ -63,7 +63,11 @@ func (cs *CLPAState) AddEdge(u, v Vertex) {
 
 // GetVertexLocation 获取节点所属的分片
 func (cs *CLPAState) GetVertexLocation(v Vertex) int {
-	return cs.partitionMap[v]
+	if val, ok := cs.partitionMap[v]; ok {
+		return val
+	}
+
+	return int(DefaultAccountLoc(v.Addr, int64(cs.shardNum)))
 }
 
 // computeEdges2Shard 根据当前划分，计算 Wk，即 shardWeight
@@ -124,11 +128,11 @@ func (cs *CLPAState) changeShardRecompute(v Vertex, old int) {
 }
 
 // CLPAPartition 运行 CLPA 划分算法
-func (cs *CLPAState) CLPAPartition() (map[Vertex]int, float64) {
+func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	cs.computeEdges2Shard()
 	slog.Info("Before running CLPA", "cross-shard edge number: ", cs.crossShardEdgeNum)
 
-	ret := make(map[Vertex]int)
+	ret := make(map[[20]byte]int)
 	updateTimes := make(map[Vertex]int)
 
 	for range cs.maxIterations { // 第一层循环控制算法次数，constraint
@@ -155,7 +159,7 @@ func (cs *CLPAState) CLPAPartition() (map[Vertex]int, float64) {
 
 			if vNowShard != maxScoreShard && cs.vertexNumInShard[vNowShard] > 1 {
 				cs.partitionMap[v] = maxScoreShard
-				ret[v] = maxScoreShard
+				ret[v.Addr] = maxScoreShard
 				updateTimes[v]++
 				// 重新计算 vertexNumInShard
 				cs.vertexNumInShard[vNowShard]--

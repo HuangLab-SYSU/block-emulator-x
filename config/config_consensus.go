@@ -8,16 +8,15 @@ const (
 )
 
 type SupervisorCfg struct {
-	ShardNum int64
-	TxNumber int64
+	ShardNum         int64
+	TxNumber         int64
+	TxInjectionSpeed int64 // transactions per second
+	ResultOutputDir  string
 
 	TxSourceCfg
 
-	TxInjectionSpeed int64 // transactions per second
-
 	ConsensusType string
-
-	ResultOutputDir string
+	EpochDuration int64 // the time duration for an epoch (second)
 }
 
 type TxSourceCfg struct {

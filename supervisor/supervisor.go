@@ -107,7 +107,7 @@ func (s *Supervisor) Start() error {
 		msgList := s.conn.ReadMsgBuffer()
 
 		for _, msg := range msgList {
-			// handle messages in measure module, this is run in another routine
+			// handle messages in measure module, this is run in another routine (measure routine)
 			s.wmBuffer <- msg
 			// the messages should be handled by the committee
 			if err := s.committee.HandleMsg(ctx, msg); err != nil {

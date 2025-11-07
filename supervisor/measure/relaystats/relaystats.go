@@ -55,7 +55,8 @@ func NewRelayStats() *RelayStats {
 func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 	// ignore
 	if msg.MsgType != message.RelayBlockInfoMessageType {
-		return fmt.Errorf("UpdateMeasureRecord failed, wrong message type: %s", msg.MsgType)
+		slog.Error("Unsupported message type: ", "type", msg.MsgType)
+		return nil
 	}
 
 	var bInfo message.RelayBlockInfoMsg

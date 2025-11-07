@@ -45,16 +45,9 @@ func NewStaticRelayCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg c
 }
 
 func (s *StaticRelayCommittee) SendTxsAndConsensus(ctx context.Context) error {
-	txs, err := s.txSource.ReadTxs(min(s.cfg.TxInjectionSpeed, s.unsentTxNum))
-	if err != nil {
-		return fmt.Errorf("failed to read txs: %w", err)
+	if err := s.readTxsAndSend(ctx); err != nil {
+		return fmt.Errorf("readTxsAndSend failed: %w", err)
 	}
-
-	if err = s.sendTxs2Shards(ctx, txs); err != nil {
-		return fmt.Errorf("failed to send txs2Shards: %w", err)
-	}
-
-	s.unsentTxNum -= int64(len(txs))
 
 	return nil
 }
@@ -80,6 +73,21 @@ func (s *StaticRelayCommittee) HandleMsg(_ context.Context, msg *rpcserver.Wrapp
 
 func (s *StaticRelayCommittee) ShouldStop() bool {
 	return s.sl.stopCnt >= s.sl.stopThreshold
+}
+
+func (s *StaticRelayCommittee) readTxsAndSend(ctx context.Context) error {
+	txs, err := s.txSource.ReadTxs(min(s.cfg.TxInjectionSpeed, s.unsentTxNum))
+	if err != nil {
+		return fmt.Errorf("failed to read txs: %w", err)
+	}
+
+	if err = s.sendTxs2Shards(ctx, txs); err != nil {
+		return fmt.Errorf("failed to send txs2Shards: %w", err)
+	}
+
+	s.unsentTxNum -= int64(len(txs))
+
+	return nil
 }
 
 func (s *StaticRelayCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
