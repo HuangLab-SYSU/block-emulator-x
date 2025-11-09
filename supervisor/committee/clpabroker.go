@@ -15,17 +15,17 @@ func NewCLPABrokerCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg co
 	return &CLPABrokerCommittee{}, nil
 }
 
-func (C CLPABrokerCommittee) SendTxsAndConsensus(ctx context.Context) error {
+func (c *CLPABrokerCommittee) SendTxsAndConsensus(ctx context.Context) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (C CLPABrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.WrappedMsg) error {
+func (c *CLPABrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (C CLPABrokerCommittee) ShouldStop() bool {
+func (c *CLPABrokerCommittee) ShouldStop() bool {
 	// TODO implement me
 	panic("implement me")
 }

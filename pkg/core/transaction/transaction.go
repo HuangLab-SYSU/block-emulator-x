@@ -12,6 +12,12 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 )
 
+const (
+	RawTxBrokerStage  = 0
+	Sigma1BrokerStage = 1
+	Sigma2BrokerStage = 2
+)
+
 type Signature []byte
 
 type Transaction struct {
@@ -32,10 +38,12 @@ type RelayTxOpt struct {
 }
 
 type BrokerTxOpt struct {
-	BrokerStage                       int
-	BOriginalHash                     []byte
-	OriginalTxCreateTime              time.Time
-	OriginalSender, OriginalRecipient account.Account
+	BrokerStage               int // label that this is a sigma_1 tx or a sigma_2 tx.
+	BrokerAddr                account.Address
+	BOriginalHash             []byte // the hash of raw message
+	OriginalTxCreateTime      time.Time
+	NonceBroker               int64
+	HeightLock, HeightCurrent int64
 }
 
 func NewTransaction(sender, recipient account.Account, value *big.Int, nonce int64, proposeTime time.Time) *Transaction {

@@ -101,7 +101,7 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		strTxHash := string(tx.ROriginalHash)
 		if val := r.txLifecycles[strTxHash]; val == nil {
 			r.txLifecycles[strTxHash] = &txLifeCycle{
-				originalTxCreateTime: tx.OriginalTxCreateTime,
+				originalTxCreateTime: tx.CreateTime,
 				isCrossShardTx:       true,
 			}
 		}
@@ -116,7 +116,7 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		strTxHash := string(tx.ROriginalHash)
 		if val := r.txLifecycles[strTxHash]; val == nil {
 			r.txLifecycles[strTxHash] = &txLifeCycle{
-				originalTxCreateTime: tx.OriginalTxCreateTime,
+				originalTxCreateTime: tx.CreateTime,
 				isCrossShardTx:       true,
 			}
 		}

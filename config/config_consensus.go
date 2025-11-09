@@ -15,7 +15,10 @@ type SupervisorCfg struct {
 
 	TxSourceCfg
 
+	BrokerModuleCfg
+
 	ConsensusType string
+
 	EpochDuration int64 // the time duration for an epoch (second)
 }
 
@@ -39,4 +42,9 @@ type LocalSetting struct {
 	ShardID    int64
 	WalletAddr [20]byte
 	Host       string
+}
+
+type BrokerModuleCfg struct {
+	BrokerPath string
+	BrokerNum  int64
 }

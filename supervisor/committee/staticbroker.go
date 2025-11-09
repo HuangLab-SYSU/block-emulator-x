@@ -5,18 +5,24 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"log/slog"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/broker"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/partition"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor/txsource"
 )
 
 type StaticBrokerCommittee struct {
 	r    nodetopo.NodeMapper // r give the information of other nodes.
 	conn *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
+
+	bManager *broker.Manager // bManager controls the brokers and their states.
 
 	txSource    txsource.TxSource // txSource brings the txs into the blockchain system.
 	sl          stopLogic         // sl is the logic of stop.
@@ -26,15 +32,36 @@ type StaticBrokerCommittee struct {
 }
 
 func NewStaticBrokerCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*StaticBrokerCommittee, error) {
-	return &StaticBrokerCommittee{}, nil
+	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
+	if err != nil {
+		return nil, fmt.Errorf("NewTxSource failed: %w", err)
+	}
+
+	bs, err := broker.NewBrokerManager(cfg.BrokerModuleCfg)
+	if err != nil {
+		return nil, fmt.Errorf("NewBrokerManager failed: %w", err)
+	}
+
+	return &StaticBrokerCommittee{
+		r:           r,
+		conn:        conn,
+		bManager:    bs,
+		txSource:    ts,
+		sl:          stopLogic{stopThreshold: cfg.ShardNum * stopThresholdPerShard, stopCnt: 0},
+		unsentTxNum: cfg.TxNumber,
+		cfg:         cfg,
+	}, nil
 }
 
-func (s StaticBrokerCommittee) SendTxsAndConsensus(ctx context.Context) error {
-	// TODO implement me
-	panic("implement me")
+func (s *StaticBrokerCommittee) SendTxsAndConsensus(ctx context.Context) error {
+	if err := s.readTxsAndSend(ctx); err != nil {
+		return fmt.Errorf("readTxsAndSend failed: %w", err)
+	}
+
+	return nil
 }
 
-func (s StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.WrappedMsg) error {
+func (s *StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	if msg.GetMsgType() != message.BrokerBlockInfoMessageType {
 		return fmt.Errorf("unexpected msg type: %s", msg.GetMsgType())
 	}
@@ -51,10 +78,116 @@ func (s StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.Wra
 		s.sl.stopCnt = 0 // reset 0 if there are transactions in a block
 	}
 
-	// operate as a broker
-	panic("implement me")
+	// operate as a broker, confirm the transactions.
+	for _, broker1Tx := range bInfo.Broker1Txs {
+		if err := s.bManager.ConfirmBrokerTx(broker1Tx); err != nil {
+			slog.ErrorContext(ctx, "broker confirm broker1 tx failed", "err", err)
+		}
+	}
+
+	for _, broker2Tx := range bInfo.Broker2Txs {
+		if err := s.bManager.ConfirmBrokerTx(broker2Tx); err != nil {
+			slog.ErrorContext(ctx, "broker confirm broker2 tx failed", "err", err)
+		}
+	}
+
+	return nil
 }
 
-func (s StaticBrokerCommittee) ShouldStop() bool {
+func (s *StaticBrokerCommittee) ShouldStop() bool {
 	return s.sl.stopCnt >= s.sl.stopThreshold
+}
+
+func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
+	txs, err := s.txSource.ReadTxs(min(s.cfg.TxInjectionSpeed, s.unsentTxNum))
+	if err != nil {
+		return fmt.Errorf("failed to read txs: %w", err)
+	}
+
+	innerTxs, crossTxs := s.classifyTxs(txs)
+	// create raw transactions according to the cross-shard txs
+	for _, crossTx := range crossTxs {
+		if _, err = s.bManager.CreateRawTxRandomBroker(crossTx); err != nil {
+			slog.ErrorContext(ctx, "create raw tx failed", "err", err)
+		}
+	}
+	// create broker accounts
+	b1Txs, b2Txs := s.bManager.CreateBrokerTxs()
+
+	sendTxs := append(innerTxs, append(b1Txs, b2Txs...)...)
+
+	// send transactions
+	if err = s.sendTxs2Shards(ctx, sendTxs); err != nil {
+		return fmt.Errorf("failed to send txs2Shards: %w", err)
+	}
+
+	s.unsentTxNum -= int64(len(txs))
+
+	return nil
+}
+
+func (s *StaticBrokerCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
+	shardTxs := make([][]transaction.Transaction, s.cfg.ShardNum)
+
+	for _, tx := range txs {
+		shardTxs[s.getTxLoc(tx)] = append(shardTxs[s.getTxLoc(tx)], tx)
+	}
+
+	// send txs
+	for i := range shardTxs {
+		rtm := message.ReceiveTxsMsg{
+			Txs: shardTxs[i],
+		}
+
+		w, err := message.WrapMsg(rtm)
+		if err != nil {
+			return fmt.Errorf("failed to wrap message: %w", err)
+		}
+
+		dest, err := s.r.GetLeader(int64(i))
+		if err != nil {
+			return fmt.Errorf("failed to get leader %d: %w", i, err)
+		}
+
+		go func() {
+			if err = s.conn.SendMessage(ctx, dest, w); err != nil {
+				slog.ErrorContext(ctx, "failed to send txs to the shard", "shardID", i, "err", err)
+			}
+		}()
+	}
+
+	return nil
+}
+
+func (s *StaticBrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction) {
+	innerShardTxs, crossShardTxs := make([]transaction.Transaction, 0, len(txs)), make([]transaction.Transaction, 0, len(txs))
+	for _, tx := range txs {
+		senderAddr, receiverAddr := tx.Sender.Addr, tx.Recipient.Addr
+		senderShard := partition.DefaultAccountLoc(senderAddr, s.cfg.ShardNum)
+
+		receiverShard := partition.DefaultAccountLoc(receiverAddr, s.cfg.ShardNum)
+
+		if senderShard == receiverShard || s.bManager.IsBroker(senderAddr) || s.bManager.IsBroker(receiverAddr) {
+			innerShardTxs = append(innerShardTxs, tx)
+		} else {
+			crossShardTxs = append(crossShardTxs, tx)
+		}
+	}
+
+	return innerShardTxs, crossShardTxs
+}
+
+func (s *StaticBrokerCommittee) getTxLoc(tx transaction.Transaction) int64 {
+	shardNumber := s.cfg.ShardNum
+	// inner-shard tx
+	if len(tx.BOriginalHash) == 0 {
+		return partition.DefaultAccountLoc(tx.Sender.Addr, shardNumber)
+	}
+	// broker tx
+	// broker 1
+	if tx.BrokerStage == transaction.Sigma1BrokerStage {
+		return partition.DefaultAccountLoc(tx.Sender.Addr, shardNumber)
+	}
+	// broker 2
+	return partition.DefaultAccountLoc(tx.Recipient.Addr, shardNumber)
 }

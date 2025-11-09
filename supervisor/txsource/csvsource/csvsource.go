@@ -90,10 +90,17 @@ func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 		return nil, fmt.Errorf("failed to parse value, val=%s", line[8])
 	}
 
-	sender := account.Account{Addr: [20]byte(utils.Hex2Bytes(line[3][2:]))}
-	receiver := account.Account{Addr: [20]byte(utils.Hex2Bytes(line[4][2:]))}
+	senderAddr, err := utils.Hex2Addr(line[3])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sender address: %w", err)
+	}
 
-	tx := transaction.NewTransaction(sender, receiver, val, count, time.Now())
+	receiverAddr, err := utils.Hex2Addr(line[4])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse receiver address: %w", err)
+	}
+
+	tx := transaction.NewTransaction(account.Account{Addr: senderAddr}, account.Account{Addr: receiverAddr}, val, count, time.Now())
 
 	return tx, nil
 }
