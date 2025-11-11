@@ -80,6 +80,10 @@ func (s *Manager) CreateRawTx(tx transaction.Transaction, brokerAddr account.Add
 		return nil, fmt.Errorf("%x is not a broker address", brokerAddr)
 	}
 
+	if _, ok := s.unconfirmedTxInfo[rawTxHash(th)]; ok {
+		return nil, fmt.Errorf("tx hash %x already exists in the unconfirmed tx set", th)
+	}
+
 	s.broker2Nonce[brokerAddr]++
 	rawTx := tx
 	rawTx.BrokerTxOpt = transaction.BrokerTxOpt{
@@ -102,28 +106,30 @@ func (s *Manager) CreateRawTx(tx transaction.Transaction, brokerAddr account.Add
 
 // CreateBrokerTxs create broker1 and broker2 txs according to the readyBrokerTxHashes.
 func (s *Manager) CreateBrokerTxs() ([]transaction.Transaction, []transaction.Transaction) {
-	b1Txs := make([]transaction.Transaction, len(s.readyBroker1TxHashes))
+	b1Txs := make([]transaction.Transaction, 0, len(s.readyBroker1TxHashes))
 
-	b2Txs := make([]transaction.Transaction, len(s.readyBroker2TxHashes))
+	b2Txs := make([]transaction.Transaction, 0, len(s.readyBroker2TxHashes))
 
-	for i, tx := range s.readyBroker1TxHashes {
+	for _, tx := range s.readyBroker1TxHashes {
 		b1Tx, err := s.createBroker1Tx(tx)
 		if err != nil {
 			slog.Error("create broker1 tx failed", "err", err)
+			continue
 		}
 
-		b1Txs[i] = *b1Tx
+		b1Txs = append(b1Txs, *b1Tx)
 	}
 
 	s.readyBroker1TxHashes = []rawTxHash{}
 
-	for i, tx := range s.readyBroker2TxHashes {
+	for _, tx := range s.readyBroker2TxHashes {
 		b2Tx, err := s.createBroker2Tx(tx)
 		if err != nil {
 			slog.Error("create broker2 tx failed", "err", err)
+			continue
 		}
 
-		b2Txs[i] = *b2Tx
+		b2Txs = append(b2Txs, *b2Tx)
 	}
 
 	s.readyBroker2TxHashes = []rawTxHash{}

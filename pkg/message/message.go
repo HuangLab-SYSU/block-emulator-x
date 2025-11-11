@@ -46,6 +46,8 @@ func getMsgType(msg any) (string, error) {
 
 	case *BrokerBlockInfoMsg:
 		msgType = BrokerBlockInfoMessageType
+	case *BrokerCLPATxSendAgainMsg:
+		msgType = BrokerCLPATxSendAgainMessageType
 
 	case *CLPARepartitionStartMsg:
 		msgType = CLPARepartitionStartMessageType

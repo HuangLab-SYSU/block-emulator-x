@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"log/slog"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
@@ -91,35 +90,31 @@ func (s *StaticRelayCommittee) readTxsAndSend(ctx context.Context) error {
 }
 
 func (s *StaticRelayCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
-	shardNumber := s.cfg.ShardNum
-	shardTxs := make([][]transaction.Transaction, s.cfg.ShardNum)
-
-	for _, tx := range txs {
-		shardID := partition.DefaultAccountLoc(tx.Sender.Addr, shardNumber)
-		shardTxs[shardID] = append(shardTxs[shardID], tx)
-	}
-
-	for i := range shardTxs {
-		rtm := message.ReceiveTxsMsg{
-			Txs: shardTxs[i],
-		}
-
-		w, err := message.WrapMsg(rtm)
-		if err != nil {
-			return fmt.Errorf("failed to wrap message: %w", err)
-		}
-
-		dest, err := s.r.GetLeader(int64(i))
+	leaders := make(map[int]nodetopo.NodeInfo, s.cfg.ShardNum)
+	for i := range s.cfg.ShardNum {
+		dest, err := s.r.GetLeader(i)
 		if err != nil {
 			return fmt.Errorf("failed to get leader %d: %w", i, err)
 		}
 
-		go func() {
-			if err = s.conn.SendMessage(ctx, dest, w); err != nil {
-				slog.ErrorContext(ctx, "failed to send txs to the shard", "shardID", i, "err", err)
-			}
-		}()
+		leaders[int(i)] = dest
 	}
 
+	shardTxs, err := PackShardTxs(txs, s.cfg.ShardNum, s.getTxLoc)
+	if err != nil {
+		return fmt.Errorf("failed to pack shard txs: %w", err)
+	}
+
+	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, s.cfg.ShardNum)
+	for i := range leaders {
+		mMap[leaders[i]] = shardTxs[i]
+	}
+
+	s.conn.MSendDifferentMessages(ctx, mMap)
+
 	return nil
+}
+
+func (s *StaticRelayCommittee) getTxLoc(tx transaction.Transaction) int64 {
+	return partition.DefaultAccountLoc(tx.Sender.Addr, s.cfg.ShardNum)
 }

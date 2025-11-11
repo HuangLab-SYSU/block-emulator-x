@@ -127,34 +127,27 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 }
 
 func (s *StaticBrokerCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
-	shardTxs := make([][]transaction.Transaction, s.cfg.ShardNum)
-
-	for _, tx := range txs {
-		shardTxs[s.getTxLoc(tx)] = append(shardTxs[s.getTxLoc(tx)], tx)
-	}
-
-	// send txs
-	for i := range shardTxs {
-		rtm := message.ReceiveTxsMsg{
-			Txs: shardTxs[i],
-		}
-
-		w, err := message.WrapMsg(rtm)
-		if err != nil {
-			return fmt.Errorf("failed to wrap message: %w", err)
-		}
-
-		dest, err := s.r.GetLeader(int64(i))
+	leaders := make(map[int]nodetopo.NodeInfo, s.cfg.ShardNum)
+	for i := range s.cfg.ShardNum {
+		dest, err := s.r.GetLeader(i)
 		if err != nil {
 			return fmt.Errorf("failed to get leader %d: %w", i, err)
 		}
 
-		go func() {
-			if err = s.conn.SendMessage(ctx, dest, w); err != nil {
-				slog.ErrorContext(ctx, "failed to send txs to the shard", "shardID", i, "err", err)
-			}
-		}()
+		leaders[int(i)] = dest
 	}
+
+	shardTxs, err := PackShardTxs(txs, s.cfg.ShardNum, s.getTxLoc)
+	if err != nil {
+		return fmt.Errorf("failed to pack shard txs: %w", err)
+	}
+
+	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, s.cfg.ShardNum)
+	for i := range leaders {
+		mMap[leaders[i]] = shardTxs[i]
+	}
+
+	s.conn.MSendDifferentMessages(ctx, mMap)
 
 	return nil
 }

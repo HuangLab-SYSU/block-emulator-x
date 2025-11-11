@@ -26,8 +26,8 @@ type clpaComponent struct {
 	shardEpoch      []int64 // shardEpoch tells the epoch ID for each shard.
 }
 
-// getEpochSync tells whether all shards are in the correct epoch
-func (clpa *clpaComponent) getEpochSync() bool {
+// checkEpochSyncAndMark tells whether all shards are in the correct epoch
+func (clpa *clpaComponent) checkEpochSyncAndMark() bool {
 	// if the epoch is synced, return
 	if clpa.epochSynced {
 		return true
@@ -73,7 +73,7 @@ func NewCLPARelayCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg con
 		clpaComponent: clpaComponent{
 			state:           partition.NewCLPAState(clpaWeightPenalty, clpaMaxIterations, int(cfg.ShardNum)),
 			lastRunTime:     time.Now(),
-			epochSynced:     true,
+			epochSynced:     false,
 			supervisorEpoch: 0,
 			shardEpoch:      make([]int64, cfg.ShardNum),
 		},
@@ -88,7 +88,7 @@ func NewCLPARelayCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg con
 func (c *CLPARelayCommittee) SendTxsAndConsensus(ctx context.Context) error {
 	// if the repartition procedure between consensus nodes is not over, wait for it and return
 	// This function should not be blocked.
-	if c.getEpochSync() {
+	if !c.checkEpochSyncAndMark() {
 		return nil
 	}
 
@@ -169,13 +169,7 @@ func (c *CLPARelayCommittee) repartition(ctx context.Context) error {
 		return fmt.Errorf("GetAllLeaders failed: %w", err)
 	}
 
-	for _, leader := range allLeaders {
-		go func(leader nodetopo.NodeInfo) {
-			if err = c.conn.SendMessage(ctx, leader, w); err != nil {
-				slog.ErrorContext(ctx, "failed to send txs to the shard", "err", err)
-			}
-		}(leader)
-	}
+	c.conn.GroupBroadcastMessage(ctx, allLeaders, w)
 
 	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch)
 	// set epoch-synced to false
@@ -200,36 +194,31 @@ func (c *CLPARelayCommittee) readTxsAndSend(ctx context.Context) error {
 }
 
 func (c *CLPARelayCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
-	shardTxs := make([][]transaction.Transaction, c.cfg.ShardNum)
-
-	// classify the transactions by the locations of sender
-	for _, tx := range txs {
-		shardID := c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender.Addr})
-		shardTxs[shardID] = append(shardTxs[shardID], tx)
-	}
-
-	// send transactions
-	for i := range shardTxs {
-		rtm := message.ReceiveTxsMsg{
-			Txs: shardTxs[i],
-		}
-
-		w, err := message.WrapMsg(rtm)
-		if err != nil {
-			return fmt.Errorf("failed to wrap message: %w", err)
-		}
-
-		dest, err := c.r.GetLeader(int64(i))
+	leaders := make(map[int]nodetopo.NodeInfo, c.cfg.ShardNum)
+	for i := range c.cfg.ShardNum {
+		dest, err := c.r.GetLeader(i)
 		if err != nil {
 			return fmt.Errorf("failed to get leader %d: %w", i, err)
 		}
 
-		go func() {
-			if err = c.conn.SendMessage(ctx, dest, w); err != nil {
-				slog.ErrorContext(ctx, "failed to send txs to the shard", "shardID", i, "err", err)
-			}
-		}()
+		leaders[int(i)] = dest
 	}
 
+	shardTxs, err := PackShardTxs(txs, c.cfg.ShardNum, c.getTxLocByCLPAState)
+	if err != nil {
+		return fmt.Errorf("failed to pack shard txs: %w", err)
+	}
+
+	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, c.cfg.ShardNum)
+	for i := range leaders {
+		mMap[leaders[i]] = shardTxs[i]
+	}
+
+	c.conn.MSendDifferentMessages(ctx, mMap)
+
 	return nil
+}
+
+func (c *CLPARelayCommittee) getTxLocByCLPAState(tx transaction.Transaction) int64 {
+	return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender.Addr}))
 }

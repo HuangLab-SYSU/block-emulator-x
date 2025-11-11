@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -91,6 +92,29 @@ func (p *P2PConn) SendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 	}
 
 	return nil
+}
+
+func (p *P2PConn) MSendDifferentMessages(ctx context.Context, node2Msg map[nodetopo.NodeInfo]*rpcserver.WrappedMsg) {
+	for node, msg := range node2Msg {
+		go func(node nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
+			err := p.SendMessage(ctx, node, msg)
+			if err != nil {
+				slog.ErrorContext(ctx, "sub-goroutine: MSendDifferentMessages", "err", err)
+			}
+		}(node, msg)
+	}
+}
+
+func (p *P2PConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
+	// broadcast to all nodes in this group
+	for _, node := range group {
+		go func(nif nodetopo.NodeInfo) {
+			err := p.SendMessage(ctx, nif, msg)
+			if err != nil {
+				slog.ErrorContext(ctx, "sub-goroutine: broadcast", "err", err)
+			}
+		}(node)
+	}
 }
 
 // Close closes all the connections in the client pool.

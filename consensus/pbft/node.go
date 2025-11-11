@@ -253,7 +253,7 @@ func (n *Node) propose(ctx context.Context) error {
 		return fmt.Errorf("GetNodesInShard failed: %w", err)
 	}
 
-	n.broadcast2Nodes(ctx, shardNeighbors, wrappedMsg)
+	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, wrappedMsg)
 
 	return nil
 }
@@ -277,7 +277,7 @@ func (n *Node) prepareBroadcast(ctx context.Context) error {
 		return fmt.Errorf("GetNodesInShard failed: %w", err)
 	}
 
-	n.broadcast2Nodes(ctx, shardNeighbors, w)
+	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, w)
 
 	return nil
 }
@@ -301,21 +301,9 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 		return fmt.Errorf("GetNodesInShard failed: %w", err)
 	}
 
-	n.broadcast2Nodes(ctx, shardNeighbors, w)
+	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, w)
 
 	return nil
-}
-
-func (n *Node) broadcast2Nodes(ctx context.Context, dest []nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
-	// broadcast to all nodes in this shard.
-	for _, neighbor := range dest {
-		go func(nb nodetopo.NodeInfo) {
-			err := n.conn.SendMessage(ctx, nb, msg)
-			if err != nil {
-				slog.ErrorContext(ctx, "sub-goroutine: broadcast", "err", err)
-			}
-		}(neighbor)
-	}
 }
 
 func (n *Node) closeAll() {

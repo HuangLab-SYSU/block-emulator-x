@@ -2,7 +2,10 @@ package committee
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 )
 
@@ -27,4 +30,31 @@ const (
 type stopLogic struct {
 	stopThreshold int64
 	stopCnt       int64
+}
+
+type txLocationFunc func(tx transaction.Transaction) int64
+
+func PackShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLocationFunc) (map[int]*rpcserver.WrappedMsg, error) {
+	shardTxs := make([][]transaction.Transaction, shardNumber)
+
+	// classify the transactions by the locations of sender
+	for _, tx := range txs {
+		shardID := locFunc(tx)
+		shardTxs[shardID] = append(shardTxs[shardID], tx)
+	}
+
+	msg2Shard := make(map[int]*rpcserver.WrappedMsg, shardNumber)
+
+	for i := range shardTxs {
+		w, err := message.WrapMsg(message.ReceiveTxsMsg{
+			Txs: shardTxs[i],
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to wrap message: %w", err)
+		}
+
+		msg2Shard[i] = w
+	}
+
+	return msg2Shard, nil
 }
