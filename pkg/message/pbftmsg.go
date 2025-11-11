@@ -1,7 +1,10 @@
 package message
 
 import (
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
+	"bytes"
+	"encoding/gob"
+	"fmt"
+
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 )
 
@@ -13,9 +16,32 @@ const (
 	ReceiveTxsMessageType = "ReceiveTxs"
 )
 
+const (
+	BlockProposalType = "BlockProposal"
+	PartitionProposal = "PartitionProposal"
+)
+
+type Proposal struct {
+	ProposalType string
+	Payload      []byte
+}
+
+func (p *Proposal) Encode() ([]byte, error) {
+	var buff bytes.Buffer
+
+	encoder := gob.NewEncoder(&buff)
+
+	err := encoder.Encode(p)
+	if err != nil {
+		return nil, fmt.Errorf("encode state failed: %w", err)
+	}
+
+	return buff.Bytes(), nil
+}
+
 // PreprepareMsg is the pre-prepare message in the PBFT consensus, and it contains a block and its digest (i.e., Hash).
 type PreprepareMsg struct {
-	B               block.Block
+	P               Proposal
 	Digest          []byte
 	Seq, View       int64
 	ShardID, NodeID int64

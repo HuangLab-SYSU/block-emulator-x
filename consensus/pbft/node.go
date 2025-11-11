@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/insideop"
+	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/outsideop"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
@@ -26,11 +28,15 @@ const (
 
 // Node is the node running the PBFT consensus.
 type Node struct {
-	conn       *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
-	resolver   nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
-	chain      *chain.Chain        // chain is the data-structure of blockchain.
-	txPool     txpool.TxPool       // txPool is the transactions pool.
-	pbftMeta   *consensusMeta      // pbftMeta is the current consensus procedure
+	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
+	resolver nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
+	chain    *chain.Chain        // chain is the data-structure of blockchain.
+	txPool   txpool.TxPool       // txPool is the transactions pool.
+	pbftMeta *consensusMeta      // pbftMeta is the current consensus procedure
+
+	iop insideop.ShardInsideExtraOp
+	oop outsideop.ShardOutsideMsgOp
+
 	msgHandler map[string]messageHandleFunc
 }
 
@@ -90,11 +96,9 @@ func (n *Node) run() {
 		n.pbftMeta.curateMsg()
 
 		// try to step into the next process
-		for {
-			if err := n.step2NextStage(ctx); err != nil {
-				slog.ErrorContext(ctx, "step2NextStage", "err", err)
-				break
-			}
+		if err := n.step2NextStage(ctx); err != nil {
+			slog.ErrorContext(ctx, "step2NextStage", "err", err)
+			continue
 		}
 
 		// if this node is the leader and not proposed yet, try to propose one block
@@ -122,7 +126,11 @@ func (n *Node) registerHandleFunc() {
 func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	handleFunc, exist := n.msgHandler[msg.GetMsgType()]
 	if !exist {
-		return fmt.Errorf("invalid msg type: %s", msg.GetMsgType())
+		if err := n.oop.HandleMsgOutsideShard(ctx, msg); err != nil {
+			return fmt.Errorf("handleMsgOutsideShard: %w", err)
+		}
+
+		return nil
 	}
 
 	if err := handleFunc(ctx, msg.GetPayload()); err != nil {
@@ -174,7 +182,7 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 
 	// ignore the out-of-date message
 	if cMsg.View < n.pbftMeta.view || cMsg.Seq < n.pbftMeta.seq {
-		slog.InfoContext(ctx, "handle out-of-date Preprepare", "view", cMsg.View, "seq", cMsg.Seq)
+		slog.InfoContext(ctx, "handle out-of-date Commit", "view", cMsg.View, "seq", cMsg.Seq)
 		return nil
 	}
 
@@ -199,10 +207,12 @@ func (n *Node) handleReceiveTxs(ctx context.Context, payload []byte) error {
 	return nil
 }
 
+// step2NextStage steps to next pbft stage until it steps to the end
 func (n *Node) step2NextStage(ctx context.Context) error {
 	newStage, err := n.pbftMeta.step2Next()
 	if err != nil {
-		return fmt.Errorf("pbftMeta.step2Next failed: %w", err)
+		slog.InfoContext(ctx, "step2NextStage", "step to next stage failed, details", err)
+		return nil
 	}
 
 	switch newStage {
@@ -219,30 +229,23 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	return n.step2NextStage(ctx)
 }
 
 func (n *Node) propose(ctx context.Context) error {
-	txs, err := n.txPool.PackTxs()
-	if err != nil {
-		return fmt.Errorf("txPool.PackTxs failed: %w", err)
-	}
-
-	b, err := n.chain.GenerateBlock(ctx, n.pbftMeta.addr, txs)
+	p, err := n.iop.BuildProposal(ctx)
 	if err != nil {
 		return fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
 
-	slog.InfoContext(ctx, "block generated", "block height", b.Header.Number, "block create time", b.Header.CreateTime)
-
 	// wrap and encode msg
-	digest, err := utils.CalcHash(b)
+	digest, err := utils.CalcHash(p)
 	if err != nil {
 		return fmt.Errorf("CalcHash failed: %w", err)
 	}
 
 	wrappedMsg, err := message.WrapMsg(&message.PreprepareMsg{
-		B: *b, Digest: digest, Seq: n.pbftMeta.seq, View: n.pbftMeta.view,
+		P: *p, Digest: digest, Seq: n.pbftMeta.seq, View: n.pbftMeta.view,
 	})
 	if err != nil {
 		return fmt.Errorf("message.WrapMsg failed: %w", err)
