@@ -6,8 +6,9 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 )
 
-type ShardInsideExtraOp interface {
+type ShardInsideOp interface {
 	BuildProposal(ctx context.Context) (*message.Proposal, error)
-	ValidateProposal(ctx context.Context, proposal *message.Proposal) (bool, error)
-	ConfirmBlock(ctx context.Context) error
+	ValidateProposal(ctx context.Context, proposal *message.Proposal) error
+	DeliverConfirmedProposal(ctx context.Context, proposal *message.Proposal) error
+	Close()
 }

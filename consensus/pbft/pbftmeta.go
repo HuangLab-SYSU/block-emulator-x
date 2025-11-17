@@ -3,6 +3,7 @@ package pbft
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/pool"
@@ -36,13 +37,14 @@ type consensusMeta struct {
 
 	// metadata for a single round;
 	// variables below will update per round.
-	proposed    bool                           // this node has proposed in this round or not
-	seq         int64                          // sequence id of PBFT consensus.
-	view        int64                          // view of PBFT consensus.
-	stage       int                            // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
-	curProposal *message.PreprepareMsg         // preprepare message in this round.
-	prepareSet  map[nodetopo.NodeInfo]struct{} // prepareSet collects the nodes sending prepare message.
-	commitSet   map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
+	proposed     bool                           // this node has proposed in this round or not
+	seq          int64                          // sequence id of PBFT consensus.
+	view         int64                          // view of PBFT consensus.
+	stage        int                            // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
+	curProposal  *message.PreprepareMsg         // preprepare message in this round.
+	lastProposal *message.PreprepareMsg         // preprepare message in the last round.
+	prepareSet   map[nodetopo.NodeInfo]struct{} // prepareSet collects the nodes sending prepare message.
+	commitSet    map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
 }
 
 func newConsensusMeta(cfg config.ConsensusCfg) *consensusMeta {
@@ -108,44 +110,46 @@ func (c *consensusMeta) curateMsg() {
 	}
 }
 
-func (c *consensusMeta) step2Next() (int, error) {
+// step2Next make pbft metadata step to next stage, returns (oldStage, newStage, err)
+func (c *consensusMeta) step2Next() (int, int, error) {
 	switch c.stage {
 	case stagePreprepare:
 		if c.curProposal == nil {
-			return -1, fmt.Errorf("preprepare is nil")
+			slog.Info("waiting for preprepare message")
+			return stagePreprepare, stagePreprepare, nil
 		}
 
 		c.stage = stagePrepare
 
-		return stagePrepare, nil
+		return stagePreprepare, stagePrepare, nil
 
 	case stagePrepare:
 		if len(c.prepareSet) < int(2*c.f+1) {
-			return -1, fmt.Errorf("prepareSet is %d < %d", len(c.prepareSet), int(2*c.f+1))
+			slog.Info("waiting for prepare message", "current", 2*c.f+1, "expect", len(c.prepareSet))
+			return stagePrepare, stagePrepare, nil
 		}
 
 		c.stage = stageCommit
 
-		return stageCommit, nil
+		return stagePrepare, stageCommit, nil
 
 	case stageCommit:
 		if len(c.commitSet) < int(2*c.f+1) {
-			return -1, fmt.Errorf("commitSet is %d < %d", len(c.commitSet), int(2*c.f+1))
+			slog.Info("waiting for commit message", "current", 2*c.f+1, "expect", len(c.commitSet))
+			return stageCommit, stageCommit, nil
 		}
 
 		// step into next round
 		c.stage = stagePreprepare
+		c.lastProposal = c.curProposal
 		c.curProposal = nil
 		c.prepareSet = map[nodetopo.NodeInfo]struct{}{}
 		c.commitSet = map[nodetopo.NodeInfo]struct{}{}
 		c.proposed = false
 		c.seq++
 
-		return stagePreprepare, nil
-
-	default:
-
+		return stageCommit, stagePreprepare, nil
 	}
 
-	return -1, fmt.Errorf("invalid stage %d", c.stage)
+	return 0, -1, fmt.Errorf("invalid stage %d", c.stage)
 }

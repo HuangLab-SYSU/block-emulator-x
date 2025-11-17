@@ -6,6 +6,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 )
 
-type ShardOutsideMsgOp interface {
+type ShardOutsideMsgHandler interface {
 	HandleMsgOutsideShard(ctx context.Context, msg *rpcserver.WrappedMsg) error
+	Close()
 }

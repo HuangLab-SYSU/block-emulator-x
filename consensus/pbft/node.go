@@ -23,7 +23,7 @@ import (
 type messageHandleFunc func(context.Context, []byte) error
 
 const (
-	executeInterval = 1000 * time.Millisecond
+	executeInterval = 500 * time.Millisecond
 )
 
 // Node is the node running the PBFT consensus.
@@ -34,8 +34,8 @@ type Node struct {
 	txPool   txpool.TxPool       // txPool is the transactions pool.
 	pbftMeta *consensusMeta      // pbftMeta is the current consensus procedure
 
-	iop insideop.ShardInsideExtraOp
-	oop outsideop.ShardOutsideMsgOp
+	iop insideop.ShardInsideOp
+	omh outsideop.ShardOutsideMsgHandler
 
 	msgHandler map[string]messageHandleFunc
 }
@@ -98,14 +98,13 @@ func (n *Node) run() {
 		// try to step into the next process
 		if err := n.step2NextStage(ctx); err != nil {
 			slog.ErrorContext(ctx, "step2NextStage", "err", err)
-			continue
 		}
 
 		// if this node is the leader and not proposed yet, try to propose one block
 		if n.pbftMeta.stage == stagePreprepare && n.pbftMeta.info.NodeID == n.pbftMeta.leader && !n.pbftMeta.proposed {
-			err := n.propose(ctx)
-			if err != nil {
+			if err := n.propose(ctx); err != nil {
 				slog.ErrorContext(ctx, "propose", "err", err)
+				continue
 			}
 
 			n.pbftMeta.proposed = true
@@ -126,7 +125,7 @@ func (n *Node) registerHandleFunc() {
 func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	handleFunc, exist := n.msgHandler[msg.GetMsgType()]
 	if !exist {
-		if err := n.oop.HandleMsgOutsideShard(ctx, msg); err != nil {
+		if err := n.omh.HandleMsgOutsideShard(ctx, msg); err != nil {
 			return fmt.Errorf("handleMsgOutsideShard: %w", err)
 		}
 
@@ -148,8 +147,12 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 
 	// ignore the out-of-date message
 	if ppMsg.View < n.pbftMeta.view || ppMsg.Seq < n.pbftMeta.seq {
-		slog.InfoContext(ctx, "handle out-of-date Preprepare", "view", ppMsg.View, "seq", ppMsg.Seq)
+		slog.InfoContext(ctx, "handle out-of-date Preprepare, ignore it", "view", ppMsg.View, "seq", ppMsg.Seq)
 		return nil
+	}
+
+	if err := n.iop.ValidateProposal(ctx, &ppMsg.P); err != nil {
+		return fmt.Errorf("validate preprepare proposal err: %w", err)
 	}
 
 	n.pbftMeta.msgPool.PushPreprepareMsg(&ppMsg)
@@ -165,7 +168,7 @@ func (n *Node) handlePrepare(ctx context.Context, payload []byte) error {
 
 	// ignore the out-of-date message
 	if pMsg.View < n.pbftMeta.view || pMsg.Seq < n.pbftMeta.seq {
-		slog.InfoContext(ctx, "handle out-of-date Prepare", "view", pMsg.View, "seq", pMsg.Seq)
+		slog.InfoContext(ctx, "handle out-of-date Prepare, ignore it", "view", pMsg.View, "seq", pMsg.Seq)
 		return nil
 	}
 
@@ -182,7 +185,7 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 
 	// ignore the out-of-date message
 	if cMsg.View < n.pbftMeta.view || cMsg.Seq < n.pbftMeta.seq {
-		slog.InfoContext(ctx, "handle out-of-date Commit", "view", cMsg.View, "seq", cMsg.Seq)
+		slog.InfoContext(ctx, "handle out-of-date Commit, ignore it", "view", cMsg.View, "seq", cMsg.Seq)
 		return nil
 	}
 
@@ -209,29 +212,43 @@ func (n *Node) handleReceiveTxs(ctx context.Context, payload []byte) error {
 
 // step2NextStage steps to next pbft stage until it steps to the end
 func (n *Node) step2NextStage(ctx context.Context) error {
-	newStage, err := n.pbftMeta.step2Next()
-	if err != nil {
-		slog.InfoContext(ctx, "step2NextStage", "step to next stage failed, details", err)
-		return nil
-	}
-
-	switch newStage {
-	case stagePreprepare:
-		// nothing to do in Preprepare stages
-	case stagePrepare:
-		// broadcast prepare message here
-		if err = n.prepareBroadcast(ctx); err != nil {
-			return fmt.Errorf("prepareBroadcast: %w", err)
+	for {
+		oldStage, newStage, err := n.pbftMeta.step2Next()
+		if err != nil {
+			return fmt.Errorf("step2NextStage: %w", err)
 		}
-	case stageCommit:
-		if err = n.commitBroadcast(ctx); err != nil {
-			return fmt.Errorf("commitBroadcast: %w", err)
+		// stages is unchanged, return
+		if oldStage == newStage {
+			return nil
+		}
+
+		switch newStage {
+		case stagePreprepare:
+			// send the last proposal to the supervisor
+			if err = n.iop.DeliverConfirmedProposal(ctx, &n.pbftMeta.lastProposal.P); err != nil {
+				slog.ErrorContext(ctx, "deliver the last confirmed proposal failed", "err", err)
+			}
+
+			return nil
+		case stagePrepare:
+			// broadcast prepare message here
+			if err = n.prepareBroadcast(ctx); err != nil {
+				return fmt.Errorf("prepareBroadcast failed, err: %w", err)
+			}
+			// not return, go to next recursion
+		case stageCommit:
+			if err = n.commitBroadcast(ctx); err != nil {
+				return fmt.Errorf("commitBroadcast failed, err: %w", err)
+			}
+
+			// not return, go to next recursion
+		default:
+			return fmt.Errorf("unknown stage: %d", newStage)
 		}
 	}
-
-	return n.step2NextStage(ctx)
 }
 
+// propose build a proposal for this round and broadcast it to all followers.
 func (n *Node) propose(ctx context.Context) error {
 	p, err := n.iop.BuildProposal(ctx)
 	if err != nil {
@@ -312,4 +329,6 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 func (n *Node) closeAll() {
 	n.conn.Close()
 	_ = n.chain.Close()
+	n.iop.Close()
+	n.omh.Close()
 }
