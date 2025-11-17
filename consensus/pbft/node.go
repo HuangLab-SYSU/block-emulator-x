@@ -30,8 +30,6 @@ const (
 type Node struct {
 	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
 	resolver nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
-	chain    *chain.Chain        // chain is the data-structure of blockchain.
-	txPool   txpool.TxPool       // txPool is the transactions pool.
 	pbftMeta *consensusMeta      // pbftMeta is the current consensus procedure
 
 	iop insideop.ShardInsideOp
@@ -57,8 +55,6 @@ func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, c *chain.Chain, t
 	return &Node{
 		conn:     conn,
 		resolver: r,
-		chain:    c,
-		txPool:   txp,
 		pbftMeta: newConsensusMeta(cfg),
 	}, nil
 }
@@ -119,7 +115,6 @@ func (n *Node) registerHandleFunc() {
 	n.msgHandler[message.PreprepareMessageType] = n.handlePreprepare
 	n.msgHandler[message.PrepareMessageType] = n.handlePrepare
 	n.msgHandler[message.CommitMessageType] = n.handleCommit
-	n.msgHandler[message.ReceiveTxsMessageType] = n.handleReceiveTxs
 }
 
 func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) error {
@@ -194,22 +189,6 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 	return nil
 }
 
-func (n *Node) handleReceiveTxs(ctx context.Context, payload []byte) error {
-	var txsMsg message.ReceiveTxsMsg
-
-	err := gob.NewDecoder(bytes.NewBuffer(payload)).Decode(&txsMsg)
-	if err != nil {
-		return fmt.Errorf("decode receive txs msg: %w", err)
-	}
-
-	err = n.txPool.AddTxs(txsMsg.Txs)
-	if err != nil {
-		return fmt.Errorf("add txs: %w", err)
-	}
-
-	return nil
-}
-
 // step2NextStage steps to next pbft stage until it steps to the end
 func (n *Node) step2NextStage(ctx context.Context) error {
 	for {
@@ -224,8 +203,8 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 
 		switch newStage {
 		case stagePreprepare:
-			// send the last proposal to the supervisor
-			if err = n.iop.DeliverConfirmedProposal(ctx, &n.pbftMeta.lastProposal.P); err != nil {
+			// deliver according to the last proposal
+			if err = n.iop.ProposalCommitAndDeliver(ctx, &n.pbftMeta.lastProposal.P); err != nil {
 				slog.ErrorContext(ctx, "deliver the last confirmed proposal failed", "err", err)
 			}
 
@@ -328,7 +307,6 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 
 func (n *Node) closeAll() {
 	n.conn.Close()
-	_ = n.chain.Close()
 	n.iop.Close()
 	n.omh.Close()
 }

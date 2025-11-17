@@ -1,12 +1,14 @@
 package chain
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
@@ -22,6 +24,7 @@ type Chain struct {
 	s         *storage.Storage
 	curHeader *block.Header
 	shardID   int64
+	epochID   int64
 
 	cfg config.BlockchainCfg
 
@@ -45,6 +48,7 @@ func NewChain(cfg config.BlockchainCfg, shardID int64) (*Chain, error) {
 
 	chain := &Chain{
 		shardID:   shardID,
+		epochID:   0,
 		s:         s,
 		cfg:       cfg,
 		curHeader: &block.Header{},
@@ -123,8 +127,6 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 		err                              error
 		blockHash, blockByte, headerByte []byte
 	)
-	// validate block
-
 	if blockHash, err = utils.CalcHash(b); err != nil {
 		return fmt.Errorf("calc hash err: %w", err)
 	}
@@ -150,6 +152,43 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	return nil
 }
 
+// GetAccountLocations returns the shard-locations of all accounts by reading the MPT in the chain.
+// It calls getAccountStates with a mutex.
+func (c *Chain) GetAccountLocations(ctx context.Context, accounts []account.Account) ([]*account.State, error) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	states, err := c.getAccountStates(ctx, accounts)
+	if err != nil {
+		return nil, fmt.Errorf("get account states err: %w", err)
+	}
+
+	return states, nil
+}
+
+// ValidateBlock validates blocks according to c's config.
+// Note that, this function only validate block structure, but will not assert whether a block is valid to be added in this chain.
+func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
+	txRoot, err := c.getTxTrieRoot(ctx, b.Body.TxList)
+	if err != nil {
+		return fmt.Errorf("get tx trie stateRoot err: %w", err)
+	}
+
+	if !bytes.Equal(txRoot, b.Header.TxRoot) {
+		return fmt.Errorf("tx root mismatch")
+	}
+
+	return nil
+}
+
+func (c *Chain) GetShardID() int64 {
+	return c.shardID
+}
+
+func (c *Chain) GetEpochID() int64 {
+	return c.epochID
+}
+
 // Close closes the blockchain.
 func (c *Chain) Close() error {
 	err := c.s.BlockStorage.Close()
@@ -168,13 +207,10 @@ func (c *Chain) Close() error {
 func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 	genesisMiner := account.Address{}
 
-	var (
-		b   *block.Block
-		err error
-	)
-
 	ctx := context.Background()
-	if b, err = c.GenerateBlock(ctx, genesisMiner, []transaction.Transaction{}); err != nil {
+
+	b, err := c.GenerateBlock(ctx, genesisMiner, []transaction.Transaction{})
+	if err != nil {
 		return nil, fmt.Errorf("generate block err: %w", err)
 	}
 
@@ -186,7 +222,7 @@ func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 }
 
 func (c *Chain) previewUpdatedTrie(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
-	keys, values, err := c.getUpdatedAccountsBytes(ctx, txs)
+	keys, values, err := c.calculateAccountsAndStatesBytes(ctx, txs)
 	if err != nil {
 		return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
 	}
@@ -200,7 +236,7 @@ func (c *Chain) previewUpdatedTrie(ctx context.Context, txs []transaction.Transa
 }
 
 func (c *Chain) updateTrie(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
-	keys, values, err := c.getUpdatedAccountsBytes(ctx, txs)
+	keys, values, err := c.calculateAccountsAndStatesBytes(ctx, txs)
 	if err != nil {
 		return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
 	}
@@ -213,48 +249,34 @@ func (c *Chain) updateTrie(ctx context.Context, txs []transaction.Transaction) (
 	return root, nil
 }
 
-func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.Transaction) ([][]byte, [][]byte, error) {
+func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []transaction.Transaction) ([][]byte, [][]byte, error) {
 	account2StateInShard := make(map[account.Account]*account.State, len(txs)*2)
 	for _, tx := range txs {
 		account2StateInShard[tx.Sender] = nil
 		account2StateInShard[tx.Recipient] = nil
 	}
 
-	accountByteList := make([][]byte, 0, len(account2StateInShard))
+	accountList := maps.Keys(account2StateInShard)
 
-	for a := range account2StateInShard {
-		encodedAccount, _ := a.Encode()
-		accountByteList = append(accountByteList, encodedAccount)
-	}
-
-	originStateByteList, err := c.s.TrieStorage.MGetAccountStates(ctx, accountByteList)
+	originalStates, err := c.getAccountStates(ctx, accountList)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get addr state err: %w", err)
+		return nil, nil, fmt.Errorf("get account states err: %w", err)
 	}
 
-	for i, accountByte := range accountByteList {
-		a, _ := account.DecodeAccount(accountByte)
-		osb := originStateByteList[i]
-
-		var s *account.State = nil
-
-		if osb != nil {
-			if s, err = account.DecodeState(osb); err != nil {
-				return nil, nil, fmt.Errorf("decode state err: %w", err)
-			}
-		}
+	for i, a := range accountList {
+		s := originalStates[i]
 
 		// if it is a new account, init it.
 		if s == nil {
 			ssid := partition.DefaultAccountLoc(a.Addr, c.cfg.ShardNum)
-			s = account.NewState(*a, []int64{ssid})
+			s = account.NewState(a, ssid)
 		}
 		// this account is not in the shard, skip it
-		if !slices.Contains(s.ShardLocations, c.shardID) {
+		if s.ShardLocation != c.shardID {
 			continue
 		}
 
-		account2StateInShard[*a] = s
+		account2StateInShard[a] = s
 	}
 
 	// update in map
@@ -274,9 +296,7 @@ func (c *Chain) getUpdatedAccountsBytes(ctx context.Context, txs []transaction.T
 	}
 
 	// pack state list
-	retAccountByteList := make([][]byte, 0, len(account2StateInShard))
-
-	stateByteList := make([][]byte, 0, len(account2StateInShard))
+	retAccountByteList, stateByteList := make([][]byte, 0, len(account2StateInShard)), make([][]byte, 0, len(account2StateInShard))
 
 	for k, v := range account2StateInShard {
 		if v == nil { // this account is not in the shard
@@ -325,4 +345,31 @@ func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction
 	}
 
 	return root, nil
+}
+
+func (c *Chain) getAccountStates(ctx context.Context, accounts []account.Account) ([]*account.State, error) {
+	accountByteList := make([][]byte, len(accounts))
+	for i, addr := range accounts {
+		aByte, err := addr.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode addr err: %w", err)
+		}
+
+		accountByteList[i] = aByte
+	}
+
+	stateByteList, err := c.s.TrieStorage.MGetAccountStates(ctx, accountByteList)
+	if err != nil {
+		return nil, fmt.Errorf("get account states err: %w", err)
+	}
+
+	states := make([]*account.State, len(accounts))
+	for i, stateByte := range stateByteList {
+		states[i], err = account.DecodeState(stateByte)
+		if err != nil {
+			return nil, fmt.Errorf("decode state err: %w", err)
+		}
+	}
+
+	return states, nil
 }

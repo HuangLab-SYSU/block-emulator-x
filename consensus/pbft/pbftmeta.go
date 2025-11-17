@@ -7,7 +7,6 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/pool"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 )
@@ -27,7 +26,6 @@ const (
 type consensusMeta struct {
 	cfg config.ConsensusCfg
 
-	addr   account.Address   // address in this blockchain
 	info   nodetopo.NodeInfo // information of current node
 	f      int64             // the number of fault-tolerance nodes
 	leader int64             // the leader id
@@ -52,7 +50,6 @@ func newConsensusMeta(cfg config.ConsensusCfg) *consensusMeta {
 		cfg: cfg,
 
 		info:   nodetopo.NodeInfo{NodeID: cfg.NodeID, ShardID: cfg.ShardID},
-		addr:   cfg.WalletAddr,
 		f:      (cfg.NodeNum - 1) / 3,
 		leader: initialLeader,
 		closed: false,

@@ -13,6 +13,9 @@ import (
 )
 
 const (
+	Relay1Tx = 1
+	Relay2Tx = 2
+
 	RawTxBrokerStage  = 0
 	Sigma1BrokerStage = 1
 	Sigma2BrokerStage = 2
@@ -59,6 +62,7 @@ func NewTransaction(sender, recipient account.Account, value *big.Int, nonce int
 }
 
 // Encode encodes transactions.
+// Transaction encode should be prepare
 func (tx *Transaction) Encode() ([]byte, error) {
 	var buff bytes.Buffer
 

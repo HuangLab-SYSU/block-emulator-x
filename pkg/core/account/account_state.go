@@ -14,19 +14,19 @@ var ErrNotEnoughBalance = errors.New("not enough balance")
 
 // State record the details of an account, and it will be saved in the mpt.
 type State struct {
-	Account        Account
-	ShardLocations []int64
-	Nonce          int64
-	Balance        *big.Int
-	StorageRoot    []byte // storage root of contract structure
-	CodeHash       []byte // the code hash of the smart contract account
+	Account       Account
+	ShardLocation int64
+	Nonce         int64
+	Balance       *big.Int
+	StorageRoot   []byte // storage root of contract structure
+	CodeHash      []byte // the code hash of the smart contract account
 }
 
-func NewState(account Account, loc []int64) *State {
+func NewState(account Account, loc int64) *State {
 	return &State{
-		Account:        account,
-		ShardLocations: loc,
-		Balance:        big.NewInt(initBalance),
+		Account:       account,
+		ShardLocation: loc,
+		Balance:       big.NewInt(initBalance),
 	}
 }
 

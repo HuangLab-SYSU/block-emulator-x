@@ -4,9 +4,19 @@ import (
 	"fmt"
 )
 
+const SupervisorShardID = 0x7fffffff
+
 type TopoGetter struct {
 	leaders     map[int64]NodeInfo
 	shard2nodes map[int64][]NodeInfo
+}
+
+func (t *TopoGetter) GetSupervisor() (NodeInfo, error) {
+	if leader, ok := t.leaders[SupervisorShardID]; ok {
+		return leader, nil
+	}
+
+	return NodeInfo{}, fmt.Errorf("no supervisor found")
 }
 
 func NewTopoGetter(l map[int64]NodeInfo, s map[int64][]NodeInfo) *TopoGetter {

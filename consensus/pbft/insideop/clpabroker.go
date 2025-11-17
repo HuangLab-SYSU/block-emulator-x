@@ -18,7 +18,7 @@ func (C *CLPABrokerInsideOp) ValidateProposal(ctx context.Context, proposal *mes
 	panic("implement me")
 }
 
-func (C *CLPABrokerInsideOp) DeliverConfirmedProposal(ctx context.Context, proposal *message.Proposal) error {
+func (C *CLPABrokerInsideOp) ProposalCommitAndDeliver(ctx context.Context, proposal *message.Proposal) error {
 	// TODO implement me
 	panic("implement me")
 }

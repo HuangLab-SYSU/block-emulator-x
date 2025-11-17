@@ -6,6 +6,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.0
 	github.com/stretchr/testify v1.10.0
 	go.etcd.io/bbolt v1.4.1
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 	google.golang.org/grpc v1.75.1
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1

@@ -18,7 +18,7 @@ func (s *StaticBrokerInsideOp) ValidateProposal(ctx context.Context, proposal *m
 	panic("implement me")
 }
 
-func (s *StaticBrokerInsideOp) DeliverConfirmedProposal(ctx context.Context, proposal *message.Proposal) error {
+func (s *StaticBrokerInsideOp) ProposalCommitAndDeliver(ctx context.Context, proposal *message.Proposal) error {
 	// TODO implement me
 	panic("implement me")
 }

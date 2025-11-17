@@ -51,6 +51,15 @@ func TestEthereumDefaultTrieBasicFlow(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, vals[0], retrieved[0])
 	assert.Equal(t, vals[1], retrieved[1])
+
+	// set the old trie
+	err = tdb.SetStateRoot(ctx, notCommitRoot)
+	assert.NoError(t, err)
+
+	retrieved, err = tdb.MGetAccountStates(ctx, keys)
+	assert.NoError(t, err)
+	assert.Nil(t, retrieved[0])
+	assert.Nil(t, retrieved[1])
 }
 
 func TestEthereumDefaultTrieEmptyAndMismatchInputs(t *testing.T) {

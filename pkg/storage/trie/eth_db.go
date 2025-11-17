@@ -158,6 +158,19 @@ func (e *EthereumDefaultTrieDB) MGetAccountStates(_ context.Context, keys [][]by
 	return ret, nil
 }
 
+func (e *EthereumDefaultTrieDB) SetStateRoot(_ context.Context, root []byte) error {
+	newRoot := common.BytesToHash(root)
+
+	_, err := trie.New(trie.TrieID(newRoot), e.trieDB)
+	if err != nil {
+		return fmt.Errorf("new trie failed, err=%w", err)
+	}
+
+	e.curStateRoot = newRoot
+
+	return nil
+}
+
 func (e *EthereumDefaultTrieDB) Close() error {
 	return e.trieDB.Close()
 }
