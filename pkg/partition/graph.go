@@ -1,15 +1,18 @@
 package partition
 
-// Vertex 图中的结点，即区块链网络中参与交易的账户
+import "github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
+
+// Vertex is the account in the blockchain.
 type Vertex struct {
-	Addr [20]byte // 账户地址
-	// 其他
+	Addr account.Address // account address
+	// else
 }
 
-// Graph 描述当前区块链交易集合的图
+// Graph is to describe the accounts / transactions in the blockchain.
+// vertex - account, edge - transaction
 type Graph struct {
-	VertexSet map[Vertex]struct{} // 节点集合，其实是 set
-	EdgeSet   map[Vertex][]Vertex // 记录节点与节点间是否存在交易，邻接表
+	VertexSet map[Vertex]struct{} // the set of vertexes
+	EdgeSet   map[Vertex][]Vertex // to record the edges (transactions) between vertexes (accounts)
 }
 
 func NewGraph() *Graph {
@@ -19,18 +22,19 @@ func NewGraph() *Graph {
 	}
 }
 
-// AddVertex 增加图中的点
+// AddVertex adds the vertexes in the graph
 func (g *Graph) AddVertex(v Vertex) {
 	g.VertexSet[v] = struct{}{}
 }
 
-// AddEdge 增加图中的边
+// AddEdge adds the edges in the graph
 func (g *Graph) AddEdge(u, v Vertex) {
-	// 如果没有点，则增加点
+	// add vertexes first
 	g.AddVertex(u)
 	g.AddVertex(v)
 
-	// 无向图，使用双向边，权恒定为 1
+	// non-direct graph, the weight of each edge is 1
+	// There can exist repeated edges.
 	g.EdgeSet[u] = append(g.EdgeSet[u], v)
 	g.EdgeSet[v] = append(g.EdgeSet[v], u)
 }

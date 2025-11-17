@@ -10,17 +10,17 @@ const updateThreshold = 50
 
 // CLPAState is the state of constraint label propagation algorithm
 type CLPAState struct {
-	netGraph         *Graph         // 需运行CLPA算法的图
-	partitionMap     map[Vertex]int // 记录分片信息的 map，某个节点属于哪个分片
-	shardWeight      []float64      // total weight of edges associated with label k
-	vertexNumInShard []int          // Shard 内节点的数目
-	minShardWeight   float64        // 最少的 Shard 邻接边数，最小的 total weight of edges associated with label k
+	netGraph         *Graph         // the graph to run CLPA algorithm.
+	partitionMap     map[Vertex]int // records the locations of all vertexes.
+	shardWeight      []float64      // total weight of edges associated with label k.
+	vertexNumInShard []int          // the number of vertexes in each shard.
+	minShardWeight   float64        // the min values in shardWeight, i.e., min(total weight of edges associated with label k)
 
-	crossShardEdgeNum float64 // 跨分片边的总数，与论文算法无关，用于评估性能
+	crossShardEdgeNum float64 // the total number of all cross-shard edges, which is used for evaluating the performance of CLPA.
 
-	maxIterations int     // 最大迭代次数，constraint，对应论文中的\tau
-	weightPenalty float64 // 权重惩罚，对应论文中的 beta
-	shardNum      int     // 分片数目
+	maxIterations int     // hyperparameter, the max iteration times, for the \tau in the paper.
+	weightPenalty float64 // hyperparameter, the weight penalty, for the beta in the paper.
+	shardNum      int     // hyperparameter, the number of shards.
 }
 
 func NewCLPAState(wp float64, maxIterations, shardNum int) *CLPAState {
@@ -36,7 +36,7 @@ func NewCLPAState(wp float64, maxIterations, shardNum int) *CLPAState {
 	}
 }
 
-// AddVertex 加入节点，需要将它默认归到一个分片中
+// AddVertex adds vertexes to the graph and locate it to a default shard.
 func (cs *CLPAState) AddVertex(v Vertex) {
 	cs.netGraph.AddVertex(v)
 
@@ -47,9 +47,9 @@ func (cs *CLPAState) AddVertex(v Vertex) {
 	}
 }
 
-// AddEdge 加入边，需要将它的端点（如果不存在）默认归到一个分片中
+// AddEdge adds edges.
+// if the vertexes of this edge are not existed, add them first.
 func (cs *CLPAState) AddEdge(u, v Vertex) {
-	// 如果没有点，则增加边，权恒定为 1
 	if _, ok := cs.netGraph.VertexSet[u]; !ok {
 		cs.AddVertex(u)
 	}
@@ -61,7 +61,7 @@ func (cs *CLPAState) AddEdge(u, v Vertex) {
 	cs.netGraph.AddEdge(u, v)
 }
 
-// GetVertexLocation 获取节点所属的分片
+// GetVertexLocation gets the location of a vertex
 func (cs *CLPAState) GetVertexLocation(v Vertex) int {
 	if val, ok := cs.partitionMap[v]; ok {
 		return val
@@ -70,7 +70,7 @@ func (cs *CLPAState) GetVertexLocation(v Vertex) int {
 	return int(DefaultAccountLoc(v.Addr, int64(cs.shardNum)))
 }
 
-// computeEdges2Shard 根据当前划分，计算 Wk，即 shardWeight
+// computeEdges2Shard calculates shardWeight according to current graph.
 func (cs *CLPAState) computeEdges2Shard() {
 	cs.shardWeight = make([]float64, cs.shardNum)
 	cs.crossShardEdgeNum = 0
@@ -79,37 +79,36 @@ func (cs *CLPAState) computeEdges2Shard() {
 	cs.minShardWeight = math.MaxInt
 
 	for v, lst := range cs.netGraph.EdgeSet {
-		// 获取节点 v 所属的shard
+		// get the shard of vertex v
 		vShard := cs.partitionMap[v]
 		for _, u := range lst {
-			// 同上，获取节点 u 所属的shard
+			// get the shard of vertex u
 			uShard := cs.partitionMap[u]
 			if vShard != uShard {
-				// 判断节点 v, u 不属于同一分片，则对应的 shardWeight 加一
-				// 根据论文公式 (5) 的前半部分，仅计算出度
+				// if u and v are not in the same shard, increase shardWeight
+				// according to the equation (5) in the paper, calculate out-degree only.
 				crossEdge[vShard]++
 			} else {
-				// vShard 内部边加一
+				// increase the inner-shard edge
 				interEdge[vShard]++
 			}
 		}
 	}
 
 	for _, val := range crossEdge {
-		// 因为一条边被插入两次，所以需要除以 2
+		// one edge will be inserted twice, thus val should be divided by 2.
 		cs.crossShardEdgeNum += float64(val) / 2
 	}
 
 	for i := range cs.shardWeight {
-		// 根据论文共识 (5)，计算 Lk(x)
+		// according to the equation (5) in the paper, calculate Lk(x)
 		cs.shardWeight[i] = float64(crossEdge[i]) + float64(interEdge[i])/2
 	}
-	// 修改 minShardWeight
+	// get the minShardWeight
 	cs.minShardWeight = slices.Min(cs.shardWeight)
 }
 
-// changeShardRecompute 在账户所属分片变动时，重新计算各个参数
-// This is a faster function than before.
+// changeShardRecompute calculates each parameter when the locations of accounts are changed.
 func (cs *CLPAState) changeShardRecompute(v Vertex, old int) {
 	newShard := cs.partitionMap[v]
 	for _, u := range cs.netGraph.EdgeSet[v] {
@@ -127,7 +126,7 @@ func (cs *CLPAState) changeShardRecompute(v Vertex, old int) {
 	cs.minShardWeight = slices.Min(cs.shardWeight)
 }
 
-// CLPAPartition 运行 CLPA 划分算法
+// CLPAPartition runs CLPA.
 func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	cs.computeEdges2Shard()
 	slog.Info("Before running CLPA", "cross-shard edge number: ", cs.crossShardEdgeNum)
@@ -135,7 +134,7 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	ret := make(map[[20]byte]int)
 	updateTimes := make(map[Vertex]int)
 
-	for range cs.maxIterations { // 第一层循环控制算法次数，constraint
+	for range cs.maxIterations { // first loop, constraint the max iterations
 		for v := range cs.netGraph.VertexSet {
 			if updateTimes[v] >= updateThreshold {
 				continue
@@ -147,7 +146,7 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 			vNowShard, maxScoreShard := cs.partitionMap[v], cs.partitionMap[v]
 			for _, u := range cs.netGraph.EdgeSet[v] {
 				uShard := cs.partitionMap[u]
-				// 对于属于 uShard 的邻居，仅需计算一次
+				// calculate only once for each neighbor shard.
 				if _, computed := neighborShardScore[uShard]; !computed {
 					neighborShardScore[uShard] = cs.getShardScore(v, uShard)
 					if maxScore < neighborShardScore[uShard] {
@@ -161,10 +160,10 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 				cs.partitionMap[v] = maxScoreShard
 				ret[v.Addr] = maxScoreShard
 				updateTimes[v]++
-				// 重新计算 vertexNumInShard
+				// re-calculate vertexNumInShard
 				cs.vertexNumInShard[vNowShard]--
 				cs.vertexNumInShard[maxScoreShard]++
-				// 重新计算Wk
+				// re-calculate Wk
 				cs.changeShardRecompute(v, vNowShard)
 			}
 		}
@@ -180,11 +179,11 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	return ret, cs.crossShardEdgeNum
 }
 
-// getShardScore 计算 将节点 v 放入 uShard 所产生的 score
+// getShardScore calculate the earning score that moving vertex v to uShard.
 func (cs *CLPAState) getShardScore(v Vertex, uShard int) float64 {
-	// 节点 v 的出度
+	// the outdegree of v
 	vOutdegree := len(cs.netGraph.EdgeSet[v])
-	// uShard 与节点 v 相连的边数
+	// the number of edges in uShard that connects to vertex v
 	edge2uShard := 0
 
 	for _, item := range cs.netGraph.EdgeSet[v] {

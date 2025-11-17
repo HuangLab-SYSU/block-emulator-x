@@ -36,7 +36,7 @@ func generateRandomEdges() [][]Vertex {
 		a, _ := rand.Int(rand.Reader, big.NewInt(int64(vertexNum)))
 		b, _ := rand.Int(rand.Reader, big.NewInt(int64(vertexNum)))
 		if a.Int64() == b.Int64() {
-			i-- // 避免自环
+			i-- // avoid a self-loop tx
 			continue
 		}
 		ret[i] = []Vertex{vertexes[a.Int64()], vertexes[b.Int64()]}
