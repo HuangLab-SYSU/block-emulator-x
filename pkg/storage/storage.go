@@ -14,14 +14,14 @@ type Storage struct {
 	TrieStorage  trie.Store
 }
 
-func NewStorage(cfg config.StorageCfg) (*Storage, error) {
+func NewStorage(cfg config.StorageCfg, lp config.LocalParams) (*Storage, error) {
 	s := &Storage{}
 
 	var err error
 
 	switch cfg.BlockStorageType {
 	default:
-		s.BlockStorage, err = block.NewBoltStore(cfg.BoltCfg)
+		s.BlockStorage, err = block.NewBoltStore(cfg.BoltCfg, lp)
 		if err != nil {
 			return nil, fmt.Errorf("NewBoltStore: %w", err)
 		}
@@ -29,7 +29,7 @@ func NewStorage(cfg config.StorageCfg) (*Storage, error) {
 
 	switch cfg.TrieStorageType {
 	default:
-		s.TrieStorage, err = trie.NewEthereumDefaultTrieDB(cfg.EthStorageCfg)
+		s.TrieStorage, err = trie.NewEthereumDefaultTrieDB(cfg.EthStorageCfg, lp)
 		if err != nil {
 			return nil, fmt.Errorf("NewEthereumDefaultTrieDB: %w", err)
 		}

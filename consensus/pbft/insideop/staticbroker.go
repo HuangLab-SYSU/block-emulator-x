@@ -26,15 +26,17 @@ type StaticBrokerInsideOp struct {
 	txPool txpool.TxPool // txPool is the transactions pool.
 
 	cfg config.ConsensusCfg
+	lp  config.LocalParams
 }
 
-func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusCfg) *StaticBrokerInsideOp {
+func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusCfg, lp config.LocalParams) *StaticBrokerInsideOp {
 	return &StaticBrokerInsideOp{
 		conn:     conn,
 		resolver: resolver,
 		chain:    chain,
 		txPool:   txPool,
 		cfg:      cfg,
+		lp:       lp,
 	}
 }
 
@@ -44,7 +46,7 @@ func (s *StaticBrokerInsideOp) BuildProposal(ctx context.Context) (*message.Prop
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}
 
-	b, err := s.chain.GenerateBlock(ctx, s.cfg.WalletAddr, txs)
+	b, err := s.chain.GenerateBlock(ctx, s.lp.WalletAddr, txs)
 	if err != nil {
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
@@ -54,7 +56,7 @@ func (s *StaticBrokerInsideOp) BuildProposal(ctx context.Context) (*message.Prop
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
 
-	slog.InfoContext(ctx, "block generated", "shard ID", s.cfg.ShardID, "block height", b.Header.Number, "block create time", b.Header.CreateTime)
+	slog.InfoContext(ctx, "block is generated in static broker module", "shard ID", s.chain.GetShardID(), "block height", b.Header.Number, "block create time", b.Header.CreateTime)
 
 	return p, nil
 }

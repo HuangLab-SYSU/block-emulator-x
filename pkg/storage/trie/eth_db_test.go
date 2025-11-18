@@ -11,11 +11,13 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/config"
 )
 
+var emptyLocalParams = config.LocalParams{}
+
 func TestEthereumDefaultTrieBasicFlow(t *testing.T) {
 	ctx := context.Background()
 
 	// 构造内存 trie DB
-	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true})
+	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true}, emptyLocalParams)
 	assert.NoError(t, err)
 
 	// 初始 root 应该是空的
@@ -64,7 +66,7 @@ func TestEthereumDefaultTrieBasicFlow(t *testing.T) {
 
 func TestEthereumDefaultTrieEmptyAndMismatchInputs(t *testing.T) {
 	// 构造内存 trie DB
-	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true})
+	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true}, emptyLocalParams)
 	assert.NoError(t, err)
 	ctx := context.Background()
 
@@ -86,7 +88,7 @@ func TestEthereumDefaultTrieEmptyAndMismatchInputs(t *testing.T) {
 
 func TestEthereumDefaultTrieGetUnknownKey(t *testing.T) {
 	// 构造内存 trie DB
-	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true})
+	tdb, err := NewEthereumDefaultTrieDB(config.EthStorageCfg{IsMemoryDB: true}, emptyLocalParams)
 	assert.NoError(t, err)
 	ctx := context.Background()
 	vals, err := tdb.MGetAccountStates(ctx, [][]byte{[]byte("unknown")})

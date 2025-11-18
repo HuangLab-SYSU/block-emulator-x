@@ -2,7 +2,6 @@ package block
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
@@ -10,16 +9,13 @@ import (
 
 func TestBoltDb(t *testing.T) {
 	testDbDir := "bolt-storage-test"
-	testDbFile := "bolt"
 	// create dir
 	err := os.MkdirAll(testDbDir, os.ModePerm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	boltDb, err := NewBoltStore(config.BoltCfg{
-		FilePath: filepath.Join(testDbDir, testDbFile),
-	})
+	boltDb, err := NewBoltStore(config.BoltCfg{FilePathDir: testDbDir}, config.LocalParams{})
 	if err != nil {
 		t.Fatal("newBoltStore failed, err: ", err)
 	}

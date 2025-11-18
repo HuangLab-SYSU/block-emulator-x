@@ -21,7 +21,8 @@ func (NoOperationTxSource) ReadTxs(int64) ([]transaction.Transaction, error) {
 
 func NewTxSource(cfg config.TxSourceCfg) (TxSource, error) {
 	var ts TxSource
-	switch cfg.TxSource {
+
+	switch cfg.TxSourceType {
 	case csvsource.Key:
 		cs, err := csvsource.NewCSVSource(cfg.TxSourceFile)
 		if err != nil {

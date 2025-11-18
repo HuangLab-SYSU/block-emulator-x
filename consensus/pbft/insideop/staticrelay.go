@@ -29,15 +29,17 @@ type StaticRelayInsideOp struct {
 	txPool txpool.TxPool // txPool is the transactions pool.
 
 	cfg config.ConsensusCfg
+	lp  config.LocalParams
 }
 
-func NewStaticRelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusCfg) *StaticRelayInsideOp {
+func NewStaticRelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusCfg, lp config.LocalParams) *StaticRelayInsideOp {
 	return &StaticRelayInsideOp{
 		conn:     conn,
 		resolver: resolver,
 		chain:    chain,
 		txPool:   txPool,
 		cfg:      cfg,
+		lp:       lp,
 	}
 }
 
@@ -53,7 +55,7 @@ func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Propo
 		return nil, fmt.Errorf("modifyTxRelayOpt failed: %w", err)
 	}
 
-	b, err := s.chain.GenerateBlock(ctx, s.cfg.WalletAddr, mTxs)
+	b, err := s.chain.GenerateBlock(ctx, s.lp.WalletAddr, mTxs)
 	if err != nil {
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
@@ -63,7 +65,7 @@ func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Propo
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
 
-	slog.InfoContext(ctx, "block generated", "shard ID", s.cfg.ShardID, "block height", b.Header.Number, "block create time", b.Header.CreateTime)
+	slog.InfoContext(ctx, "block is generated in static relay module", "shard ID", s.chain.GetShardID(), "block height", b.Header.Number, "block create time", b.Header.CreateTime)
 
 	return p, nil
 }

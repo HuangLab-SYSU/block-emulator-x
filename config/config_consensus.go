@@ -8,43 +8,29 @@ const (
 )
 
 type SupervisorCfg struct {
-	ShardNum         int64
-	TxNumber         int64
-	TxInjectionSpeed int64 // transactions per second
-	ResultOutputDir  string
-
-	TxSourceCfg
-
-	BrokerModuleCfg
-
-	ConsensusType string
-
-	EpochDuration int64 // the time duration for an epoch (second)
+	ShardNum         int64  `json:"shard_num" yaml:"shard_num"`
+	TxNumber         int64  `json:"tx_number" yaml:"tx_number"`
+	TxInjectionSpeed int64  `json:"tx_injection_speed" yaml:"tx_injection_speed"` // transactions per second
+	ResultOutputDir  string `json:"result_output_dir" yaml:"result_output_dir"`
+	ConsensusType    string `json:"consensus_type" yaml:"consensus_type"`
+	EpochDuration    int64  `json:"epoch_duration" yaml:"epoch_duration"`
+	TxSourceCfg      `json:"tx_source" yaml:"tx_source"`
+	BrokerModuleCfg  `json:"broker_module" yaml:"broker_module"`
 }
 
 type TxSourceCfg struct {
-	TxSource     string
-	TxSourceFile string
+	TxSourceType string `json:"tx_source_type" yaml:"tx_source_type"`
+	TxSourceFile string `json:"tx_source_file" yaml:"tx_source_file"`
 }
 
 type ConsensusCfg struct {
-	ShardNum int64
-	NodeNum  int64
+	ShardNum int64 `json:"shard_num" yaml:"shard_num"`
+	NodeNum  int64 `json:"node_num" yaml:"node_num"`
 
-	HandlerBufferSize int64
-	BlockInterval     int64 // ms
-
-	LocalSetting
-}
-
-type LocalSetting struct {
-	NodeID     int64
-	ShardID    int64
-	WalletAddr [20]byte
-	Host       string
+	BlockInterval int64 `json:"block_interval" yaml:"block_interval"` // ms
 }
 
 type BrokerModuleCfg struct {
-	BrokerPath string
-	BrokerNum  int64
+	BrokerFilePath string `json:"broker_file_path" yaml:"broker_file_path"`
+	BrokerNum      int64  `json:"broker_num" yaml:"broker_num"`
 }

@@ -49,16 +49,12 @@ func getAccountLocationsInTxs(ctx context.Context, c *chain.Chain, txs []transac
 
 	requestAccounts := maps.Keys(accountLocations)
 
-	states, err := c.GetAccountLocations(ctx, requestAccounts)
+	states, err := c.GetAccountStates(ctx, requestAccounts)
 	if err != nil {
-		return nil, fmt.Errorf("GetAccountLocations failed: %w", err)
+		return nil, fmt.Errorf("GetAccountStates failed: %w", err)
 	}
 
 	for i, requestAccount := range requestAccounts {
-		if states[i] == nil {
-			return nil, fmt.Errorf("unexpected error: state is nil for account: %s", requestAccounts[i])
-		}
-
 		accountLocations[requestAccount] = states[i].ShardLocation
 	}
 

@@ -30,15 +30,16 @@ var (
 )
 
 func TestChain(t *testing.T) {
+	cfg := getTestConfig()
 	// create test dir
-	err := os.MkdirAll(chainStorageTestDir, os.ModePerm)
+	err := os.MkdirAll(cfg.BoltCfg.FilePathDir, os.ModePerm)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clearChainStorage()
 
 	// create block
-	bc, err := NewChain(getTestConfig(), 0)
+	bc, err := NewChain(getTestConfig(), config.LocalParams{ShardID: 0})
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, bc.Close())
@@ -85,7 +86,7 @@ func getTestConfig() config.BlockchainCfg {
 			BlockStorageType: "bolt",
 			TrieStorageType:  "eth_level",
 			BoltCfg: config.BoltCfg{
-				FilePath: path.Join(chainStorageTestDir, "bolt"),
+				FilePathDir: path.Join(chainStorageTestDir, "bolt"),
 			},
 			EthStorageCfg: config.EthStorageCfg{
 				IsMemoryDB: true, // memory db for testing

@@ -1,0 +1,41 @@
+blockchain:
+  shard_num: 4
+  bloom_filter:
+    bitset_len: 4096
+    filter_hash_func: [sha256, sha512, sha1]
+  storage:
+    block_storage_type: "bolt"
+    trie_storage_type: "eth_level_db"
+    bolt:
+      file_path_dir: "./exp/boltdb/"
+    eth_storage:
+      is_memory_db: false
+      level_file_path_dir: "./exp/trie_db/"
+      old_state_root: ""
+
+tx_pool:
+  type: "number" # [byte, number]
+  limit: 2000
+
+consensus:
+  shard_num: 4
+  node_num: 4
+  block_interval: 5000 # ms
+
+supervisor:
+  shard_num: 4
+  tx_number: 100000
+  tx_injection_speed: 10000
+  result_output_dir:
+  consensus_type: "static_relay" # [static_relay, static_broker, clpa_relay, clpa_broker]
+  epoch_duration: 50.0 # second
+  tx_source:
+    tx_source_type: "random_source" # [random_source, csv_source]
+    tx_source_file: "" # valid when tx_source_type = csv_source
+  broker_module:
+    broker_file_path: "./pkg/broker/broker"
+    broker_num: 50
+
+network:
+  bandwidth: 1000000
+  latency: 0

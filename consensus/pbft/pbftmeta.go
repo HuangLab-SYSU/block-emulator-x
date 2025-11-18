@@ -25,6 +25,7 @@ const (
 // Note that, consensusMeta is not thread-safe.
 type consensusMeta struct {
 	cfg config.ConsensusCfg
+	lp  config.LocalParams
 
 	info   nodetopo.NodeInfo // information of current node
 	f      int64             // the number of fault-tolerance nodes
@@ -45,11 +46,11 @@ type consensusMeta struct {
 	commitSet    map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
 }
 
-func newConsensusMeta(cfg config.ConsensusCfg) *consensusMeta {
+func newConsensusMeta(cfg config.ConsensusCfg, lp config.LocalParams) *consensusMeta {
 	return &consensusMeta{
 		cfg: cfg,
 
-		info:   nodetopo.NodeInfo{NodeID: cfg.NodeID, ShardID: cfg.ShardID},
+		info:   nodetopo.NodeInfo{NodeID: lp.NodeID, ShardID: lp.ShardID},
 		f:      (cfg.NodeNum - 1) / 3,
 		leader: initialLeader,
 		closed: false,

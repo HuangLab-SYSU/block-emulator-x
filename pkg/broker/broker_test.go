@@ -19,8 +19,8 @@ const (
 
 func TestBroker(t *testing.T) {
 	cfg := config.BrokerModuleCfg{
-		BrokerPath: "./broker",
-		BrokerNum:  10,
+		BrokerFilePath: "./broker",
+		BrokerNum:      10,
 	}
 	bm, err := NewBrokerManager(cfg)
 	require.NoError(t, err)

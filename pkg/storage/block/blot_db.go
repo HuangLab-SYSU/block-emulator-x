@@ -3,6 +3,7 @@ package block
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"go.etcd.io/bbolt"
 
@@ -10,11 +11,13 @@ import (
 )
 
 const (
-	BucketBlock       = "block"
-	BucketBlockHeader = "block_header"
-	BucketNewestBlock = "newest_block"
+	bucketBlock       = "block"
+	bucketBlockHeader = "block_header"
+	bucketNewestBlock = "newest_block"
 
-	NewestBlockKey = "newest_block"
+	newestBlockKey = "newest_block"
+
+	boltDBFilePathFmt = "shard_%d_node_%d.db"
 )
 
 // BoltStore implements block.Store.
@@ -22,8 +25,8 @@ type BoltStore struct {
 	db *bbolt.DB
 }
 
-func NewBoltStore(cfg config.BoltCfg) (*BoltStore, error) {
-	db, err := bbolt.Open(cfg.FilePath, 0o600, nil)
+func NewBoltStore(cfg config.BoltCfg, lp config.LocalParams) (*BoltStore, error) {
+	db, err := bbolt.Open(filepath.Join(cfg.FilePathDir, fmt.Sprintf(boltDBFilePathFmt, lp.ShardID, lp.NodeID)), 0o600, nil)
 	if err != nil {
 		return nil, fmt.Errorf("open bolt db err: %w", err)
 	}
@@ -31,17 +34,17 @@ func NewBoltStore(cfg config.BoltCfg) (*BoltStore, error) {
 	err = db.Update(func(tx *bbolt.Tx) error {
 		var err error
 
-		_, err = tx.CreateBucketIfNotExists([]byte(BucketBlock))
+		_, err = tx.CreateBucketIfNotExists([]byte(bucketBlock))
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.CreateBucketIfNotExists([]byte(BucketBlockHeader))
+		_, err = tx.CreateBucketIfNotExists([]byte(bucketBlockHeader))
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.CreateBucketIfNotExists([]byte(BucketNewestBlock))
+		_, err = tx.CreateBucketIfNotExists([]byte(bucketNewestBlock))
 		if err != nil {
 			return err
 		}
@@ -59,12 +62,12 @@ func NewBoltStore(cfg config.BoltCfg) (*BoltStore, error) {
 
 func (b *BoltStore) UpdateNewestBlockHash(_ context.Context, newBlockHash []byte) error {
 	err := b.db.Update(func(tx *bbolt.Tx) error {
-		bucket := tx.Bucket([]byte(BucketNewestBlock))
+		bucket := tx.Bucket([]byte(bucketNewestBlock))
 		if bucket == nil {
-			return fmt.Errorf("fetch BucketNewestBlock failed, bucket is nil")
+			return fmt.Errorf("fetch bucketNewestBlock failed, bucket is nil")
 		}
 
-		err := bucket.Put([]byte(NewestBlockKey), newBlockHash)
+		err := bucket.Put([]byte(newestBlockKey), newBlockHash)
 		if err != nil {
 			return fmt.Errorf("put newest blockHash err: %w", err)
 		}
@@ -82,12 +85,12 @@ func (b *BoltStore) GetNewestBlockHash(_ context.Context) ([]byte, error) {
 	var result []byte
 
 	err := b.db.View(func(tx *bbolt.Tx) error {
-		bucket := tx.Bucket([]byte(BucketNewestBlock))
+		bucket := tx.Bucket([]byte(bucketNewestBlock))
 		if bucket == nil {
-			return fmt.Errorf("fetch BucketNewestBlock failed, bucket is nil")
+			return fmt.Errorf("fetch bucketNewestBlock failed, bucket is nil")
 		}
 
-		result = bucket.Get([]byte(NewestBlockKey))
+		result = bucket.Get([]byte(newestBlockKey))
 		if result == nil {
 			return fmt.Errorf("get newest blockHash failed")
 		}
@@ -104,9 +107,9 @@ func (b *BoltStore) GetNewestBlockHash(_ context.Context) ([]byte, error) {
 func (b *BoltStore) AddBlockHeader(_ context.Context, blockHash, encodedBlockHeader []byte) error {
 	err := b.db.Update(func(tx *bbolt.Tx) error {
 		// add block header first
-		headerBucket := tx.Bucket([]byte(BucketBlockHeader))
+		headerBucket := tx.Bucket([]byte(bucketBlockHeader))
 		if headerBucket == nil {
-			return fmt.Errorf("fetch BucketBlockHeader failed, headerBucket is nil")
+			return fmt.Errorf("fetch bucketBlockHeader failed, headerBucket is nil")
 		}
 
 		err := headerBucket.Put(blockHash, encodedBlockHeader)
@@ -115,12 +118,12 @@ func (b *BoltStore) AddBlockHeader(_ context.Context, blockHash, encodedBlockHea
 		}
 
 		// update the newest block hash
-		newestBlockBucket := tx.Bucket([]byte(BucketNewestBlock))
+		newestBlockBucket := tx.Bucket([]byte(bucketNewestBlock))
 		if newestBlockBucket == nil {
-			return fmt.Errorf("fetch BucketNewestBlock failed, newestBlockBucket is nil")
+			return fmt.Errorf("fetch bucketNewestBlock failed, newestBlockBucket is nil")
 		}
 
-		err = newestBlockBucket.Put([]byte(NewestBlockKey), blockHash)
+		err = newestBlockBucket.Put([]byte(newestBlockKey), blockHash)
 		if err != nil {
 			return fmt.Errorf("update newest blockHash err: %w", err)
 		}
@@ -138,14 +141,14 @@ func (b *BoltStore) GetBlockHeaderByHash(_ context.Context, blockHash []byte) ([
 	var result []byte
 
 	err := b.db.View(func(tx *bbolt.Tx) error {
-		bucket := tx.Bucket([]byte(BucketBlockHeader))
+		bucket := tx.Bucket([]byte(bucketBlockHeader))
 		if bucket == nil {
-			return fmt.Errorf("fetch BucketBlockHeader failed, bucket is nil")
+			return fmt.Errorf("fetch bucketBlockHeader failed, bucket is nil")
 		}
 
 		result = bucket.Get(blockHash)
 		if result == nil {
-			return fmt.Errorf("get blockHash in the BucketBlockHeader failed")
+			return fmt.Errorf("get blockHash in the bucketBlockHeader failed")
 		}
 
 		return nil
@@ -160,9 +163,9 @@ func (b *BoltStore) GetBlockHeaderByHash(_ context.Context, blockHash []byte) ([
 func (b *BoltStore) AddBlock(_ context.Context, blockHash, encodedBlock, encodedBlockHeader []byte) error {
 	err := b.db.Update(func(tx *bbolt.Tx) error {
 		// add block first
-		blockBucket := tx.Bucket([]byte(BucketBlock))
+		blockBucket := tx.Bucket([]byte(bucketBlock))
 		if blockBucket == nil {
-			return fmt.Errorf("fetch BucketBlock failed, bucket is nil")
+			return fmt.Errorf("fetch bucketBlock failed, bucket is nil")
 		}
 
 		err := blockBucket.Put(blockHash, encodedBlock)
@@ -171,9 +174,9 @@ func (b *BoltStore) AddBlock(_ context.Context, blockHash, encodedBlock, encoded
 		}
 
 		// add block header
-		headerBucket := tx.Bucket([]byte(BucketBlockHeader))
+		headerBucket := tx.Bucket([]byte(bucketBlockHeader))
 		if headerBucket == nil {
-			return fmt.Errorf("fetch BucketBlockHeader failed, headerBucket is nil")
+			return fmt.Errorf("fetch bucketBlockHeader failed, headerBucket is nil")
 		}
 
 		err = headerBucket.Put(blockHash, encodedBlockHeader)
@@ -182,12 +185,12 @@ func (b *BoltStore) AddBlock(_ context.Context, blockHash, encodedBlock, encoded
 		}
 
 		// update the newest block hash
-		newestBlockBucket := tx.Bucket([]byte(BucketNewestBlock))
+		newestBlockBucket := tx.Bucket([]byte(bucketNewestBlock))
 		if newestBlockBucket == nil {
-			return fmt.Errorf("fetch BucketNewestBlock failed, newestBlockBucket is nil")
+			return fmt.Errorf("fetch bucketNewestBlock failed, newestBlockBucket is nil")
 		}
 
-		err = newestBlockBucket.Put([]byte(NewestBlockKey), blockHash)
+		err = newestBlockBucket.Put([]byte(newestBlockKey), blockHash)
 		if err != nil {
 			return fmt.Errorf("update newest blockHash err: %w", err)
 		}
@@ -205,14 +208,14 @@ func (b *BoltStore) GetBlockByHash(_ context.Context, hash []byte) ([]byte, erro
 	var result []byte
 
 	err := b.db.View(func(tx *bbolt.Tx) error {
-		bucket := tx.Bucket([]byte(BucketBlock))
+		bucket := tx.Bucket([]byte(bucketBlock))
 		if bucket == nil {
-			return fmt.Errorf("fetch BucketBlock failed, bucket is nil")
+			return fmt.Errorf("fetch bucketBlock failed, bucket is nil")
 		}
 
 		result = bucket.Get(hash)
 		if result == nil {
-			return fmt.Errorf("get block by hash in BucketBlock failed")
+			return fmt.Errorf("get block by hash in bucketBlock failed")
 		}
 
 		return nil

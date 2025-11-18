@@ -3,6 +3,7 @@ package trie
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -16,22 +17,27 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/config"
 )
 
-const levelDBNamespace = "trie"
+const (
+	levelDBNamespace    = "trie"
+	defaultLevelCache   = 16
+	defaultLevelHandler = 16
+	levelDBFilePathFmt  = "shard_%d_node_%d"
+)
 
 type EthereumDefaultTrieDB struct {
 	trieDB       *triedb.Database
 	curStateRoot common.Hash
 }
 
-func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg) (*EthereumDefaultTrieDB, error) {
+func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg, lp config.LocalParams) (*EthereumDefaultTrieDB, error) {
 	var db ethdb.Database
 	if cfg.IsMemoryDB {
 		db = rawdb.NewMemoryDatabase()
 	} else {
 		level, err := leveldb.New(
-			cfg.LevelFilePath,
-			cfg.LevelCache,
-			cfg.LevelHandler,
+			filepath.Join(cfg.LevelFilePathDir, fmt.Sprintf(levelDBFilePathFmt, lp.ShardID, lp.NodeID)),
+			defaultLevelCache,
+			defaultLevelHandler,
 			levelDBNamespace,
 			false,
 		)
@@ -49,8 +55,8 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg) (*EthereumDefaultTrieDB,
 
 	trieId := trie.TrieID(types.EmptyRootHash)
 	// if there are existing merkle, try to re-build it.
-	if cfg.OldStateRoot != nil {
-		trieId = trie.TrieID(common.BytesToHash(cfg.OldStateRoot))
+	if cfg.OldStateRoot != "" {
+		trieId = trie.TrieID(common.BytesToHash([]byte(cfg.OldStateRoot)))
 		// make sure that the old trie can be built.
 		_, err := trie.New(trieId, trieDb)
 		if err != nil {

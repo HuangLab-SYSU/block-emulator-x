@@ -11,8 +11,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/insideop"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/outsideop"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
@@ -39,23 +37,19 @@ type Node struct {
 }
 
 // NewPBFTNode creates a new node running PBFT consensus with given configurations.
-func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, c *chain.Chain, txp txpool.TxPool, cfg config.ConsensusCfg) (*Node, error) {
-	if cfg.ShardNum <= 0 || cfg.ShardNum <= cfg.ShardID {
-		return nil, fmt.Errorf("invalid shardID=%d", cfg.ShardID)
+func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.ConsensusCfg, lp config.LocalParams) (*Node, error) {
+	if cfg.ShardNum <= 0 || cfg.ShardNum <= lp.ShardID {
+		return nil, fmt.Errorf("invalid shardID=%d", lp.ShardID)
 	}
 
-	if cfg.NodeNum <= 0 || cfg.NodeNum <= cfg.NodeID {
-		return nil, fmt.Errorf("invalid nodeID=%d", cfg.NodeID)
-	}
-
-	if cfg.HandlerBufferSize <= 0 {
-		return nil, fmt.Errorf("expected HandlerBufferSize > 0, got handlerBufferSize=%d", cfg.HandlerBufferSize)
+	if cfg.NodeNum <= 0 || cfg.NodeNum <= lp.NodeID {
+		return nil, fmt.Errorf("invalid nodeID=%d", lp.NodeID)
 	}
 
 	return &Node{
 		conn:     conn,
 		resolver: r,
-		pbftMeta: newConsensusMeta(cfg),
+		pbftMeta: newConsensusMeta(cfg, lp),
 	}, nil
 }
 
@@ -262,8 +256,8 @@ func (n *Node) prepareBroadcast(ctx context.Context) error {
 		Digest:  n.pbftMeta.curProposal.Digest,
 		View:    n.pbftMeta.view,
 		Seq:     n.pbftMeta.seq,
-		ShardID: n.pbftMeta.cfg.ShardID,
-		NodeID:  n.pbftMeta.cfg.NodeID,
+		ShardID: n.pbftMeta.lp.ShardID,
+		NodeID:  n.pbftMeta.lp.NodeID,
 	}
 
 	w, err := message.WrapMsg(pMsg)
@@ -286,8 +280,8 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 		Digest:  n.pbftMeta.curProposal.Digest,
 		View:    n.pbftMeta.view,
 		Seq:     n.pbftMeta.seq,
-		ShardID: n.pbftMeta.cfg.ShardID,
-		NodeID:  n.pbftMeta.cfg.NodeID,
+		ShardID: n.pbftMeta.lp.ShardID,
+		NodeID:  n.pbftMeta.lp.NodeID,
 	}
 
 	w, err := message.WrapMsg(cMsg)

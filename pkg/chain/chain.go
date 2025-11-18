@@ -32,22 +32,22 @@ type Chain struct {
 }
 
 // NewChain creates a new blockchain data structure with given components.
-func NewChain(cfg config.BlockchainCfg, shardID int64) (*Chain, error) {
+func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
 	if cfg.ShardNum <= 0 {
-		return nil, fmt.Errorf("expected shard number >= 0, got %d", cfg.ShardNum)
+		return nil, fmt.Errorf("expected shard number > 0, got %d", cfg.ShardNum)
 	}
 
-	if cfg.ShardNum <= shardID {
-		return nil, fmt.Errorf("expected shard id < shard number, got %d", shardID)
+	if cfg.ShardNum <= lp.ShardID {
+		return nil, fmt.Errorf("expected shard id < shard number, got %d", lp.ShardID)
 	}
 
-	s, err := storage.NewStorage(cfg.StorageCfg)
+	s, err := storage.NewStorage(cfg.StorageCfg, lp)
 	if err != nil {
 		return nil, err
 	}
 
 	chain := &Chain{
-		shardID:   shardID,
+		shardID:   lp.ShardID,
 		epochID:   0,
 		s:         s,
 		cfg:       cfg,
@@ -152,9 +152,9 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	return nil
 }
 
-// GetAccountLocations returns the shard-locations of all accounts by reading the MPT in the chain.
+// GetAccountStates returns the shard-locations of all accounts by reading the MPT in the chain.
 // It calls getAccountStates with a mutex.
-func (c *Chain) GetAccountLocations(ctx context.Context, accounts []account.Account) ([]*account.State, error) {
+func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account) ([]account.State, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -163,7 +163,17 @@ func (c *Chain) GetAccountLocations(ctx context.Context, accounts []account.Acco
 		return nil, fmt.Errorf("get account states err: %w", err)
 	}
 
-	return states, nil
+	ret := make([]account.State, len(states))
+	for i, state := range states {
+		if state == nil {
+			// return the init state
+			ret[i] = *account.NewState(accounts[i], partition.DefaultAccountLoc(accounts[i].Addr, c.cfg.ShardNum))
+		} else {
+			ret[i] = *state
+		}
+	}
+
+	return ret, nil
 }
 
 // ValidateBlock validates blocks according to c's config.
@@ -268,8 +278,7 @@ func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []trans
 
 		// if it is a new account, init it.
 		if s == nil {
-			ssid := partition.DefaultAccountLoc(a.Addr, c.cfg.ShardNum)
-			s = account.NewState(a, ssid)
+			s = account.NewState(a, partition.DefaultAccountLoc(a.Addr, c.cfg.ShardNum))
 		}
 		// this account is not in the shard, skip it
 		if s.ShardLocation != c.shardID {
@@ -360,11 +369,16 @@ func (c *Chain) getAccountStates(ctx context.Context, accounts []account.Account
 
 	stateByteList, err := c.s.TrieStorage.MGetAccountStates(ctx, accountByteList)
 	if err != nil {
-		return nil, fmt.Errorf("get account states err: %w", err)
+		return nil, fmt.Errorf("get account states from trie err: %w", err)
 	}
 
 	states := make([]*account.State, len(accounts))
+
 	for i, stateByte := range stateByteList {
+		if stateByte == nil {
+			continue
+		}
+
 		states[i], err = account.DecodeState(stateByte)
 		if err != nil {
 			return nil, fmt.Errorf("decode state err: %w", err)

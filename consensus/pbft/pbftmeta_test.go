@@ -19,14 +19,18 @@ const (
 )
 
 var consensusCfg = config.ConsensusCfg{
-	ShardNum:          1,
-	NodeNum:           testNodeNum,
-	HandlerBufferSize: 1 << 10,
-	BlockInterval:     int64(1 * time.Second),
+	ShardNum:      1,
+	NodeNum:       testNodeNum,
+	BlockInterval: int64(1 * time.Second),
+}
+
+var localParams = config.LocalParams{
+	NodeID:  0,
+	ShardID: 0,
 }
 
 func TestConsensusMeta(t *testing.T) {
-	cm := newConsensusMeta(consensusCfg)
+	cm := newConsensusMeta(consensusCfg, localParams)
 
 	// inject messages
 	injectMsg(cm)

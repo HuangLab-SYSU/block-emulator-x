@@ -13,9 +13,9 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
-const Key = "CSVSource"
+const Key = "csv_source"
 
-// CSVSource implements TxSource.
+// CSVSource implements TxSourceType.
 // The csv file format supported by this implementation is like those from XBlock (https://xblock.pro/xblock-eth.html).
 type CSVSource struct {
 	count int64

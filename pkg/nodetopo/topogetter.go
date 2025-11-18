@@ -11,19 +11,19 @@ type TopoGetter struct {
 	shard2nodes map[int64][]NodeInfo
 }
 
+func NewTopoGetter(l map[int64]NodeInfo, s map[int64][]NodeInfo) *TopoGetter {
+	return &TopoGetter{
+		leaders:     l,
+		shard2nodes: s,
+	}
+}
+
 func (t *TopoGetter) GetSupervisor() (NodeInfo, error) {
 	if leader, ok := t.leaders[SupervisorShardID]; ok {
 		return leader, nil
 	}
 
 	return NodeInfo{}, fmt.Errorf("no supervisor found")
-}
-
-func NewTopoGetter(l map[int64]NodeInfo, s map[int64][]NodeInfo) *TopoGetter {
-	return &TopoGetter{
-		leaders:     l,
-		shard2nodes: s,
-	}
 }
 
 func (t *TopoGetter) GetNodesInShard(shardID int64) ([]NodeInfo, error) {

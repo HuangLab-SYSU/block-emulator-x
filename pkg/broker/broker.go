@@ -205,7 +205,7 @@ func (s *Manager) createBroker2Tx(txHash rawTxHash) (*transaction.Transaction, e
 func readBrokersFromFile(cfg config.BrokerModuleCfg) (map[account.Address]int64, error) {
 	brokerSet := make(map[account.Address]int64)
 
-	f, err := os.Open(cfg.BrokerPath)
+	f, err := os.Open(cfg.BrokerFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("open broker file: %w", err)
 	}
