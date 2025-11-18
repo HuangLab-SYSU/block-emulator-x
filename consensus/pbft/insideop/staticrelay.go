@@ -8,8 +8,6 @@ import (
 	"log/slog"
 	"time"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
@@ -49,7 +47,13 @@ func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Propo
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}
 
-	b, err := s.chain.GenerateBlock(ctx, s.cfg.WalletAddr, txs)
+	// if a transaction is a cross-shard tx, modify its RelayOpt
+	mTxs, err := s.modifyTxRelayOpt(ctx, txs)
+	if err != nil {
+		return nil, fmt.Errorf("modifyTxRelayOpt failed: %w", err)
+	}
+
+	b, err := s.chain.GenerateBlock(ctx, s.cfg.WalletAddr, mTxs)
 	if err != nil {
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
@@ -100,6 +104,57 @@ func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, prop
 
 func (s *StaticRelayInsideOp) Close() {}
 
+// set the RelayOpt of txs
+func (s *StaticRelayInsideOp) modifyTxRelayOpt(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, error) {
+	accountLocations, err := getAccountLocationsInTxs(ctx, s.chain, txs)
+	if err != nil {
+		return nil, fmt.Errorf("getAccountLocationsInTxs failed: %w", err)
+	}
+
+	modifiedTxs := make([]transaction.Transaction, 0, len(txs))
+	shardID := s.chain.GetShardID()
+
+	for _, tx := range txs {
+		// if this tx's relay stage is determined, not modify it
+		if tx.RelayStage != transaction.UndeterminedRelayTx {
+			modifiedTxs = append(modifiedTxs, tx)
+			continue
+		}
+
+		senderID, senderOK := accountLocations[tx.Sender]
+		recipientID, recipientOK := accountLocations[tx.Recipient]
+
+		if !senderOK || !recipientOK {
+			return nil, fmt.Errorf("tx sender or recipient does not exist in the accountLocation map")
+		}
+
+		if senderID != shardID {
+			slog.ErrorContext(ctx, "modify tx relay opt failed, the sender of this tx is not in this shard, and this transaction is not a relay-2 tx")
+			continue
+		}
+
+		// this is an inner-shard tx, append it
+		if senderID == recipientID {
+			modifiedTxs = append(modifiedTxs, tx)
+			continue
+		}
+
+		// this is a cross-shard tx, modify its RelayOpt
+		var thash []byte
+
+		if thash, err = utils.CalcHash(&tx); err != nil {
+			return nil, fmt.Errorf("CalcHash failed: %w", err)
+		}
+
+		r1tx := tx
+		r1tx.RelayStage = transaction.Relay1Tx
+		r1tx.ROriginalHash = thash
+		modifiedTxs = append(modifiedTxs, r1tx)
+	}
+
+	return modifiedTxs, nil
+}
+
 func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context, proposal *message.Proposal) error {
 	var b block.Block
 	if err := gob.NewDecoder(bytes.NewReader(proposal.Payload)).Decode(&b); err != nil {
@@ -111,18 +166,15 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 	}
 
 	// deliver this block info to the supervisor
-	accountLocations, err := s.getAccountLocationsInTxs(ctx, b.Body.TxList)
+	innerTxs, r1Txs, r2Txs := s.splitTxs(ctx, b.Body.TxList)
+
+	if err := s.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
+		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
+	}
+
+	accountLocations, err := getAccountLocationsInTxs(ctx, s.chain, b.Body.TxList)
 	if err != nil {
 		return fmt.Errorf("getAccountLocationsInTxs failed: %w", err)
-	}
-
-	innerTxs, r1Txs, r2Txs, err := s.splitTxs(ctx, b.Body.TxList, accountLocations)
-	if err != nil {
-		return fmt.Errorf("splitTxs failed: %w", err)
-	}
-
-	if err = s.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
-		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}
 
 	if err = s.sendRelayedTxs(ctx, r1Txs, accountLocations); err != nil {
@@ -132,78 +184,24 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 	return nil
 }
 
-func (s *StaticRelayInsideOp) getAccountLocationsInTxs(ctx context.Context, txs []transaction.Transaction) (map[account.Account]int64, error) {
-	// get all locations of accounts.
-	accountLocations := make(map[account.Account]int64)
-	for _, tx := range txs {
-		accountLocations[tx.Sender] = -1
-		accountLocations[tx.Recipient] = -1
-	}
-
-	requestAccounts := maps.Keys(accountLocations)
-
-	states, err := s.chain.GetAccountLocations(ctx, requestAccounts)
-	if err != nil {
-		return nil, fmt.Errorf("GetAccountLocations failed: %w", err)
-	}
-
-	for i, requestAccount := range requestAccounts {
-		if states[i] == nil {
-			return nil, fmt.Errorf("unexpected error: state is nil for account: %s", requestAccounts[i])
-		}
-
-		accountLocations[requestAccount] = states[i].ShardLocation
-	}
-
-	return accountLocations, nil
-}
-
 // splitTxs split transactions to inner-shard txs, relay1 txs and relay2 txs.
-func (s *StaticRelayInsideOp) splitTxs(ctx context.Context, txs []transaction.Transaction, accountLocations map[account.Account]int64) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction, error) {
-	// split txs
+func (s *StaticRelayInsideOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
 	innerTxs, r1txs, r2txs := make([]transaction.Transaction, 0), make([]transaction.Transaction, 0), make([]transaction.Transaction, 0)
-	shardID := s.chain.GetShardID()
 
 	for _, tx := range txs {
-		senderID, senderOK := accountLocations[tx.Sender]
-
-		recipientID, recipientOK := accountLocations[tx.Recipient]
-		if !senderOK || !recipientOK {
-			return nil, nil, nil, fmt.Errorf("tx sender or recipient does not exist in the accountLocation map")
-		}
-
-		if senderID == shardID {
-			if recipientID == shardID {
-				innerTxs = append(innerTxs, tx)
-			} else {
-				thash, err := utils.CalcHash(&tx)
-				if err != nil {
-					slog.ErrorContext(ctx, "calculate tx hash failed when splitting txs", "err", err)
-					continue
-				}
-
-				r1tx := tx
-				r1tx.RelayStage = transaction.Relay1Tx
-				r1tx.ROriginalHash = thash
-				r1txs = append(r1txs, r1tx)
-			}
-		} else {
-			if recipientID == shardID {
-				if tx.RelayStage != transaction.Relay1Tx {
-					slog.ErrorContext(ctx, "tx is not on the relay-1 stage", "recipient shard ID", recipientID, "this shard ID", shardID)
-					continue
-				}
-
-				r2tx := tx
-				r2tx.RelayStage = transaction.Relay2Tx
-				r2txs = append(r2txs, r2tx)
-			} else {
-				slog.ErrorContext(ctx, "unexpected tx", "current shard ID", shardID, "senderID", senderID, "recipientID", recipientID)
-			}
+		switch tx.RelayStage {
+		case transaction.UndeterminedRelayTx:
+			innerTxs = append(innerTxs, tx)
+		case transaction.Relay1Tx:
+			r1txs = append(r1txs, tx)
+		case transaction.Relay2Tx:
+			r2txs = append(r2txs, tx)
+		default:
+			slog.ErrorContext(ctx, "invalid relay tx stage", "relay stage", tx.RelayStage)
 		}
 	}
 
-	return innerTxs, r1txs, r2txs, nil
+	return innerTxs, r1txs, r2txs
 }
 
 func (s *StaticRelayInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, innerTxs, r1Txs, r2Txs []transaction.Transaction, b block.Block) error {
@@ -245,11 +243,15 @@ func (s *StaticRelayInsideOp) sendRelayedTxs(ctx context.Context, r1Txs []transa
 			continue
 		}
 
-		relayedTxs[shardID] = append(relayedTxs[shardID], tx)
+		// modify relay tx's RelayOpt
+		updatedRelayedTx := tx
+		updatedRelayedTx.RelayStage = transaction.Relay2Tx
+		relayedTxs[shardID] = append(relayedTxs[shardID], updatedRelayedTx)
 	}
 
 	node2Msg := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, s.cfg.ShardNum)
 
+	// pack messages and send them
 	for i, txs := range relayedTxs {
 		if len(txs) == 0 {
 			continue

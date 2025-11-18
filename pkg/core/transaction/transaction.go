@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	Relay1Tx = 1
-	Relay2Tx = 2
+	UndeterminedRelayTx = 0
+	Relay1Tx            = 1
+	Relay2Tx            = 2
 
 	RawTxBrokerStage  = 0
 	Sigma1BrokerStage = 1
