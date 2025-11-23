@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
@@ -22,10 +23,12 @@ type clientConnection struct {
 type P2PConn struct {
 	mux sync.Mutex
 
-	me         nodetopo.NodeInfo
-	info2Host  map[nodetopo.NodeInfo]string
+	me        nodetopo.NodeInfo
+	info2Host map[nodetopo.NodeInfo]string
+	msgBuffer chan *rpcserver.WrappedMsg
+
+	connLock   sync.Mutex
 	clientPool map[nodetopo.NodeInfo]*clientConnection
-	msgBuffer  chan *rpcserver.WrappedMsg
 
 	rpcserver.UnimplementedReplicaConnServer
 }
@@ -40,13 +43,8 @@ func NewP2PConn(me nodetopo.NodeInfo, info2Host map[nodetopo.NodeInfo]string) *P
 }
 
 func (p *P2PConn) HandleMessage(ctx context.Context, req *rpcserver.HandleMessageRequest) (*rpcserver.HandleMessageResponse, error) {
-	p.mux.Lock()
-	defer p.mux.Unlock()
-
-	select {
-	case p.msgBuffer <- req.GetMsg():
-	default:
-		return nil, fmt.Errorf("dest message buffer is full or closed")
+	if err := p.add2LocalBuffer(req.GetMsg()); err != nil {
+		return nil, fmt.Errorf("add message to buffer failed: %w", err)
 	}
 
 	return &rpcserver.HandleMessageResponse{Ack: true}, nil
@@ -111,12 +109,20 @@ func (p *P2PConn) Close() {
 }
 
 func (p *P2PConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) error {
+	// if the dest node is me, add to the buffer directly
+	if p.me == dest {
+		return p.add2LocalBuffer(msg)
+	}
+
+	p.connLock.Lock()
+	defer p.connLock.Unlock()
+
 	if _, ok := p.info2Host[dest]; !ok {
 		return fmt.Errorf("node %+v not exist in the p2p connection", dest)
 	}
 	// if there's no client, create one and reuse it.
 	if _, ok := p.clientPool[dest]; !ok {
-		conn, err := grpc.NewClient(p.info2Host[dest])
+		conn, err := grpc.NewClient(p.info2Host[dest], grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			return fmt.Errorf("grpc client fail to connect: %w", err)
 		}
@@ -131,6 +137,19 @@ func (p *P2PConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 	})
 	if err != nil {
 		return fmt.Errorf("grpc client fail to send message: %w", err)
+	}
+
+	return nil
+}
+
+func (p *P2PConn) add2LocalBuffer(msg *rpcserver.WrappedMsg) error {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	select {
+	case p.msgBuffer <- msg:
+	default:
+		return fmt.Errorf("message buffer is full or closed")
 	}
 
 	return nil

@@ -46,7 +46,7 @@ func PackShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLo
 	msg2Shard := make(map[int]*rpcserver.WrappedMsg, shardNumber)
 
 	for i := range shardTxs {
-		w, err := message.WrapMsg(message.ReceiveTxsMsg{
+		w, err := message.WrapMsg(&message.ReceiveTxsMsg{
 			Txs: shardTxs[i],
 		})
 		if err != nil {

@@ -207,7 +207,7 @@ func (s *StaticRelayInsideOp) splitTxs(ctx context.Context, txs []transaction.Tr
 }
 
 func (s *StaticRelayInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, innerTxs, r1Txs, r2Txs []transaction.Transaction, b block.Block) error {
-	rbm := message.RelayBlockInfoMsg{
+	rbm := &message.RelayBlockInfoMsg{
 		InnerShardTxs:    innerTxs,
 		Relay1Txs:        r1Txs,
 		Relay2Txs:        r2Txs,

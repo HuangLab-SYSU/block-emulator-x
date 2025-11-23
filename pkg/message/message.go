@@ -9,6 +9,7 @@ import (
 )
 
 // WrapMsg encodes different types of messages.
+// Note that this function's input should be a pointer
 func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
 	msgType, err := getMsgType(msg)
 	if err != nil {

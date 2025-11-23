@@ -3,6 +3,7 @@ package block
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"go.etcd.io/bbolt"
@@ -17,7 +18,7 @@ const (
 
 	newestBlockKey = "newest_block"
 
-	boltDBFilePathFmt = "shard_%d_node_%d.db"
+	boltDBFilePathFmt = "/shard_%d_node_%d/block.db"
 )
 
 // BoltStore implements block.Store.
@@ -26,27 +27,30 @@ type BoltStore struct {
 }
 
 func NewBoltStore(cfg config.BoltCfg, lp config.LocalParams) (*BoltStore, error) {
-	db, err := bbolt.Open(filepath.Join(cfg.FilePathDir, fmt.Sprintf(boltDBFilePathFmt, lp.ShardID, lp.NodeID)), 0o600, nil)
+	fp := filepath.Join(cfg.FilePathDir, fmt.Sprintf(boltDBFilePathFmt, lp.ShardID, lp.NodeID))
+	if err := os.MkdirAll(filepath.Dir(fp), os.ModePerm); err != nil {
+		return nil, fmt.Errorf("create bolt db dir: %w", err)
+	}
+
+	db, err := bbolt.Open(fp, 0o600, nil)
 	if err != nil {
 		return nil, fmt.Errorf("open bolt db err: %w", err)
 	}
 
 	err = db.Update(func(tx *bbolt.Tx) error {
-		var err error
-
-		_, err = tx.CreateBucketIfNotExists([]byte(bucketBlock))
+		_, err := tx.CreateBucketIfNotExists([]byte(bucketBlock))
 		if err != nil {
-			return err
+			return fmt.Errorf("create bucket %s: %w", bucketBlock, err)
 		}
 
 		_, err = tx.CreateBucketIfNotExists([]byte(bucketBlockHeader))
 		if err != nil {
-			return err
+			return fmt.Errorf("create bucket %s: %w", bucketBlockHeader, err)
 		}
 
 		_, err = tx.CreateBucketIfNotExists([]byte(bucketNewestBlock))
 		if err != nil {
-			return err
+			return fmt.Errorf("create bucket %s: %w", bucketNewestBlock, err)
 		}
 
 		return nil

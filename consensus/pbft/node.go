@@ -289,7 +289,7 @@ func (n *Node) propose(ctx context.Context) error {
 }
 
 func (n *Node) prepareBroadcast(ctx context.Context) error {
-	pMsg := message.PrepareMsg{
+	pMsg := &message.PrepareMsg{
 		Digest:  n.pbftMeta.curProposal.Digest,
 		View:    n.pbftMeta.view,
 		Seq:     n.pbftMeta.seq,
@@ -313,7 +313,7 @@ func (n *Node) prepareBroadcast(ctx context.Context) error {
 }
 
 func (n *Node) commitBroadcast(ctx context.Context) error {
-	cMsg := message.CommitMsg{
+	cMsg := &message.CommitMsg{
 		Digest:  n.pbftMeta.curProposal.Digest,
 		View:    n.pbftMeta.view,
 		Seq:     n.pbftMeta.seq,

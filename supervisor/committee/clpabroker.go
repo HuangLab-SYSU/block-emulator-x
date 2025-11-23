@@ -118,7 +118,7 @@ func (c *CLPABrokerCommittee) repartition(ctx context.Context) error {
 
 	modifiedMap, _ := c.state.CLPAPartition()
 	c.supervisorEpoch++
-	cr := message.CLPARepartitionStartMsg{
+	cr := &message.CLPARepartitionStartMsg{
 		Epoch:       c.supervisorEpoch,
 		ModifiedMap: modifiedMap,
 	}

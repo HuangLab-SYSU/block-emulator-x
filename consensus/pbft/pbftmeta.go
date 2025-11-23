@@ -113,7 +113,7 @@ func (c *consensusMeta) step2Next() (int, int, error) {
 	switch c.stage {
 	case stagePreprepare:
 		if c.curProposal == nil {
-			slog.Info("waiting for preprepare message")
+			slog.Debug("waiting for preprepare message")
 			return stagePreprepare, stagePreprepare, nil
 		}
 
@@ -123,7 +123,7 @@ func (c *consensusMeta) step2Next() (int, int, error) {
 
 	case stagePrepare:
 		if len(c.prepareSet) < int(2*c.f+1) {
-			slog.Info("waiting for prepare message", "current", 2*c.f+1, "expect", len(c.prepareSet))
+			slog.Debug("waiting for prepare message", "expect", 2*c.f+1, "current", len(c.prepareSet))
 			return stagePrepare, stagePrepare, nil
 		}
 
@@ -133,7 +133,7 @@ func (c *consensusMeta) step2Next() (int, int, error) {
 
 	case stageCommit:
 		if len(c.commitSet) < int(2*c.f+1) {
-			slog.Info("waiting for commit message", "current", 2*c.f+1, "expect", len(c.commitSet))
+			slog.Debug("waiting for commit message", "expect", 2*c.f+1, "current", len(c.commitSet))
 			return stageCommit, stageCommit, nil
 		}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft"
+	_ "github.com/HuangLab-SYSU/block-emulator/pkg/logger"
 )
 
 var configPath = flag.String("config", "config.yaml", "path to config file")

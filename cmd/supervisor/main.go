@@ -7,6 +7,7 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
 	"github.com/HuangLab-SYSU/block-emulator/config"
+	_ "github.com/HuangLab-SYSU/block-emulator/pkg/logger"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor"
 )
 
