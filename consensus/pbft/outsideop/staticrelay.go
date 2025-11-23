@@ -15,6 +15,10 @@ type StaticRelayOutsideOp struct {
 	txPool txpool.TxPool
 }
 
+func NewStaticRelayOutsideOp(txp txpool.TxPool) *StaticRelayOutsideOp {
+	return &StaticRelayOutsideOp{txPool: txp}
+}
+
 func (s *StaticRelayOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	switch msg.GetMsgType() {
 	case message.ReceiveTxsMessageType:

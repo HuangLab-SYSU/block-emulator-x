@@ -6,50 +6,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var expectedSystemCfg = SystemCfg{
+	ShardNum:      4,
+	NodeNum:       4,
+	ConsensusType: StaticRelayConsensus,
+}
+
 var expectedCfg = Config{
-	BlockchainCfg: BlockchainCfg{
-		ShardNum: 4,
-		BloomFilterCfg: BloomFilterCfg{
-			BitsetLen:      4096,
-			FilterHashFunc: []string{"sha256", "sha512", "sha1"},
-		},
-		StorageCfg: StorageCfg{
-			BlockStorageType: "bolt",
-			TrieStorageType:  "eth_level_db",
-			BoltCfg: BoltCfg{
-				FilePathDir: "./exp/boltdb_test/",
+	GlobalSys: expectedSystemCfg,
+	ConsensusNodeCfg: ConsensusNodeCfg{
+		BlockchainCfg: BlockchainCfg{
+			SystemCfg: expectedSystemCfg,
+			BloomFilterCfg: BloomFilterCfg{
+				BitsetLen:      4096,
+				FilterHashFunc: []string{"sha256", "sha512", "sha1"},
 			},
-			EthStorageCfg: EthStorageCfg{
-				IsMemoryDB:       false,
-				LevelFilePathDir: "./exp/trie_db_test/",
-				OldStateRoot:     "",
+			StorageCfg: StorageCfg{
+				BlockStorageType: "bolt",
+				TrieStorageType:  "eth_level_db",
+				BoltCfg: BoltCfg{
+					FilePathDir: "./exp_test/boltdb/",
+				},
+				EthStorageCfg: EthStorageCfg{
+					IsMemoryDB:       false,
+					LevelFilePathDir: "./exp_test/trie_db/",
+					OldStateRoot:     "",
+				},
 			},
 		},
-	},
-	TxPoolCfg: TxPoolCfg{
-		Type:  "number",
-		Limit: 2000,
-	},
-	ConsensusCfg: ConsensusCfg{
-		ShardNum:      4,
-		NodeNum:       4,
+		TxPoolCfg: TxPoolCfg{
+			Type:  "number",
+			Limit: 2000,
+		},
 		BlockInterval: 5000,
 	},
 	SupervisorCfg: SupervisorCfg{
-		ShardNum:         4,
 		TxNumber:         100000,
 		TxInjectionSpeed: 10000,
-		ResultOutputDir:  "./exp/result_test",
-		ConsensusType:    StaticRelayConsensus,
+		ResultOutputDir:  "./exp_test/results/",
 		EpochDuration:    50.0,
 		TxSourceCfg: TxSourceCfg{
 			TxSourceType: "random_source",
 			TxSourceFile: "",
 		},
 		BrokerModuleCfg: BrokerModuleCfg{
-			BrokerFilePath: "./pkg/broker/broker_test",
+			BrokerFilePath: "./pkg/broker/broker",
 			BrokerNum:      50,
 		},
+		SystemCfg: expectedSystemCfg,
 	},
 	NetworkCfg: NetworkCfg{
 		Bandwidth: 1000000,

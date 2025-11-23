@@ -78,7 +78,9 @@ func generateAccountAddr(s string) account.Address {
 
 func getTestConfig() config.BlockchainCfg {
 	return config.BlockchainCfg{
-		ShardNum: 2,
+		SystemCfg: config.SystemCfg{
+			ShardNum: 2,
+		},
 		BloomFilterCfg: config.BloomFilterCfg{
 			BitsetLen: bitsetTestLen,
 		},

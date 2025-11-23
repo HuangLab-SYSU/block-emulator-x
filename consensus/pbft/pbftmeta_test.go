@@ -2,7 +2,6 @@ package pbft
 
 import (
 	"testing"
-	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
@@ -18,10 +17,13 @@ const (
 	testNodeNum      = int64(4)
 )
 
-var consensusCfg = config.ConsensusCfg{
-	ShardNum:      1,
-	NodeNum:       testNodeNum,
-	BlockInterval: int64(1 * time.Second),
+var consensusCfg = config.ConsensusNodeCfg{
+	BlockchainCfg: config.BlockchainCfg{
+		SystemCfg: config.SystemCfg{
+			ShardNum: 1,
+			NodeNum:  testNodeNum,
+		},
+	},
 }
 
 var localParams = config.LocalParams{

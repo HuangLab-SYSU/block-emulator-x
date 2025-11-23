@@ -25,11 +25,11 @@ type StaticBrokerInsideOp struct {
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
 
-	cfg config.ConsensusCfg
+	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusCfg, lp config.LocalParams) *StaticBrokerInsideOp {
+func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) *StaticBrokerInsideOp {
 	return &StaticBrokerInsideOp{
 		conn:     conn,
 		resolver: resolver,

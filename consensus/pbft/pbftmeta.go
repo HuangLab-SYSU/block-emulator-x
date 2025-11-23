@@ -24,7 +24,7 @@ const (
 // consensusMeta is the metadata of PBFT consensus.
 // Note that, consensusMeta is not thread-safe.
 type consensusMeta struct {
-	cfg config.ConsensusCfg
+	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 
 	info   nodetopo.NodeInfo // information of current node
@@ -46,7 +46,7 @@ type consensusMeta struct {
 	commitSet    map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
 }
 
-func newConsensusMeta(cfg config.ConsensusCfg, lp config.LocalParams) *consensusMeta {
+func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *consensusMeta {
 	return &consensusMeta{
 		cfg: cfg,
 

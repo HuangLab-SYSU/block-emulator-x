@@ -11,6 +11,8 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/insideop"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/outsideop"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
@@ -33,11 +35,11 @@ type Node struct {
 	iop insideop.ShardInsideOp
 	omh outsideop.ShardOutsideMsgHandler
 
-	msgHandler map[string]messageHandleFunc
+	defaultMsgHandler map[string]messageHandleFunc
 }
 
 // NewPBFTNode creates a new node running PBFT consensus with given configurations.
-func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.ConsensusCfg, lp config.LocalParams) (*Node, error) {
+func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*Node, error) {
 	if cfg.ShardNum <= 0 || cfg.ShardNum <= lp.ShardID {
 		return nil, fmt.Errorf("invalid shardID=%d", lp.ShardID)
 	}
@@ -46,10 +48,45 @@ func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Consen
 		return nil, fmt.Errorf("invalid nodeID=%d", lp.NodeID)
 	}
 
+	// new a blockchain
+	bc, err := chain.NewChain(cfg.BlockchainCfg, lp)
+	if err != nil {
+		return nil, fmt.Errorf("NewChain err=%w", err)
+	}
+
+	txp, err := txpool.NewTxPool(cfg.TxPoolCfg)
+	if err != nil {
+		return nil, fmt.Errorf("NewTxPool err=%w", err)
+	}
+
+	var (
+		iop insideop.ShardInsideOp
+		omh outsideop.ShardOutsideMsgHandler
+	)
+
+	switch cfg.ConsensusType {
+	case config.StaticRelayConsensus:
+		iop = insideop.NewStaticRelayInsideOp(conn, r, bc, txp, cfg, lp)
+		omh = outsideop.NewStaticRelayOutsideOp(txp)
+	case config.StaticBrokerConsensus:
+		return nil, fmt.Errorf("unimplemented consensus")
+	case config.CLPARelayConsensus:
+		return nil, fmt.Errorf("unimplemented consensus")
+	case config.CLPABrokerConsensus:
+		return nil, fmt.Errorf("unimplemented consensus")
+	default:
+		return nil, fmt.Errorf("invalid consensus type=%s", cfg.ConsensusType)
+	}
+
 	return &Node{
 		conn:     conn,
 		resolver: r,
 		pbftMeta: newConsensusMeta(cfg, lp),
+
+		iop: iop,
+		omh: omh,
+
+		defaultMsgHandler: make(map[string]messageHandleFunc),
 	}, nil
 }
 
@@ -106,13 +143,13 @@ func (n *Node) run() {
 
 // registerHandleFunc registers all message handle functions.
 func (n *Node) registerHandleFunc() {
-	n.msgHandler[message.PreprepareMessageType] = n.handlePreprepare
-	n.msgHandler[message.PrepareMessageType] = n.handlePrepare
-	n.msgHandler[message.CommitMessageType] = n.handleCommit
+	n.defaultMsgHandler[message.PreprepareMessageType] = n.handlePreprepare
+	n.defaultMsgHandler[message.PrepareMessageType] = n.handlePrepare
+	n.defaultMsgHandler[message.CommitMessageType] = n.handleCommit
 }
 
 func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) error {
-	handleFunc, exist := n.msgHandler[msg.GetMsgType()]
+	handleFunc, exist := n.defaultMsgHandler[msg.GetMsgType()]
 	if !exist {
 		if err := n.omh.HandleMsgOutsideShard(ctx, msg); err != nil {
 			return fmt.Errorf("handleMsgOutsideShard: %w", err)

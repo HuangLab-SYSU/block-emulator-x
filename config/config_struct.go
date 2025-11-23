@@ -6,7 +6,7 @@ type TxPoolCfg struct {
 }
 
 type BlockchainCfg struct {
-	ShardNum       int64 `json:"shard_num" yaml:"shard_num"`
+	SystemCfg
 	BloomFilterCfg `json:"bloom_filter" yaml:"bloom_filter"`
 	StorageCfg     `json:"storage" yaml:"storage"`
 }

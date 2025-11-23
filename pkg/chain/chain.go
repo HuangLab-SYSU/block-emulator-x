@@ -33,14 +33,6 @@ type Chain struct {
 
 // NewChain creates a new blockchain data structure with given components.
 func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
-	if cfg.ShardNum <= 0 {
-		return nil, fmt.Errorf("expected shard number > 0, got %d", cfg.ShardNum)
-	}
-
-	if cfg.ShardNum <= lp.ShardID {
-		return nil, fmt.Errorf("expected shard id < shard number, got %d", lp.ShardID)
-	}
-
 	s, err := storage.NewStorage(cfg.StorageCfg, lp)
 	if err != nil {
 		return nil, err

@@ -32,6 +32,10 @@ type Supervisor struct {
 }
 
 func NewSupervisor(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*Supervisor, error) {
+	if meShardID := conn.GetMeNodeInfo().ShardID; meShardID != nodetopo.SupervisorShardID {
+		return nil, fmt.Errorf("invalid shardID for a supervisor node, expeted=0x%x, actually=0x%x", nodetopo.SupervisorShardID, meShardID)
+	}
+
 	var (
 		ms  measure.Measure
 		com committee.Committee
@@ -96,7 +100,11 @@ func (s *Supervisor) Start() error {
 
 	defer tk.Stop()
 
+	slog.Info("supervisor main-goroutine started")
+
 	for range tk.C {
+		slog.Debug("supervisor is running")
+
 		if s.committee.ShouldStop() {
 			break
 		}
@@ -130,6 +138,8 @@ func (s *Supervisor) Start() error {
 }
 
 func (s *Supervisor) measureSubroutine() {
+	slog.Info("supervisor measure subroutine started")
+
 	for wm := range s.wmBuffer {
 		if err := s.measure.UpdateMeasureRecord(wm); err != nil {
 			slog.Error("failed to update measure record", "err", err)

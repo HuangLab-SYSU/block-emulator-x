@@ -52,6 +52,10 @@ func (p *P2PConn) HandleMessage(ctx context.Context, req *rpcserver.HandleMessag
 	return &rpcserver.HandleMessageResponse{Ack: true}, nil
 }
 
+func (p *P2PConn) GetMeNodeInfo() nodetopo.NodeInfo {
+	return p.me
+}
+
 func (p *P2PConn) ReadMsgBuffer() []*rpcserver.WrappedMsg {
 	p.mux.Lock()
 	defer p.mux.Unlock()

@@ -14,11 +14,10 @@ import (
 )
 
 type Config struct {
-	BlockchainCfg `json:"blockchain" yaml:"blockchain"`
-	TxPoolCfg     `json:"tx_pool"     yaml:"tx_pool"`
-	ConsensusCfg  `json:"consensus"  yaml:"consensus"`
-	SupervisorCfg `json:"supervisor"  yaml:"supervisor"`
-	NetworkCfg    `json:"network"    yaml:"network"`
+	GlobalSys        SystemCfg `json:"system" yaml:"system"`
+	ConsensusNodeCfg `json:"consensus_node" yaml:"consensus_node"`
+	SupervisorCfg    `json:"supervisor"  yaml:"supervisor"`
+	NetworkCfg       `json:"network"    yaml:"network"`
 }
 
 type LocalParams struct {
@@ -54,6 +53,11 @@ func LoadConfig(path string) (*Config, error) {
 	default:
 		return nil, fmt.Errorf("unsupported cfg type")
 	}
+
+	// pass the global system config to the supervisor config
+	cfg.SystemCfg = cfg.GlobalSys
+	// pass the global system config to the blockchain config
+	cfg.BlockchainCfg.SystemCfg = cfg.GlobalSys
 
 	return cfg, nil
 }
