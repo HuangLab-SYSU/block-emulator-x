@@ -141,6 +141,9 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 		return fmt.Errorf("failed to add block to storage: %w", err)
 	}
 
+	// update the current header
+	c.curHeader = b.Header
+
 	return nil
 }
 

@@ -106,6 +106,8 @@ func (s *StaticBrokerInsideOp) blockProposalCommitAndDeliver(ctx context.Context
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
+	slog.Info("block is added in static broker module", "block height", b.Header.Number)
+
 	// deliver this block info to the supervisor
 	innerTxs, b1Txs, b2Txs := s.splitTxs(ctx, b.Body.TxList)
 	if err := s.deliverBlockInfo2Supervisor(ctx, innerTxs, b1Txs, b2Txs, b); err != nil {

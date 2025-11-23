@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/pool"
@@ -36,34 +37,37 @@ type consensusMeta struct {
 
 	// metadata for a single round;
 	// variables below will update per round.
-	proposed     bool                           // this node has proposed in this round or not
-	seq          int64                          // sequence id of PBFT consensus.
-	view         int64                          // view of PBFT consensus.
-	stage        int                            // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
-	curProposal  *message.PreprepareMsg         // preprepare message in this round.
-	lastProposal *message.PreprepareMsg         // preprepare message in the last round.
-	prepareSet   map[nodetopo.NodeInfo]struct{} // prepareSet collects the nodes sending prepare message.
-	commitSet    map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
+	proposed        bool                           // this node has proposed in this round or not
+	seq             int64                          // sequence id of PBFT consensus.
+	view            int64                          // view of PBFT consensus.
+	stage           int                            // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
+	curProposal     *message.PreprepareMsg         // preprepare message in this round.
+	lastProposal    *message.PreprepareMsg         // preprepare message in the last round.
+	lastProposeTime time.Time                      // the time for the last proposal
+	prepareSet      map[nodetopo.NodeInfo]struct{} // prepareSet collects the nodes sending prepare message.
+	commitSet       map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
 }
 
 func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *consensusMeta {
 	return &consensusMeta{
 		cfg: cfg,
+		lp:  lp,
 
-		info:   nodetopo.NodeInfo{NodeID: lp.NodeID, ShardID: lp.ShardID},
 		f:      (cfg.NodeNum - 1) / 3,
 		leader: initialLeader,
 		closed: false,
 
 		msgPool: pool.NewMsgPool(),
 
-		proposed:    false,
-		seq:         0,
-		view:        0,
-		stage:       stagePreprepare,
-		curProposal: nil,
-		prepareSet:  map[nodetopo.NodeInfo]struct{}{},
-		commitSet:   map[nodetopo.NodeInfo]struct{}{},
+		proposed:        false,
+		seq:             0,
+		view:            0,
+		stage:           stagePreprepare,
+		curProposal:     nil,
+		lastProposal:    nil,
+		lastProposeTime: time.Now(),
+		prepareSet:      map[nodetopo.NodeInfo]struct{}{},
+		commitSet:       map[nodetopo.NodeInfo]struct{}{},
 	}
 }
 
@@ -74,9 +78,11 @@ func (c *consensusMeta) curateMsg() {
 		for _, ppMsg := range ppMsgList {
 			if ppMsg.View != c.view || ppMsg.Seq != c.seq || ppMsg.NodeID != c.leader {
 				// if the message is invalid (wrong seq/view or wrong leader), drop it
+				slog.Info("get invalid ppMsg", "view", ppMsg.View, "seq", ppMsg.Seq)
 				continue
 			}
 
+			slog.Info("proposal of this round is received", "view", c.view, "seq", c.seq)
 			c.curProposal = ppMsg
 
 			break
@@ -90,7 +96,8 @@ func (c *consensusMeta) curateMsg() {
 	pMsgList := c.msgPool.ReadPrepareMsg(c.view, c.seq)
 	for _, pMsg := range pMsgList {
 		if pMsg.View != c.view || pMsg.Seq != c.seq || !bytes.Equal(pMsg.Digest, c.curProposal.Digest) {
-			// if the message is invalid (wrong seq/view or wrong digest), drop it
+			// if the prepare message is invalid (wrong seq/view or wrong digest), drop it
+			slog.Info("get invalid pMsg", "view", pMsg.View, "seq", pMsg.Seq)
 			continue
 		}
 
@@ -100,7 +107,8 @@ func (c *consensusMeta) curateMsg() {
 	cMsgList := c.msgPool.ReadCommitMsg(c.view, c.seq)
 	for _, cMsg := range cMsgList {
 		if cMsg.View != c.view || cMsg.Seq != c.seq || !bytes.Equal(cMsg.Digest, c.curProposal.Digest) {
-			// if the message is invalid (wrong seq/view or wrong digest), drop it
+			// if the commit message is invalid (wrong seq/view or wrong digest), drop it
+			slog.Info("get invalid cMsg", "view", cMsg.View, "seq", cMsg.Seq)
 			continue
 		}
 

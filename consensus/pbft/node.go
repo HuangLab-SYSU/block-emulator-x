@@ -131,10 +131,7 @@ func (n *Node) run() {
 		if n.pbftMeta.stage == stagePreprepare && n.pbftMeta.info.NodeID == n.pbftMeta.leader && !n.pbftMeta.proposed {
 			if err := n.propose(ctx); err != nil {
 				slog.ErrorContext(ctx, "propose", "err", err)
-				continue
 			}
-
-			n.pbftMeta.proposed = true
 		}
 	}
 
@@ -171,6 +168,8 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode preprepare msg: %w", err)
 	}
 
+	slog.InfoContext(ctx, "handle preprepare message", "shardID", ppMsg.ShardID, "nodeID", ppMsg.NodeID)
+
 	// ignore the out-of-date message
 	if ppMsg.View < n.pbftMeta.view || ppMsg.Seq < n.pbftMeta.seq {
 		slog.InfoContext(ctx, "handle out-of-date Preprepare, ignore it", "view", ppMsg.View, "seq", ppMsg.Seq)
@@ -192,6 +191,8 @@ func (n *Node) handlePrepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode prepare msg: %w", err)
 	}
 
+	slog.InfoContext(ctx, "handle prepare message", "shardID", pMsg.ShardID, "nodeID", pMsg.NodeID)
+
 	// ignore the out-of-date message
 	if pMsg.View < n.pbftMeta.view || pMsg.Seq < n.pbftMeta.seq {
 		slog.InfoContext(ctx, "handle out-of-date Prepare, ignore it", "view", pMsg.View, "seq", pMsg.Seq)
@@ -208,6 +209,8 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 	if err := gob.NewDecoder(bytes.NewReader(payload)).Decode(&cMsg); err != nil {
 		return fmt.Errorf("decode commit msg: %w", err)
 	}
+
+	slog.InfoContext(ctx, "handle commit message", "shardID", cMsg.ShardID, "nodeID", cMsg.NodeID)
 
 	// ignore the out-of-date message
 	if cMsg.View < n.pbftMeta.view || cMsg.Seq < n.pbftMeta.seq {
@@ -260,6 +263,11 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 
 // propose build a proposal for this round and broadcast it to all followers.
 func (n *Node) propose(ctx context.Context) error {
+	if time.Since(n.pbftMeta.lastProposeTime) < time.Duration(n.pbftMeta.cfg.BlockInterval)*time.Millisecond {
+		// not reach the block interval
+		return nil
+	}
+
 	p, err := n.iop.BuildProposal(ctx)
 	if err != nil {
 		return fmt.Errorf("chain.GenerateBlock failed: %w", err)
@@ -284,6 +292,8 @@ func (n *Node) propose(ctx context.Context) error {
 	}
 
 	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, wrappedMsg)
+	n.pbftMeta.proposed = true
+	n.pbftMeta.lastProposeTime = time.Now()
 
 	return nil
 }

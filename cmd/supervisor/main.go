@@ -31,6 +31,13 @@ func main() {
 		log.Fatal(fmt.Errorf("supervisor.NewSupervisor error: %w", err))
 	}
 
+	// start grpc server
+	go func() {
+		if err := p2p.StartServer(); err != nil {
+			log.Fatal(fmt.Errorf("startServer: %w", err))
+		}
+	}()
+
 	if err = spv.Start(); err != nil {
 		log.Fatal(fmt.Errorf("supervisor.Startup error: %w", err))
 	}

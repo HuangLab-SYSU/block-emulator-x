@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -42,10 +43,29 @@ func NewP2PConn(me nodetopo.NodeInfo, info2Host map[nodetopo.NodeInfo]string) *P
 	}
 }
 
-func (p *P2PConn) HandleMessage(ctx context.Context, req *rpcserver.HandleMessageRequest) (*rpcserver.HandleMessageResponse, error) {
+func (p *P2PConn) StartServer() error {
+	listenAddr := p.info2Host[p.me]
+
+	lis, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", listenAddr, err)
+	}
+
+	s := grpc.NewServer()
+
+	rpcserver.RegisterReplicaConnServer(s, p)
+
+	slog.Info("gRPC P2P server listening", "addr", listenAddr)
+
+	return s.Serve(lis)
+}
+
+func (p *P2PConn) HandleMessage(_ context.Context, req *rpcserver.HandleMessageRequest) (*rpcserver.HandleMessageResponse, error) {
 	if err := p.add2LocalBuffer(req.GetMsg()); err != nil {
 		return nil, fmt.Errorf("add message to buffer failed: %w", err)
 	}
+
+	slog.Debug("handle message to local buffer", "from", req.GetFrom(), "to", req.GetTo())
 
 	return &rpcserver.HandleMessageResponse{Ack: true}, nil
 }

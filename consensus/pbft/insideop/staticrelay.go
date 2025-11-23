@@ -167,6 +167,8 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
+	slog.Info("block is added in static relay module", "block height", b.Header.Number)
+
 	// deliver this block info to the supervisor
 	innerTxs, r1Txs, r2Txs := s.splitTxs(ctx, b.Body.TxList)
 
