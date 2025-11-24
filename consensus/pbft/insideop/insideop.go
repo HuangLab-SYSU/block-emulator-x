@@ -16,7 +16,7 @@ import (
 type ShardInsideOp interface {
 	BuildProposal(ctx context.Context) (*message.Proposal, error)
 	ValidateProposal(ctx context.Context, proposal *message.Proposal) error
-	ProposalCommitAndDeliver(ctx context.Context, proposal *message.Proposal) error
+	ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error
 	Close()
 }
 

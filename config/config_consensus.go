@@ -11,6 +11,7 @@ type SystemCfg struct {
 	ShardNum      int64  `json:"shard_num" yaml:"shard_num"`
 	NodeNum       int64  `json:"node_num" yaml:"node_num"`
 	ConsensusType string `json:"consensus_type" yaml:"consensus_type"`
+	LogCfg        `json:"log" yaml:"log"`
 }
 
 type SupervisorCfg struct {

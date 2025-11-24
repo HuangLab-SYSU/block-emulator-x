@@ -18,7 +18,7 @@ func (C *CLPARelayInsideOp) ValidateProposal(ctx context.Context, proposal *mess
 	panic("implement me")
 }
 
-func (C *CLPARelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, proposal *message.Proposal) error {
+func (C *CLPARelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	// TODO implement me
 	panic("implement me")
 }

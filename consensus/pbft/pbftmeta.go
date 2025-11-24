@@ -28,10 +28,9 @@ type consensusMeta struct {
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 
-	info   nodetopo.NodeInfo // information of current node
-	f      int64             // the number of fault-tolerance nodes
-	leader int64             // the leader id
-	closed bool              // consensus is closed or not
+	f      int64 // the number of fault-tolerance nodes
+	leader int64 // the leader id
+	closed bool  // consensus is closed or not
 
 	msgPool *pool.MsgPool
 

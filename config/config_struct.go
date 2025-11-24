@@ -1,5 +1,10 @@
 package config
 
+type LogCfg struct {
+	LogDir   string `json:"log_dir" yaml:"log_dir"`
+	LogLevel string `json:"log_level" yaml:"log_level"`
+}
+
 type TxPoolCfg struct {
 	Type  string `json:"type" yaml:"type"`
 	Limit int64  `json:"limit" yaml:"limit"`

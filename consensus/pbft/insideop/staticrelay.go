@@ -91,10 +91,10 @@ func (s *StaticRelayInsideOp) ValidateProposal(ctx context.Context, proposal *me
 // 1. apply the proposal to the chain.
 // 2.1. send blockInfoMsg to the supervisor.
 // 2.2. send relay-txs to leaders of other shards.
-func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, proposal *message.Proposal) error {
+func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	switch proposal.ProposalType {
 	case message.BlockProposalType:
-		if err := s.blockProposalCommitAndDeliver(ctx, proposal); err != nil {
+		if err := s.blockProposalCommitAndDeliver(ctx, isLeader, proposal); err != nil {
 			return fmt.Errorf("deliver the confirmed block proposal failed: %w", err)
 		}
 	default:
@@ -157,7 +157,7 @@ func (s *StaticRelayInsideOp) modifyTxRelayOpt(ctx context.Context, txs []transa
 	return modifiedTxs, nil
 }
 
-func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context, proposal *message.Proposal) error {
+func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	var b block.Block
 	if err := gob.NewDecoder(bytes.NewReader(proposal.Payload)).Decode(&b); err != nil {
 		return fmt.Errorf("invalid payload, decode as block failed: %w", err)
@@ -168,6 +168,11 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 	}
 
 	slog.Info("block is added in static relay module", "block height", b.Header.Number)
+
+	// if this node is not a leader, skip
+	if !isLeader {
+		return nil
+	}
 
 	// deliver this block info to the supervisor
 	innerTxs, r1Txs, r2Txs := s.splitTxs(ctx, b.Body.TxList)

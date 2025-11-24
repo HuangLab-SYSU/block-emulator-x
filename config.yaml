@@ -2,6 +2,9 @@ system:
   shard_num: 4
   consensus_type: "static_relay" # [static_relay, static_broker, clpa_relay, clpa_broker]
   node_num: 4
+  log:
+    log_dir: "./exp/"
+    log_level: "debug" #[debug, info, warn, error]
 
 consensus_node:
   blockchain:

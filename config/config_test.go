@@ -10,6 +10,10 @@ var expectedSystemCfg = SystemCfg{
 	ShardNum:      4,
 	NodeNum:       4,
 	ConsensusType: StaticRelayConsensus,
+	LogCfg: LogCfg{
+		LogDir:   "./exp_test/",
+		LogLevel: "debug",
+	},
 }
 
 var expectedCfg = Config{

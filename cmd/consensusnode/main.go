@@ -9,7 +9,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft"
-	_ "github.com/HuangLab-SYSU/block-emulator/pkg/logger"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/logger"
 )
 
 const nodeWaitingTime = 5 * time.Second
@@ -19,14 +19,25 @@ var configPath = flag.String("config", "config.yaml", "path to config file")
 func main() {
 	flag.Parse()
 
-	lp, p2p, nodeM, err := loadnetwork.GetLocalParamsAndNetworkNodes()
+	lp, err := config.LoadLocalParams()
 	if err != nil {
-		log.Fatal(fmt.Errorf("getNetworkAndNodeTopo: %w", err))
+		log.Fatal(fmt.Errorf("config.LoadLocalParams: %w", err))
 	}
 
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		log.Fatal(fmt.Errorf("load config: %w", err))
+	}
+
+	// set the default logger here
+	if err = logger.InitLogger(lp, cfg.LogCfg); err != nil {
+		log.Fatal(fmt.Errorf("init logger: %w", err))
+	}
+	defer logger.CloseLoggerFile()
+
+	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(lp)
+	if err != nil {
+		log.Fatal(fmt.Errorf("getNetworkAndNodeTopo: %w", err))
 	}
 
 	consensusNode, err := pbft.NewPBFTNode(p2p, nodeM, cfg.ConsensusNodeCfg, *lp)
@@ -36,7 +47,7 @@ func main() {
 
 	// start grpc server
 	go func() {
-		if err := p2p.StartServer(); err != nil {
+		if err = p2p.StartServer(); err != nil {
 			log.Fatal(fmt.Errorf("startServer: %w", err))
 		}
 	}()

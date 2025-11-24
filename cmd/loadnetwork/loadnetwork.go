@@ -14,18 +14,15 @@ import (
 
 var ipTablePath = flag.String("ip_table", "ip_table.json", "path to ip_table.json")
 
-func GetLocalParamsAndNetworkNodes() (*config.LocalParams, *network.P2PConn, nodetopo.NodeMapper, error) {
+func GetNetworkAndNodeInfo(lp *config.LocalParams) (*network.P2PConn, nodetopo.NodeMapper, error) {
 	info2Host, err := readIpTableFromFile()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getNetworkAndNodeTopo: %w", err)
+		return nil, nil, fmt.Errorf("getNetworkAndNodeTopo: %w", err)
 	}
 
-	lp, err := config.LoadLocalParams()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("config.LoadLocalParams: %w", err)
-	}
-
-	slog.Info("local params is loaded successfully", "shard id", lp.ShardID, "node id", lp.NodeID, "wallet addr", lp.WalletAddr)
+	slog.Info("local params is loaded successfully",
+		"shard id", lp.ShardID, "node id", lp.NodeID, "wallet addr", lp.WalletAddr, "ip addr",
+		info2Host[nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}])
 	meNode := nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}
 
 	p2p := network.NewP2PConn(meNode, info2Host)
@@ -43,7 +40,7 @@ func GetLocalParamsAndNetworkNodes() (*config.LocalParams, *network.P2PConn, nod
 
 	m := nodetopo.NewTopoGetter(shardLeader, shardNodeInfo)
 
-	return lp, p2p, m, nil
+	return p2p, m, nil
 }
 
 func readIpTableFromFile() (map[nodetopo.NodeInfo]string, error) {

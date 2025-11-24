@@ -128,7 +128,7 @@ func (n *Node) run() {
 		}
 
 		// if this node is the leader and not proposed yet, try to propose one block
-		if n.pbftMeta.stage == stagePreprepare && n.pbftMeta.info.NodeID == n.pbftMeta.leader && !n.pbftMeta.proposed {
+		if n.pbftMeta.stage == stagePreprepare && n.pbftMeta.lp.NodeID == n.pbftMeta.leader && !n.pbftMeta.proposed {
 			if err := n.propose(ctx); err != nil {
 				slog.ErrorContext(ctx, "propose", "err", err)
 			}
@@ -238,7 +238,7 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 		switch newStage {
 		case stagePreprepare:
 			// deliver according to the last proposal
-			if err = n.iop.ProposalCommitAndDeliver(ctx, &n.pbftMeta.lastProposal.P); err != nil {
+			if err = n.iop.ProposalCommitAndDeliver(ctx, n.pbftMeta.leader == n.pbftMeta.lp.NodeID, &n.pbftMeta.lastProposal.P); err != nil {
 				slog.ErrorContext(ctx, "deliver the last confirmed proposal failed", "err", err)
 			}
 
@@ -286,7 +286,7 @@ func (n *Node) propose(ctx context.Context) error {
 		return fmt.Errorf("message.WrapMsg failed: %w", err)
 	}
 
-	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.info.ShardID)
+	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.lp.ShardID)
 	if err != nil {
 		return fmt.Errorf("GetNodesInShard failed: %w", err)
 	}
@@ -312,7 +312,7 @@ func (n *Node) prepareBroadcast(ctx context.Context) error {
 		return fmt.Errorf("message.WrapMsg failed: %w", err)
 	}
 
-	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.info.ShardID)
+	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.lp.ShardID)
 	if err != nil {
 		return fmt.Errorf("GetNodesInShard failed: %w", err)
 	}
@@ -336,7 +336,7 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 		return fmt.Errorf("message.WrapMsg failed: %w", err)
 	}
 
-	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.info.ShardID)
+	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.lp.ShardID)
 	if err != nil {
 		return fmt.Errorf("GetNodesInShard failed: %w", err)
 	}

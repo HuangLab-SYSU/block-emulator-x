@@ -7,7 +7,7 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
 	"github.com/HuangLab-SYSU/block-emulator/config"
-	_ "github.com/HuangLab-SYSU/block-emulator/pkg/logger"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/logger"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor"
 )
 
@@ -16,14 +16,25 @@ var configPath = flag.String("config", "config.yaml", "path to config file")
 func main() {
 	flag.Parse()
 
-	_, p2p, nodeM, err := loadnetwork.GetLocalParamsAndNetworkNodes()
+	lp, err := config.LoadLocalParams()
 	if err != nil {
-		log.Fatal(fmt.Errorf("getNetworkAndNodeTopo: %w", err))
+		log.Fatal(fmt.Errorf("config.LoadLocalParams: %w", err))
 	}
 
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		log.Fatal(fmt.Errorf("load config: %w", err))
+	}
+
+	// set the default logger here
+	if err = logger.InitLogger(lp, cfg.LogCfg); err != nil {
+		log.Fatal(fmt.Errorf("init logger: %w", err))
+	}
+	defer logger.CloseLoggerFile()
+
+	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(lp)
+	if err != nil {
+		log.Fatal(fmt.Errorf("getNetworkAndNodeTopo: %w", err))
 	}
 
 	spv, err := supervisor.NewSupervisor(p2p, nodeM, cfg.SupervisorCfg)
@@ -33,7 +44,7 @@ func main() {
 
 	// start grpc server
 	go func() {
-		if err := p2p.StartServer(); err != nil {
+		if err = p2p.StartServer(); err != nil {
 			log.Fatal(fmt.Errorf("startServer: %w", err))
 		}
 	}()
