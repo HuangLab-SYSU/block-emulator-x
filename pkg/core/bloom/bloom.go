@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	hashByteLen  = 3
-	maxBitsetLen = 1 << (8 * hashByteLen)
+	hashByteLen  = 8
+	maxBitsetLen = 1 << 24
 )
 
 // filterFuncRegistry is the registry table of Bloom Filter functions.

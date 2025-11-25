@@ -12,7 +12,7 @@ import (
 
 const (
 	logFilePathFmt   = "logs/shard=%d_node=%d/%s.log"
-	nodeInfoPrintFmt = "S%dN%d"
+	nodeInfoPrintFmt = "S{%d}_N{%d}"
 	levelDebug       = "debug"
 	levelInfo        = "info"
 	levelWarn        = "warn"

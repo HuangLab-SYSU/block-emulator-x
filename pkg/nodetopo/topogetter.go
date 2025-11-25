@@ -55,6 +55,10 @@ func (t *TopoGetter) ChangeLeader(shardID int64, info NodeInfo) error {
 func (t *TopoGetter) GetAllLeaders() ([]NodeInfo, error) {
 	ret := make([]NodeInfo, 0, len(t.leaders))
 	for _, v := range t.leaders {
+		if v.ShardID == SupervisorShardID {
+			continue
+		}
+
 		ret = append(ret, v)
 	}
 

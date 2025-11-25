@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"log/slog"
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
@@ -26,6 +27,9 @@ func (s *StaticBrokerOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *
 		if err := s.txPool.AddTxs(rt.Txs); err != nil {
 			return fmt.Errorf("tx pool add txs: %w", err)
 		}
+
+		slog.InfoContext(ctx, "Received txs are added in the tx pool successfully", "tx size", len(rt.Txs))
+
 	default:
 		return fmt.Errorf("unknown msg type: %s", msg.GetMsgType())
 	}

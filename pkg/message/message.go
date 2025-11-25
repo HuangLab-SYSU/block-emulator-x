@@ -34,6 +34,9 @@ func getMsgType(msg any) (string, error) {
 	var msgType string
 
 	switch msg.(type) {
+	case *StopConsensusMsg:
+		msgType = StopConsensusMessageType
+
 	case *PreprepareMsg:
 		msgType = PreprepareMessageType
 	case *PrepareMsg:

@@ -14,6 +14,8 @@ const (
 	CommitMessageType     = "Commit"
 
 	ReceiveTxsMessageType = "ReceiveTxs"
+
+	StopConsensusMessageType = "StopConsensus"
 )
 
 const (
@@ -63,4 +65,8 @@ type CommitMsg struct {
 
 type ReceiveTxsMsg struct {
 	Txs []transaction.Transaction
+}
+
+type StopConsensusMsg struct {
+	StopSignal struct{}
 }

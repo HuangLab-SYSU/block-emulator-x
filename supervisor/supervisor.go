@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
@@ -103,8 +104,6 @@ func (s *Supervisor) Start() error {
 	slog.Info("supervisor main-goroutine started")
 
 	for range tk.C {
-		slog.Debug("supervisor is running")
-
 		if s.committee.ShouldStop() {
 			break
 		}
@@ -122,8 +121,13 @@ func (s *Supervisor) Start() error {
 				slog.ErrorContext(ctx, "failed to handle msg", "err", err)
 			}
 		}
+
+		if err := s.committee.SendTxsAndConsensus(ctx); err != nil {
+			slog.ErrorContext(ctx, "failed to send txs and consensus messages", "err", err)
+		}
 	}
 
+	// close the wrapped message buffer, and wait all measures are handled.
 	close(s.wmBuffer)
 	<-s.measureDone
 
@@ -133,6 +137,25 @@ func (s *Supervisor) Start() error {
 	} else {
 		slog.Info("successfully output the result", "dir", s.cfg.ResultOutputDir)
 	}
+
+	// Send 'stop consensus message' to the consensus nodes.
+	wMsg, err := message.WrapMsg(&message.StopConsensusMsg{})
+	if err != nil {
+		return fmt.Errorf("failed to wrap stop consensus message: %w", err)
+	}
+
+	destNodes := make([]nodetopo.NodeInfo, 0)
+
+	for i := range s.cfg.ShardNum {
+		ls, err := s.r.GetNodesInShard(i)
+		if err != nil {
+			return fmt.Errorf("get all leaders failed when trying to send stop: %w", err)
+		}
+
+		destNodes = append(destNodes, ls...)
+	}
+
+	s.conn.GroupBroadcastMessage(context.Background(), destNodes, wMsg)
 
 	return nil
 }

@@ -140,6 +140,7 @@ func (n *Node) run() {
 
 // registerHandleFunc registers all message handle functions.
 func (n *Node) registerHandleFunc() {
+	n.defaultMsgHandler[message.StopConsensusMessageType] = n.handleStopConsensus
 	n.defaultMsgHandler[message.PreprepareMessageType] = n.handlePreprepare
 	n.defaultMsgHandler[message.PrepareMessageType] = n.handlePrepare
 	n.defaultMsgHandler[message.CommitMessageType] = n.handleCommit
@@ -158,6 +159,14 @@ func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) err
 	if err := handleFunc(ctx, msg.GetPayload()); err != nil {
 		return fmt.Errorf("handle %s message err: %w", msg.GetMsgType(), err)
 	}
+
+	return nil
+}
+
+func (n *Node) handleStopConsensus(ctx context.Context, _ []byte) error {
+	n.pbftMeta.closed = true
+
+	slog.InfoContext(ctx, "handle stop consensus message")
 
 	return nil
 }
