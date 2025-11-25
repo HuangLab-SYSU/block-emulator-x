@@ -1,42 +1,167 @@
 system:
+  ### -----------------------------------------------------------------------------------
+  ### `shard_num` is the number of shards. It should be a positive integer.
   shard_num: 4
-  consensus_type: "static_relay" # [static_relay, static_broker, clpa_relay, clpa_broker]
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `node_num` is the number of nodes per shard. It should be a positive integer.
   node_num: 4
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `consensus_type` is the type of consensus. Optional setting: [static_relay, static_broker, clpa_relay, clpa_broker]
+  ### `static_relay`: The location distribution of accounts is static, and accounts will not be migrated to other shards. For a cross-shard transaction, it will be handled by `Relay`.
+  ### `static_broker`: The location distribution of accounts is static, and accounts will not be migrated to other shards. For a cross-shard transaction, it will be handled by the broker accounts.
+  ### `clpa_relay`: The locations distribution of accounts is dynamic. When each epoch ends, some accounts will be migrated to other shards by CLPA. For a cross-shard transaction, it will be handled by `Relay`.
+  ### `clpa_broker`: The locations distribution of accounts is dynamic. When each epoch ends, some accounts will be migrated to other shards by CLPA. For a cross-shard transaction, it will be handled by the broker accounts.
+  consensus_type: "static_relay" # [static_relay, static_broker, clpa_relay, clpa_broker]
+  ### -----------------------------------------------------------------------------------
+
   log:
+    ### -----------------------------------------------------------------------------------
+    ### `log_dir` is the root directory for the logger. It should be a path.
+    ### The actual log directory of a node (ShardID=2, NodeID=1) is "`log_dir`/logs/shard=2_node=1".
     log_dir: "./exp/"
-    log_level: "debug" #[debug, info, warn, error]
+    ### -----------------------------------------------------------------------------------
+
+    ### -----------------------------------------------------------------------------------
+    ### `log_level` is level for the logger. Optional setting: [debug, info, warn, error]
+    ### `debug` is usually used when debugging, and it shows all levels of logs.
+    ### `info` is the most commonly used level. It shows [info, warn, error] levels of logs.
+    ### `warn` shows [warn, error] levels of logs.
+    ### `error` shows only the [error] level of logs.
+    log_level: "debug" # [debug, info, warn, error]
+    ### -----------------------------------------------------------------------------------
 
 consensus_node:
   blockchain:
     bloom_filter:
+      ### -----------------------------------------------------------------------------------
+      ### `bitset_len` is the length of bloom filter. It should be a positive integer.
+      ### The larger `bitset_len` is, the lower the bloom filter's false positive is.
       bitset_len: 4096
+      ### -----------------------------------------------------------------------------------
+
+      ### -----------------------------------------------------------------------------------
+      ### `filter_hash_func` is the hash functions used in the bloom filter.
+      ### Optional settings: [sha256, sha512, sha1].
+      ### Note that `filter_hash_func` is a list, thus 3 all functions can be included.
       filter_hash_func: [sha256, sha512, sha1]
+      ### -----------------------------------------------------------------------------------
+
     storage:
+      ### -----------------------------------------------------------------------------------
+      ### `block_storage_type` is the database-type of the block storage. Optional settings: [bolt].
       block_storage_type: "bolt"
+      ### -----------------------------------------------------------------------------------
+
+      ### -----------------------------------------------------------------------------------
+      ### `trie_storage_type` is the database-type of the trie storage. Optional settings: [eth_level_db].
       trie_storage_type: "eth_level_db"
+      ### -----------------------------------------------------------------------------------
+
       bolt:
+        ### -----------------------------------------------------------------------------------
+        ### `file_path_dir` is the directory of bolt-database files.
+        ### The actual database directory of a node (ShardID=2, NodeID=1) is "`file_path_dir`/shard_2_node_1/".
+        ### Note that, `file_path_dir` will be ignored when `block_storage_type` is not "bolt".
         file_path_dir: "./exp/boltdb/"
+        ### -----------------------------------------------------------------------------------
+
       eth_storage:
+        ### -----------------------------------------------------------------------------------
+        ### `is_memory_db` determines whether the trie-db is stored in memory. It is a bool value (["true", "false"]).
         is_memory_db: false
+        ### -----------------------------------------------------------------------------------
+
+        ### -----------------------------------------------------------------------------------
+        ### `level_file_path_dir` is the directory of level-database files.
+        ### The actual database directory of a node (ShardID=2, NodeID=1) is "`level_file_path_dir`/shard_2_node_1/".
+        ### Note that, `level_file_path_dir` will be ignored when `is_memory_db` is true.
         level_file_path_dir: "./exp/trie_db/"
+        ### -----------------------------------------------------------------------------------
+
+        ### -----------------------------------------------------------------------------------
+        ### `old_state_root` is the root of an existing trie. The trie db engine can rebuild the existing trie with `old_state_root`.
+        ### If `old_state_root` is empty, the consensus-node will create a new trie db.
+        ### Note that, `old_state_root` will be ignored when `is_memory_db` is true.
         old_state_root: ""
+        ### -----------------------------------------------------------------------------------
+
   tx_pool:
+    ### -----------------------------------------------------------------------------------
+    ### `type` is the transaction-packing-type of the transaction pool. Optional settings: [byte, number]
+    ### `byte`: When packing transactions, the byte-size of transactions will be limited.
+    ### `number`: When packing transactions, the number of transactions will be limited.
     type: "number" # [byte, number]
+    ### -----------------------------------------------------------------------------------
+
+    ### -----------------------------------------------------------------------------------
+    ### `limit` is the limitation of bytes/transactions when packing transactions in the tx pool.
     limit: 2000
+    ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `block_interval` is the time interval between two blocks. (ms)
   block_interval: 5000 # ms
+  ### -----------------------------------------------------------------------------------
 
 supervisor:
+  ### -----------------------------------------------------------------------------------
+  ### `tx_number` is the number of transactions to be injected to the system by the supervisor.
   tx_number: 100000
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `tx_injection_speed` is speed of transaction injections.
+  ### The supervisor will inject `tx_injection_speed` transactions per second.
   tx_injection_speed: 10000
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `result_output_dir` is directory of measurement result outputs.
   result_output_dir: "./exp/results/"
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `epoch_duration` is the time duration for an epoch. (Second)
   epoch_duration: 50.0 # second
+  ### -----------------------------------------------------------------------------------
+
   tx_source:
+    ### -----------------------------------------------------------------------------------
+    ### `tx_source_type` is type of the transaction source.
+    ### `random_source`: The supervisor generates random transactions and inject them to the system.
+    ### `csv_source`: The supervisor reads transactions from a .csv file and inject them to the system.
+    ### Else: The supervisor will not inject any transactions.
     tx_source_type: "random_source" # [random_source, csv_source]
+    ### -----------------------------------------------------------------------------------
+
+    ### -----------------------------------------------------------------------------------
+    ### `tx_source_file` is the .csv source file of transactions.
+    ### This variable is valid when `tx_source_file` is `csv_source`.
     tx_source_file: "" # valid when tx_source_type = csv_source
+    ### -----------------------------------------------------------------------------------
+
   broker_module:
+    ### -----------------------------------------------------------------------------------
+    ### `broker_file_path` is the file path of the broker file.
     broker_file_path: "./pkg/broker/broker"
+    ### -----------------------------------------------------------------------------------
+
+    ### -----------------------------------------------------------------------------------
+    ### `broker_num` is the number of brokers that will be read from the broker file.
     broker_num: 50
+    ### -----------------------------------------------------------------------------------
 
 network:
+  ### -----------------------------------------------------------------------------------
+  ### `bandwidth` is the bandwidth limit for the blockchain network.
   bandwidth: 1000000
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `latency` is the latency in the network.
   latency: 0
+  ### -----------------------------------------------------------------------------------
