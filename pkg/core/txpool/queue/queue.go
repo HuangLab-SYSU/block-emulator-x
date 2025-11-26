@@ -8,11 +8,10 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 )
 
-type packTxFunc func(q []transaction.Transaction, n int64) ([]transaction.Transaction, []transaction.Transaction, error)
+type packTxFunc func(q []transaction.Transaction, n int) ([]transaction.Transaction, []transaction.Transaction, error)
 
 type TxPool struct {
 	queue []transaction.Transaction
-	limit int64
 	pf    packTxFunc
 	lock  sync.Mutex
 }
@@ -32,7 +31,6 @@ func NewTxPool(cfg config.TxPoolCfg) (*TxPool, error) {
 	return &TxPool{
 		queue: make([]transaction.Transaction, 0),
 		pf:    pf,
-		limit: cfg.Limit,
 	}, nil
 }
 
@@ -45,7 +43,7 @@ func (t *TxPool) AddTxs(txs []transaction.Transaction) error {
 	return nil
 }
 
-func (t *TxPool) PackTxs() ([]transaction.Transaction, error) {
+func (t *TxPool) PackTxs(limit int) ([]transaction.Transaction, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -54,7 +52,7 @@ func (t *TxPool) PackTxs() ([]transaction.Transaction, error) {
 		err       error
 	)
 
-	packed, q, err = t.pf(t.queue, t.limit)
+	packed, q, err = t.pf(t.queue, limit)
 	if err != nil {
 		return nil, fmt.Errorf("call pack tx func err: %w", err)
 	}
@@ -64,8 +62,8 @@ func (t *TxPool) PackTxs() ([]transaction.Transaction, error) {
 	return packed, nil
 }
 
-func packTxsByGivenNum(q []transaction.Transaction, n int64) ([]transaction.Transaction, []transaction.Transaction, error) {
-	length := int64(len(q))
+func packTxsByGivenNum(q []transaction.Transaction, n int) ([]transaction.Transaction, []transaction.Transaction, error) {
+	length := len(q)
 	if length > n {
 		length = n
 	}
@@ -77,7 +75,7 @@ func packTxsByGivenNum(q []transaction.Transaction, n int64) ([]transaction.Tran
 	return ret, q, nil
 }
 
-func packTxsByGivenBytes(q []transaction.Transaction, n int64) ([]transaction.Transaction, []transaction.Transaction, error) {
+func packTxsByGivenBytes(q []transaction.Transaction, n int) ([]transaction.Transaction, []transaction.Transaction, error) {
 	endIdx := 0
 
 	for i, tx := range q {
@@ -86,7 +84,7 @@ func packTxsByGivenBytes(q []transaction.Transaction, n int64) ([]transaction.Tr
 			return nil, nil, err
 		}
 
-		size := int64(len(b))
+		size := len(b)
 		if size < n {
 			break
 		}

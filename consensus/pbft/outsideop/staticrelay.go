@@ -25,7 +25,7 @@ func (s *StaticRelayOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *r
 	case message.ReceiveTxsMessageType:
 		var rt message.ReceiveTxsMsg
 		if err := gob.NewDecoder(bytes.NewReader(msg.GetPayload())).Decode(&rt); err != nil {
-			return fmt.Errorf("decode ReceiveTxs msg failed: %v", err)
+			return fmt.Errorf("decode ReceiveTxs msg failed: %w", err)
 		}
 
 		if err := s.txPool.AddTxs(rt.Txs); err != nil {

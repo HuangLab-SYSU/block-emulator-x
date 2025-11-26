@@ -8,7 +8,7 @@ import (
 
 type TxPool interface {
 	AddTxs(txs []transaction.Transaction) error
-	PackTxs() ([]transaction.Transaction, error)
+	PackTxs(limit int) ([]transaction.Transaction, error)
 }
 
 func NewTxPool(cfg config.TxPoolCfg) (TxPool, error) {

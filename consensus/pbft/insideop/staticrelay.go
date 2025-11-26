@@ -44,7 +44,7 @@ func NewStaticRelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper,
 }
 
 func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
-	txs, err := s.txPool.PackTxs()
+	txs, err := s.txPool.PackTxs(int(s.cfg.Limit))
 	if err != nil {
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}
@@ -106,7 +106,7 @@ func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLe
 
 func (s *StaticRelayInsideOp) Close() {}
 
-// set the RelayOpt of txs
+// modifyTxRelayOpt sets the RelayOpt of txs
 func (s *StaticRelayInsideOp) modifyTxRelayOpt(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, error) {
 	accountLocations, err := getAccountLocationsInTxs(ctx, s.chain, txs)
 	if err != nil {

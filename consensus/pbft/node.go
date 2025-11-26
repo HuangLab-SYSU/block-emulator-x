@@ -69,7 +69,8 @@ func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Consen
 		iop = insideop.NewStaticRelayInsideOp(conn, r, bc, txp, cfg, lp)
 		omh = outsideop.NewStaticRelayOutsideOp(txp)
 	case config.StaticBrokerConsensus:
-		return nil, fmt.Errorf("unimplemented consensus")
+		iop = insideop.NewStaticBrokerInsideOp(conn, r, bc, txp, cfg, lp)
+		omh = outsideop.NewStaticRelayOutsideOp(txp)
 	case config.CLPARelayConsensus:
 		return nil, fmt.Errorf("unimplemented consensus")
 	case config.CLPABrokerConsensus:

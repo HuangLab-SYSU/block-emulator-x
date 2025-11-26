@@ -23,7 +23,7 @@ var logFile *os.File = nil
 
 func InitLogger(lp *config.LocalParams, cfg config.LogCfg) error {
 	if err := setLogFile(lp, cfg); err != nil {
-		return fmt.Errorf("set the logger file failed: %v", err)
+		return fmt.Errorf("set the logger file failed: %w", err)
 	}
 
 	slogLevel := getSlogLevel(cfg)

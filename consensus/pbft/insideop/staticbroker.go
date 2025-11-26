@@ -41,7 +41,7 @@ func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper
 }
 
 func (s *StaticBrokerInsideOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
-	txs, err := s.txPool.PackTxs()
+	txs, err := s.txPool.PackTxs(int(s.cfg.Limit))
 	if err != nil {
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}

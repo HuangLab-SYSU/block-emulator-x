@@ -43,7 +43,7 @@ type RelayTxOpt struct {
 
 type BrokerTxOpt struct {
 	BrokerStage               int // label that this is a sigma_1 tx or a sigma_2 tx.
-	BrokerAddr                account.Address
+	Broker                    account.Account
 	BOriginalHash             []byte // the hash of raw message
 	OriginalTxCreateTime      time.Time
 	NonceBroker               int64
