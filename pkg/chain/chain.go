@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -110,7 +111,7 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 
 // AddBlock adds the given block into storage.
 // It will modify the Chain.
-// TODO(Guang Ye): AddBlock should be atomic.
+// TODO(G Ye): AddBlock should be atomic.
 func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	c.mux.Lock()
 	defer c.mux.Unlock()
@@ -149,7 +150,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 
 // GetAccountStates returns the shard-locations of all accounts by reading the MPT in the chain.
 // It calls getAccountStates with a mutex.
-func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account) ([]account.State, error) {
+func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account) ([]*account.State, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -158,17 +159,7 @@ func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account
 		return nil, fmt.Errorf("get account states err: %w", err)
 	}
 
-	ret := make([]account.State, len(states))
-	for i, state := range states {
-		if state == nil {
-			// return the init state
-			ret[i] = *account.NewState(accounts[i], partition.DefaultAccountLoc(accounts[i].Addr, c.cfg.ShardNum))
-		} else {
-			ret[i] = *state
-		}
-	}
-
-	return ret, nil
+	return states, nil
 }
 
 // ValidateBlock validates blocks according to c's config.
@@ -255,13 +246,18 @@ func (c *Chain) updateTrie(ctx context.Context, txs []transaction.Transaction) (
 }
 
 func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []transaction.Transaction) ([][]byte, [][]byte, error) {
-	account2StateInShard := make(map[account.Account]*account.State, len(txs)*2)
+	accountStates := make(map[account.Account]*account.State, len(txs)*2)
 	for _, tx := range txs {
-		account2StateInShard[tx.Sender] = nil
-		account2StateInShard[tx.Recipient] = nil
+		accountStates[tx.Sender] = nil
+		accountStates[tx.Recipient] = nil
+
+		// If this transaction is a broker tx, fetch the broker state
+		if len(tx.BOriginalHash) > 0 {
+			accountStates[tx.Broker] = nil
+		}
 	}
 
-	accountList := maps.Keys(account2StateInShard)
+	accountList := maps.Keys(accountStates)
 
 	originalStates, err := c.getAccountStates(ctx, accountList)
 	if err != nil {
@@ -269,40 +265,18 @@ func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []trans
 	}
 
 	for i, a := range accountList {
-		s := originalStates[i]
-
-		// if it is a new account, init it.
-		if s == nil {
-			s = account.NewState(a, partition.DefaultAccountLoc(a.Addr, c.cfg.ShardNum))
-		}
-		// this account is not in the shard, skip it
-		if s.ShardLocation != c.shardID {
-			continue
-		}
-
-		account2StateInShard[a] = s
+		accountStates[a] = originalStates[i]
 	}
 
 	// update in map
 	for _, tx := range txs {
-		senderState := account2StateInShard[tx.Sender]
-		recipientState := account2StateInShard[tx.Recipient]
-		// if sender exists in this shard, try to debit it. otherwise, skip debit.
-		// if the debit operation failed, skip this transaction.
-		if senderState == nil || errors.Is(senderState.Debit(tx.Value), account.ErrNotEnoughBalance) {
-			// TODO(Guang Ye): check whether to continue, or report error
-			continue
-		}
-		// if recipient exists in this shard, credit it.
-		if recipientState != nil {
-			recipientState.Credit(tx.Value)
-		}
+		c.modifyStateMapByTx(accountStates, tx)
 	}
 
 	// pack state list
-	retAccountByteList, stateByteList := make([][]byte, 0, len(account2StateInShard)), make([][]byte, 0, len(account2StateInShard))
+	retAccountByteList, stateByteList := make([][]byte, 0, len(accountStates)), make([][]byte, 0, len(accountStates))
 
-	for k, v := range account2StateInShard {
+	for k, v := range accountStates {
 		if v == nil { // this account is not in the shard
 			continue
 		}
@@ -322,6 +296,110 @@ func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []trans
 	}
 
 	return retAccountByteList, stateByteList, nil
+}
+
+func (c *Chain) modifyStateMapByTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+	if len(tx.ROriginalHash) != 0 { // relay transaction
+		c.modifyStateMapByRelayTx(accountStates, tx)
+		return
+	}
+
+	if len(tx.BOriginalHash) != 0 { // broker transaction
+		c.modifyStateMapByBrokerTx(accountStates, tx)
+		return
+	}
+
+	c.modifyStateMapByNormalTx(accountStates, tx)
+}
+
+func (c *Chain) modifyStateMapByRelayTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+	switch tx.RelayStage {
+	case transaction.Relay1Tx:
+		// For a relay1 transaction, debit the sender's balance.
+		senderState := accountStates[tx.Sender]
+		if senderState == nil || senderState.ShardLocation != c.shardID {
+			// Sender is not in this shard, skip.
+			return
+		}
+
+		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
+			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
+		} else if err != nil {
+			slog.Error("debit error", "err", err)
+		}
+
+	case transaction.Relay2Tx:
+		// For a relay2 transaction credit the recipient's balance.
+		recipientState := accountStates[tx.Recipient]
+		if recipientState == nil || recipientState.ShardLocation != c.shardID {
+			return
+		}
+
+		recipientState.Credit(tx.Value)
+
+	default:
+		slog.Error("unexpected relay stage in modifyStateMapByRelayTx", "stage", tx.RelayStage)
+	}
+}
+
+func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+	switch tx.BrokerStage {
+	case transaction.Sigma1BrokerStage:
+		// For a broker1 transaction, debit the sender's balance and credit the broker's balance.
+		senderState := accountStates[tx.Sender]
+
+		brokerState := accountStates[tx.Broker]
+		if senderState == nil || senderState.ShardLocation != c.shardID {
+			slog.Error("handle broker1 tx error", "err", "the sender is not in this shard", "sender", tx.Sender, "shard", c.shardID)
+			return
+		}
+
+		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
+			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
+		} else if err != nil {
+			slog.Error("debit error", "err", err)
+		} else {
+			brokerState.Credit(tx.Value)
+		}
+	case transaction.Sigma2BrokerStage:
+		// For a broker2 transaction, debit the broker's balance and credit the recipient's balance.
+		recipientState := accountStates[tx.Recipient]
+
+		brokerState := accountStates[tx.Broker]
+		if recipientState == nil || recipientState.ShardLocation != c.shardID {
+			slog.Error("handle broker2 tx error", "err", "the recipient is not in this shard", "recipient", tx.Recipient, "shard", c.shardID)
+			return
+		}
+
+		if err := brokerState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
+			slog.Warn("the balance of broker is not enough", "sender", tx.Sender, "value", tx.Value)
+		} else if err != nil {
+			slog.Error("debit error", "err", err)
+		} else {
+			recipientState.Credit(tx.Value)
+		}
+	default:
+		slog.Error("unexpected broker stage in modifyStateMapByBrokerTx", "stage", tx.BrokerStage)
+	}
+}
+
+func (c *Chain) modifyStateMapByNormalTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+	senderState := accountStates[tx.Sender]
+	recipientState := accountStates[tx.Recipient]
+
+	// Modify senderState
+	if senderState != nil && senderState.ShardLocation != c.shardID {
+		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
+			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
+		} else if err != nil {
+			slog.Error("debit error", "err", err)
+		}
+	}
+
+	// Modify recipientState
+	if recipientState != nil && recipientState.ShardLocation != c.shardID {
+		recipientState.Credit(tx.Value)
+	}
 }
 
 func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
@@ -351,6 +429,8 @@ func (c *Chain) getTxTrieRoot(ctx context.Context, txs []transaction.Transaction
 	return root, nil
 }
 
+// getAccountStates get the states of accounts from the state trie.
+// Note that, if the node is not existed in this state-trie, return a default state of this account.
 func (c *Chain) getAccountStates(ctx context.Context, accounts []account.Account) ([]*account.State, error) {
 	accountByteList := make([][]byte, len(accounts))
 	for i, addr := range accounts {
@@ -371,11 +451,12 @@ func (c *Chain) getAccountStates(ctx context.Context, accounts []account.Account
 
 	for i, stateByte := range stateByteList {
 		if stateByte == nil {
+			// set the default state
+			states[i] = account.NewState(accounts[i], partition.DefaultAccountLoc(accounts[i].Addr, c.cfg.ShardNum))
 			continue
 		}
 
-		states[i], err = account.DecodeState(stateByte)
-		if err != nil {
+		if states[i], err = account.DecodeState(stateByte); err != nil {
 			return nil, fmt.Errorf("decode state err: %w", err)
 		}
 	}
