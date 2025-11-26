@@ -100,15 +100,18 @@ func (p *P2PConn) SendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 func (p *P2PConn) MSendDifferentMessages(ctx context.Context, node2Msg map[nodetopo.NodeInfo]*rpcserver.WrappedMsg) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(node2Msg))
+
 	for node, msg := range node2Msg {
 		go func(node nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
 			defer wg.Done()
+
 			err := p.sendMessage(ctx, node, msg)
 			if err != nil {
 				slog.ErrorContext(ctx, "sub-goroutine: MSendDifferentMessages", "err", err)
 			}
 		}(node, msg)
 	}
+
 	wg.Wait()
 }
 
@@ -119,12 +122,14 @@ func (p *P2PConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo.No
 	for _, node := range group {
 		go func(nif nodetopo.NodeInfo) {
 			defer wg.Done()
+
 			err := p.sendMessage(ctx, nif, msg)
 			if err != nil {
 				slog.ErrorContext(ctx, "sub-goroutine: broadcast", "err", err)
 			}
 		}(node)
 	}
+
 	wg.Wait()
 }
 

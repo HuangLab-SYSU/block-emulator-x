@@ -4,12 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/logger"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor"
 )
+
+const supervisorWaitingTime = 8 * time.Second
 
 var configPath = flag.String("config", "config.yaml", "path to config file")
 
@@ -48,6 +51,8 @@ func main() {
 			log.Fatal(fmt.Errorf("startServer: %w", err))
 		}
 	}()
+
+	time.Sleep(supervisorWaitingTime)
 
 	if err = spv.Start(); err != nil {
 		log.Fatal(fmt.Errorf("supervisor.Startup error: %w", err))

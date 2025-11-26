@@ -64,6 +64,8 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		return fmt.Errorf("decode relayBlockInfoMsg: %w", err)
 	}
 
+	slog.Info("relay stats: receives the block info message", "from shardID", bInfo.ShardID, "epoch", bInfo.Epoch)
+
 	epochID := int(bInfo.Epoch)
 	// update the start/end time of this epoch
 	if start, ok := r.epochStartTime[epochID]; !ok || bInfo.BlockProposeTime.Before(start) {
@@ -141,6 +143,8 @@ func (r *RelayStats) OutputResult(fp string) error {
 	if err := r.outputDetailTxInfo(detailTxInfoFp); err != nil {
 		return fmt.Errorf("failed to outputDetailTxInfo: %w", err)
 	}
+
+	slog.Info("broker stats has output all results")
 
 	return nil
 }

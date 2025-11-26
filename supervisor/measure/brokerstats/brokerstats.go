@@ -64,6 +64,8 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		return fmt.Errorf("decode brokerBlockInfoMsg: %w", err)
 	}
 
+	slog.Info("broker stats: receives the block info message", "from shardID", bInfo.ShardID, "epoch", bInfo.Epoch)
+
 	epochID := int(bInfo.Epoch)
 
 	// update the start/end time of this epoch
@@ -145,6 +147,8 @@ func (b *BrokerStats) OutputResult(fp string) error {
 	if err := b.outputDetailTxInfo(detailTxInfoFp); err != nil {
 		return fmt.Errorf("failed to outputDetailTxInfo: %w", err)
 	}
+
+	slog.Info("broker stats has output all results")
 
 	return nil
 }
