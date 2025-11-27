@@ -64,6 +64,17 @@ func TestChain(t *testing.T) {
 
 	headerAfterAdd := *bc.GetCurHeader()
 	require.NotEqual(t, generateHeader, headerAfterAdd)
+
+	migratedB, err := bc.GenerateMigrationBlock(ctx, testMiner, []account.Account{testSender}, []account.State{*account.NewState(testSender, 100)})
+	require.NoError(t, err)
+
+	err = bc.AddBlock(ctx, migratedB)
+	require.NoError(t, err)
+
+	as, err := bc.GetAccountStates(ctx, []account.Account{testSender})
+	require.NoError(t, err)
+	require.Len(t, as, 1)
+	require.Equal(t, *account.NewState(testSender, 100), *as[0])
 }
 
 func clearChainStorage() {

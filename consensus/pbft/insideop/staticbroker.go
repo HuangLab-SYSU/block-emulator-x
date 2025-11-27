@@ -114,7 +114,7 @@ func (s *StaticBrokerInsideOp) blockProposalCommitAndDeliver(ctx context.Context
 	}
 
 	// deliver this block info to the supervisor
-	innerTxs, b1Txs, b2Txs := s.splitTxs(ctx, b.Body.TxList)
+	innerTxs, b1Txs, b2Txs := s.splitTxs(ctx, b.TxList)
 	if err := s.deliverBlockInfo2Supervisor(ctx, innerTxs, b1Txs, b2Txs, b); err != nil {
 		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}

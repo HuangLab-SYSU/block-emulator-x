@@ -175,13 +175,13 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 	}
 
 	// deliver this block info to the supervisor
-	innerTxs, r1Txs, r2Txs := s.splitTxs(ctx, b.Body.TxList)
+	innerTxs, r1Txs, r2Txs := s.splitTxs(ctx, b.TxList)
 
 	if err := s.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
 		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}
 
-	accountLocations, err := getAccountLocationsInTxs(ctx, s.chain, b.Body.TxList)
+	accountLocations, err := getAccountLocationsInTxs(ctx, s.chain, b.TxList)
 	if err != nil {
 		return fmt.Errorf("getAccountLocationsInTxs failed: %w", err)
 	}
