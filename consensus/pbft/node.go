@@ -10,6 +10,7 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/insideop"
+	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/outsideop"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
@@ -72,7 +73,9 @@ func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Consen
 		iop = insideop.NewStaticBrokerInsideOp(conn, r, bc, txp, cfg, lp)
 		omh = outsideop.NewStaticRelayOutsideOp(txp)
 	case config.CLPARelayConsensus:
-		return nil, fmt.Errorf("unimplemented consensus")
+		amm := migration.NewAccMigrateMetadata(cfg.SystemCfg, lp)
+		iop = insideop.NewCLPARelayInsideOp(conn, r, bc, txp, amm, cfg, lp)
+		omh = outsideop.NewCLPARelayOutsideOp(txp, amm)
 	case config.CLPABrokerConsensus:
 		return nil, fmt.Errorf("unimplemented consensus")
 	default:
@@ -281,6 +284,11 @@ func (n *Node) propose(ctx context.Context) error {
 	p, err := n.iop.BuildProposal(ctx)
 	if err != nil {
 		return fmt.Errorf("chain.GenerateBlock failed: %w", err)
+	}
+
+	// If the proposal is nil, skip this propose operation.
+	if p == nil {
+		return nil
 	}
 
 	// wrap and encode msg

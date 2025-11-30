@@ -14,6 +14,9 @@ import (
 )
 
 type ShardInsideOp interface {
+	// BuildProposal build a proposal for a round of the PBFT consensus.
+	// Note that, this function is normally called by the leader.
+	// If both the returned proposal and the returned error are nil, the leader of PBFT should not propose now.
 	BuildProposal(ctx context.Context) (*message.Proposal, error)
 	ValidateProposal(ctx context.Context, proposal *message.Proposal) error
 	ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error

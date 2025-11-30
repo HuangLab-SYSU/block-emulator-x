@@ -55,6 +55,8 @@ func getMsgType(msg any) (string, error) {
 
 	case *CLPARepartitionStartMsg:
 		msgType = CLPARepartitionStartMessageType
+	case *AccountAndTxMigrationMsg:
+		msgType = AccountAndTxMigrationMessageType
 
 	default:
 		return "", fmt.Errorf("unknown msg type: %T", msg)
