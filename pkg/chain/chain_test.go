@@ -90,7 +90,7 @@ func generateAccountAddr(s string) account.Address {
 func getTestConfig() config.BlockchainCfg {
 	return config.BlockchainCfg{
 		SystemCfg: config.SystemCfg{
-			ShardNum: 2,
+			ShardNum: 4,
 		},
 		BloomFilterCfg: config.BloomFilterCfg{
 			BitsetLen: bitsetTestLen,

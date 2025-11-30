@@ -199,13 +199,28 @@ func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account
 // ValidateBlock validates blocks according to c's config.
 // Note that, this function only validate block structure, but will not assert whether a block is valid to be added in this chain.
 func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
-	txRoot, err := c.getTxMerkleRoot(ctx, b.TxList)
-	if err != nil {
-		return fmt.Errorf("get tx trie stateRoot err: %w", err)
+	// This block is a transaction block.
+	if b.Header.TxRoot != nil {
+		txRoot, err := c.getTxMerkleRoot(ctx, b.TxList)
+		if err != nil {
+			return fmt.Errorf("get tx trie stateRoot err: %w", err)
+		}
+
+		if !bytes.Equal(txRoot, b.Header.TxRoot) {
+			return fmt.Errorf("tx root mismatch")
+		}
+
+		return nil
 	}
 
-	if !bytes.Equal(txRoot, b.Header.TxRoot) {
-		return fmt.Errorf("tx root mismatch")
+	// This block is a migration block.
+	mRoot, err := c.getMigratedStateMerkleRoot(ctx, b.MigratedAccounts, b.MigratedStates)
+	if err != nil {
+		return fmt.Errorf("get migrated account state merkle root err: %w", err)
+	}
+
+	if !bytes.Equal(mRoot, b.Header.MigratedAccountsRoot) {
+		return fmt.Errorf("migration root mismatch")
 	}
 
 	return nil
@@ -217,6 +232,10 @@ func (c *Chain) GetShardID() int64 {
 
 func (c *Chain) GetEpochID() int64 {
 	return c.epochID
+}
+
+func (c *Chain) UpdateEpoch(epoch int64) {
+	c.epochID = epoch
 }
 
 // Close closes the blockchain.

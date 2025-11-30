@@ -1,5 +1,10 @@
 package config
 
+const (
+	TxPoolNumType  = "number"
+	TxPoolByteType = "byte"
+)
+
 type LogCfg struct {
 	LogDir   string `json:"log_dir" yaml:"log_dir"`
 	LogLevel string `json:"log_level" yaml:"log_level"`

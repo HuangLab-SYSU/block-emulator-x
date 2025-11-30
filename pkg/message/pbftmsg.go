@@ -19,8 +19,8 @@ const (
 )
 
 const (
-	BlockProposalType = "BlockProposal"
-	PartitionProposal = "PartitionProposal"
+	BlockProposalType     = "BlockProposal"
+	PartitionProposalType = "PartitionProposalType"
 )
 
 type Proposal struct {

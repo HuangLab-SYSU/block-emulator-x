@@ -143,7 +143,12 @@ func (s *StaticBrokerCommittee) sendTxs2Shards(ctx context.Context, txs []transa
 	}
 
 	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, s.cfg.ShardNum)
+
 	for i := range leaders {
+		if shardTxs[i] == nil {
+			continue
+		}
+
 		mMap[leaders[i]] = shardTxs[i]
 	}
 

@@ -106,7 +106,12 @@ func (s *StaticRelayCommittee) sendTxs2Shards(ctx context.Context, txs []transac
 	}
 
 	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, s.cfg.ShardNum)
+
 	for i := range leaders {
+		if shardTxs[i] == nil {
+			continue
+		}
+
 		mMap[leaders[i]] = shardTxs[i]
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
@@ -46,6 +47,10 @@ func PackShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLo
 	msg2Shard := make(map[int]*rpcserver.WrappedMsg, shardNumber)
 
 	for i := range shardTxs {
+		if len(shardTxs[i]) == 0 {
+			continue
+		}
+
 		w, err := message.WrapMsg(&message.ReceiveTxsMsg{
 			Txs: shardTxs[i],
 		})
@@ -57,4 +62,13 @@ func PackShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLo
 	}
 
 	return msg2Shard, nil
+}
+
+func transferMapAddr2Account(src map[[20]byte]int) map[account.Account]int {
+	dest := make(map[account.Account]int, len(src))
+	for k, v := range src {
+		dest[account.Account{Addr: k}] = v
+	}
+
+	return dest
 }

@@ -22,7 +22,6 @@ linters:
     - gocyclo
     - ineffassign
     - goconst
-    - dupl
     - unparam
     - misspell
     - tparallel

@@ -14,15 +14,16 @@ type TxPool struct {
 	queue []transaction.Transaction
 	pf    packTxFunc
 	lock  sync.Mutex
+	cfg   config.TxPoolCfg
 }
 
 func NewTxPool(cfg config.TxPoolCfg) (*TxPool, error) {
 	var pf packTxFunc
 
 	switch cfg.Type {
-	case "byte":
+	case config.TxPoolByteType:
 		pf = packTxsByGivenBytes
-	case "number":
+	case config.TxPoolNumType:
 		pf = packTxsByGivenNum
 	default:
 		return nil, fmt.Errorf("unknown tx pool type: %s", cfg.Type)
@@ -31,6 +32,7 @@ func NewTxPool(cfg config.TxPoolCfg) (*TxPool, error) {
 	return &TxPool{
 		queue: make([]transaction.Transaction, 0),
 		pf:    pf,
+		cfg:   cfg,
 	}, nil
 }
 
@@ -60,6 +62,17 @@ func (t *TxPool) PackTxs(limit int) ([]transaction.Transaction, error) {
 	t.queue = q
 
 	return packed, nil
+}
+
+func (t *TxPool) GetTxListSize(txs []transaction.Transaction) (int, error) {
+	switch t.cfg.Type {
+	case config.TxPoolByteType:
+		return getCurSizeOfByte(txs)
+	case config.TxPoolNumType:
+		return getCurSizeOfNum(txs)
+	}
+
+	return 0, fmt.Errorf("unknown tx pool type: %s", t.cfg.Type)
 }
 
 func packTxsByGivenNum(q []transaction.Transaction, n int) ([]transaction.Transaction, []transaction.Transaction, error) {
@@ -98,4 +111,23 @@ func packTxsByGivenBytes(q []transaction.Transaction, n int) ([]transaction.Tran
 	q = q[endIdx:]
 
 	return ret, q, nil
+}
+
+func getCurSizeOfNum(txs []transaction.Transaction) (int, error) {
+	return len(txs), nil
+}
+
+func getCurSizeOfByte(txs []transaction.Transaction) (int, error) {
+	cnt := 0
+
+	for _, tx := range txs {
+		b, err := tx.Encode()
+		if err != nil {
+			return 0, err
+		}
+
+		cnt += len(b)
+	}
+
+	return cnt, nil
 }

@@ -49,15 +49,23 @@ func (c *CLPARelayOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpc
 			return fmt.Errorf("set account migration metadata by RepartitionStartMsg failed: %w", err)
 		}
 
+		slog.InfoContext(ctx, "handle CLPARepartitionStartMsg successfully")
+
 	case message.AccountAndTxMigrationMessageType:
 		var aat message.AccountAndTxMigrationMsg
 		if err := gob.NewDecoder(bytes.NewReader(msg.GetPayload())).Decode(&aat); err != nil {
 			return fmt.Errorf("decode AccountAndTxMigrationMsg failed: %w", err)
 		}
 
+		if err := c.txPool.AddTxs(aat.MigratedTxs); err != nil {
+			return fmt.Errorf("tx pool add txs from AccountAndTxMigrationMsg failed: %w", err)
+		}
+
 		if err := c.amm.CollectStatesByMsg(&aat); err != nil {
 			return fmt.Errorf("collect states by AccountAndTxMigrationMsg failed: %w", err)
 		}
+
+		slog.InfoContext(ctx, "handle AccountAndTxMigrationMsg successfully")
 
 	default:
 		return fmt.Errorf("unknown msg type: %s", msg.GetMsgType())

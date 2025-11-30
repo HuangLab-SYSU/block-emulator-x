@@ -18,7 +18,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
 type StaticRelayInsideOp struct {
@@ -50,7 +49,7 @@ func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Propo
 	}
 
 	// if a transaction is a cross-shard tx, modify its RelayOpt
-	mTxs, err := s.modifyTxRelayOpt(ctx, txs)
+	mTxs, err := modifyTxRelayOpt(ctx, txs, s.chain)
 	if err != nil {
 		return nil, fmt.Errorf("modifyTxRelayOpt failed: %w", err)
 	}
@@ -60,7 +59,7 @@ func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Propo
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
 
-	p, err := WrapProposal(b)
+	p, err := WrapProposal(b, message.BlockProposalType)
 	if err != nil {
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
@@ -95,7 +94,7 @@ func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLe
 	switch proposal.ProposalType {
 	case message.BlockProposalType:
 		if err := s.blockProposalCommitAndDeliver(ctx, isLeader, proposal); err != nil {
-			return fmt.Errorf("deliver the confirmed block proposal failed: %w", err)
+			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
 	default:
 		return fmt.Errorf("invalid proposal type = %s", proposal.ProposalType)
@@ -105,57 +104,6 @@ func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLe
 }
 
 func (s *StaticRelayInsideOp) Close() {}
-
-// modifyTxRelayOpt sets the RelayOpt of txs
-func (s *StaticRelayInsideOp) modifyTxRelayOpt(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, error) {
-	accountLocations, err := getAccountLocationsInTxs(ctx, s.chain, txs)
-	if err != nil {
-		return nil, fmt.Errorf("getAccountLocationsInTxs failed: %w", err)
-	}
-
-	modifiedTxs := make([]transaction.Transaction, 0, len(txs))
-	shardID := s.chain.GetShardID()
-
-	for _, tx := range txs {
-		// if this tx's relay stage is determined, not modify it
-		if tx.RelayStage != transaction.UndeterminedRelayTx {
-			modifiedTxs = append(modifiedTxs, tx)
-			continue
-		}
-
-		senderID, senderOK := accountLocations[tx.Sender]
-		recipientID, recipientOK := accountLocations[tx.Recipient]
-
-		if !senderOK || !recipientOK {
-			return nil, fmt.Errorf("tx sender or recipient does not exist in the accountLocation map")
-		}
-
-		if senderID != shardID {
-			slog.ErrorContext(ctx, "modify tx relay opt failed, the sender of this tx is not in this shard, and this transaction is not a relay-2 tx")
-			continue
-		}
-
-		// this is an inner-shard tx, append it
-		if senderID == recipientID {
-			modifiedTxs = append(modifiedTxs, tx)
-			continue
-		}
-
-		// this is a cross-shard tx, modify its RelayOpt
-		var thash []byte
-
-		if thash, err = utils.CalcHash(&tx); err != nil {
-			return nil, fmt.Errorf("CalcHash failed: %w", err)
-		}
-
-		r1tx := tx
-		r1tx.RelayStage = transaction.Relay1Tx
-		r1tx.ROriginalHash = thash
-		modifiedTxs = append(modifiedTxs, r1tx)
-	}
-
-	return modifiedTxs, nil
-}
 
 func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	var b block.Block

@@ -120,7 +120,7 @@ func (c *CLPABrokerCommittee) repartition(ctx context.Context) error {
 	c.supervisorEpoch++
 	cr := &message.CLPARepartitionStartMsg{
 		Epoch:       c.supervisorEpoch,
-		ModifiedMap: modifiedMap,
+		ModifiedMap: transferMapAddr2Account(modifiedMap),
 	}
 
 	w, err := message.WrapMsg(cr)
@@ -187,7 +187,12 @@ func (c *CLPABrokerCommittee) sendTxs2Shards(ctx context.Context, txs []transact
 	}
 
 	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, c.cfg.ShardNum)
+
 	for i := range leaders {
+		if shardTxs[i] == nil {
+			continue
+		}
+
 		mMap[leaders[i]] = shardTxs[i]
 	}
 

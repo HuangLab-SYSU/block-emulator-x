@@ -12,7 +12,7 @@ const (
 
 type CLPARepartitionStartMsg struct {
 	Epoch       int64
-	ModifiedMap map[[20]byte]int
+	ModifiedMap map[account.Account]int
 }
 
 type AccountAndTxMigrationMsg struct {

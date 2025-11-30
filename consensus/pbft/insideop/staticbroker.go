@@ -51,7 +51,7 @@ func (s *StaticBrokerInsideOp) BuildProposal(ctx context.Context) (*message.Prop
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
 
-	p, err := WrapProposal(b)
+	p, err := WrapProposal(b, message.BlockProposalType)
 	if err != nil {
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
@@ -85,7 +85,7 @@ func (s *StaticBrokerInsideOp) ProposalCommitAndDeliver(ctx context.Context, isL
 	switch proposal.ProposalType {
 	case message.BlockProposalType:
 		if err := s.blockProposalCommitAndDeliver(ctx, isLeader, proposal); err != nil {
-			return fmt.Errorf("deliver the confirmed block proposal failed: %w", err)
+			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
 	default:
 		return fmt.Errorf("invalid proposal type = %s", proposal.ProposalType)
