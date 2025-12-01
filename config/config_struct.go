@@ -11,8 +11,7 @@ type LogCfg struct {
 }
 
 type TxPoolCfg struct {
-	Type  string `json:"type" yaml:"type"`
-	Limit int64  `json:"limit" yaml:"limit"`
+	Type string `json:"type" yaml:"type"`
 }
 
 type BlockchainCfg struct {

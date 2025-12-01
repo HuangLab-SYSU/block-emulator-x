@@ -10,6 +10,11 @@ system:
   ### -----------------------------------------------------------------------------------
 
   ### -----------------------------------------------------------------------------------
+  ### `limit` is the limitation of bytes/transactions of a block.
+  limit: 2000
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
   ### `consensus_type` is the type of consensus. Optional setting: [static_relay, static_broker, clpa_relay, clpa_broker]
   ### `static_relay`: The location distribution of accounts is static, and accounts will not be migrated to other shards. For a cross-shard transaction, it will be handled by `Relay`.
   ### `static_broker`: The location distribution of accounts is static, and accounts will not be migrated to other shards. For a cross-shard transaction, it will be handled by the broker accounts.
@@ -95,11 +100,6 @@ consensus_node:
     ### `byte`: When packing transactions, the byte-size of transactions will be limited.
     ### `number`: When packing transactions, the number of transactions will be limited.
     type: "number" # [byte, number]
-    ### -----------------------------------------------------------------------------------
-
-    ### -----------------------------------------------------------------------------------
-    ### `limit` is the limitation of bytes/transactions when packing transactions in the tx pool.
-    limit: 2000
     ### -----------------------------------------------------------------------------------
 
   ### -----------------------------------------------------------------------------------

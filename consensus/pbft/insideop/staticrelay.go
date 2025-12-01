@@ -43,7 +43,7 @@ func NewStaticRelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper,
 }
 
 func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
-	txs, err := s.txPool.PackTxs(int(s.cfg.Limit))
+	txs, err := s.txPool.PackTxs(int(s.cfg.BlockSizeLimit))
 	if err != nil {
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}

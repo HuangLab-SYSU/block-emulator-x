@@ -101,7 +101,7 @@ func (c *CLPARelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLead
 func (c *CLPARelayInsideOp) Close() {}
 
 func (c *CLPARelayInsideOp) buildBlockProposal(ctx context.Context) (*message.Proposal, error) {
-	txs, err := c.packValidTxs(ctx, int(c.cfg.Limit))
+	txs, err := c.packValidTxs(ctx, int(c.cfg.BlockSizeLimit))
 	if err != nil {
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}

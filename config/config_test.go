@@ -7,9 +7,10 @@ import (
 )
 
 var expectedSystemCfg = SystemCfg{
-	ShardNum:      4,
-	NodeNum:       4,
-	ConsensusType: StaticRelayConsensus,
+	ShardNum:       4,
+	NodeNum:        4,
+	ConsensusType:  StaticRelayConsensus,
+	BlockSizeLimit: 2000,
 	LogCfg: LogCfg{
 		LogDir:   "./exp_test/",
 		LogLevel: "debug",
@@ -39,8 +40,7 @@ var expectedCfg = Config{
 			},
 		},
 		TxPoolCfg: TxPoolCfg{
-			Type:  "number",
-			Limit: 2000,
+			Type: "number",
 		},
 		BlockInterval: 5000,
 	},
