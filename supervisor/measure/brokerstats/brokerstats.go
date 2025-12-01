@@ -195,9 +195,9 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 			fmt.Sprintf("%.2f", totalTxCnt/epochDuration),
 			fmt.Sprintf("%.2f", ctxCnt/totalTxCnt),
 			fmt.Sprintf("%.2f", totalTCL/totalTxCnt),
+			fmt.Sprintf("%.2f", innerShardTCL/float64(b.innerShardTxNum[epochID])),
 			fmt.Sprintf("%.2f", broker1TCL/float64(b.broker1TxNum[epochID])),
 			fmt.Sprintf("%.2f", broker2TCL/float64(b.broker2TxNum[epochID])),
-			fmt.Sprintf("%.2f", innerShardTCL/float64(b.innerShardTxNum[epochID])),
 		}
 		measureVals = append(measureVals, csvLine)
 	}

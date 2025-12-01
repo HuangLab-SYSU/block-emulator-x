@@ -42,7 +42,8 @@ var expectedCfg = Config{
 		TxPoolCfg: TxPoolCfg{
 			Type: "number",
 		},
-		BlockInterval: 5000,
+		BlockInterval:  5000,
+		BlockRecordDir: "./exp_test/block_record/",
 	},
 	SupervisorCfg: SupervisorCfg{
 		TxNumber:         100000,

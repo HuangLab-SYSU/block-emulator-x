@@ -16,6 +16,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
 type StaticBrokerInsideOp struct {
@@ -25,19 +26,27 @@ type StaticBrokerInsideOp struct {
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
 
+	blockCSVWriter
+
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) *StaticBrokerInsideOp {
-	return &StaticBrokerInsideOp{
-		conn:     conn,
-		resolver: resolver,
-		chain:    chain,
-		txPool:   txPool,
-		cfg:      cfg,
-		lp:       lp,
+func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*StaticBrokerInsideOp, error) {
+	bcw, err := newBlockCSVWriter(cfg, lp)
+	if err != nil {
+		return nil, fmt.Errorf("newBlockCSVWriter failed: %w", err)
 	}
+
+	return &StaticBrokerInsideOp{
+		conn:           conn,
+		resolver:       resolver,
+		chain:          chain,
+		txPool:         txPool,
+		blockCSVWriter: *bcw,
+		cfg:            cfg,
+		lp:             lp,
+	}, nil
 }
 
 func (s *StaticBrokerInsideOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
@@ -94,7 +103,10 @@ func (s *StaticBrokerInsideOp) ProposalCommitAndDeliver(ctx context.Context, isL
 	return nil
 }
 
-func (s *StaticBrokerInsideOp) Close() {}
+func (s *StaticBrokerInsideOp) Close() {
+	_ = s.file.Close()
+	_ = s.chain.Close()
+}
 
 func (s *StaticBrokerInsideOp) blockProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	var b block.Block
@@ -113,9 +125,19 @@ func (s *StaticBrokerInsideOp) blockProposalCommitAndDeliver(ctx context.Context
 		return nil
 	}
 
+	// record this block
+	line, err := convertBlock2Line(&b)
+	if err != nil {
+		return fmt.Errorf("convertBlock2Line failed: %w", err)
+	}
+
+	if err = utils.WriteLine2CSV(s.csvW, line); err != nil {
+		return fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
+
 	// deliver this block info to the supervisor
 	innerTxs, b1Txs, b2Txs := s.splitTxs(ctx, b.TxList)
-	if err := s.deliverBlockInfo2Supervisor(ctx, innerTxs, b1Txs, b2Txs, b); err != nil {
+	if err = s.deliverBlockInfo2Supervisor(ctx, innerTxs, b1Txs, b2Txs, b); err != nil {
 		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}
 

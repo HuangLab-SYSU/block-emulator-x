@@ -24,6 +24,7 @@ consensus_node:
   tx_pool:
     type: "number" # [byte, number]
   block_interval: 5000 # ms
+  block_record_dir: "./exp_test/block_record/"
 
 supervisor:
   tx_number: 100000

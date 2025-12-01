@@ -2,10 +2,16 @@ package insideop
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	"golang.org/x/exp/maps"
+
+	"github.com/HuangLab-SYSU/block-emulator/config"
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 
@@ -16,14 +22,51 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 )
 
+const blockRecordPathFmt = "shard=%d_node=%d/block_record.csv"
+
+var blockRecordHeader = []string{
+	"ParentHash",
+	"BlockHash",
+	"StateRoot",
+	"Number",
+	"CreateTime",
+	"TxRoot",
+	"TxBodyLen",
+	"MigratedAccountsRoot",
+	"MigrationAccountLen",
+}
+
 type ShardInsideOp interface {
 	// BuildProposal build a proposal for a round of the PBFT consensus.
 	// Note that, this function is normally called by the leader.
 	// If both the returned proposal and the returned error are nil, the leader of PBFT should not propose now.
 	BuildProposal(ctx context.Context) (*message.Proposal, error)
+	// ValidateProposal validates the proposal.
 	ValidateProposal(ctx context.Context, proposal *message.Proposal) error
+	// ProposalCommitAndDeliver commits the given proposal and deliver the related messages to the supervisor or other shards.
 	ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error
 	Close()
+}
+
+type blockCSVWriter struct {
+	file *os.File
+	csvW *csv.Writer
+}
+
+func newBlockCSVWriter(cfg config.ConsensusNodeCfg, lp config.LocalParams) (*blockCSVWriter, error) {
+	fp := filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID))
+
+	file, err := utils.CreateFileWithDirs(fp)
+	if err != nil {
+		return nil, fmt.Errorf("CreateFileWithDirs failed: %w", err)
+	}
+
+	csvW := csv.NewWriter(file)
+	if err = utils.WriteLine2CSV(csvW, blockRecordHeader); err != nil {
+		return nil, fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
+
+	return &blockCSVWriter{file: file, csvW: csvW}, nil
 }
 
 func WrapProposal(b *block.Block, proposalType string) (*message.Proposal, error) {
@@ -40,7 +83,7 @@ func WrapProposal(b *block.Block, proposalType string) (*message.Proposal, error
 	return &p, nil
 }
 
-// modifyTxRelayOpt sets the RelayOpt of txs
+// modifyTxRelayOpt sets the RelayOpt of txs.
 func modifyTxRelayOpt(ctx context.Context, txs []transaction.Transaction, ch *chain.Chain) ([]transaction.Transaction, error) {
 	accountLocations, err := getAccountLocationsInTxs(ctx, ch, txs)
 	if err != nil {
@@ -51,7 +94,7 @@ func modifyTxRelayOpt(ctx context.Context, txs []transaction.Transaction, ch *ch
 	shardID := ch.GetShardID()
 
 	for _, tx := range txs {
-		// if this tx's relay stage is determined, not modify it
+		// if this transaction's relay stage is determined, not modify it
 		if tx.RelayStage != transaction.UndeterminedRelayTx {
 			modifiedTxs = append(modifiedTxs, tx)
 			continue
@@ -111,4 +154,23 @@ func getAccountLocationsInTxs(ctx context.Context, c *chain.Chain, txs []transac
 	}
 
 	return accountLocations, nil
+}
+
+func convertBlock2Line(b *block.Block) ([]string, error) {
+	blockHash, err := utils.CalcHash(b)
+	if err != nil {
+		return nil, fmt.Errorf("CalcHash failed: %w", err)
+	}
+
+	return []string{
+		hex.EncodeToString(b.Header.ParentBlockHash),      // "ParentHash"
+		hex.EncodeToString(blockHash),                     // "BlockHash"
+		hex.EncodeToString(b.Header.StateRoot),            // "StateRoot"
+		fmt.Sprintf("%d", b.Header.Number),                // "Number"
+		utils.ConvertTime2Str(b.Header.CreateTime),        // "CreateTime"
+		hex.EncodeToString(b.Header.TxRoot),               // "TxRoot"
+		fmt.Sprintf("%d", len(b.TxList)),                  // "TxBodyLen"
+		hex.EncodeToString(b.Header.MigratedAccountsRoot), // "MigratedAccountsRoot"
+		fmt.Sprintf("%d", len(b.MigratedAccounts)),        // "MigrationAccountLen"
+	}, nil
 }

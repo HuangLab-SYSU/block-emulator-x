@@ -36,7 +36,7 @@ system:
     ### `info` is the most commonly used level. It shows [info, warn, error] levels of logs.
     ### `warn` shows [warn, error] levels of logs.
     ### `error` shows only the [error] level of logs.
-    log_level: "debug" # [debug, info, warn, error]
+    log_level: "info" # [debug, info, warn, error]
     ### -----------------------------------------------------------------------------------
 
 consensus_node:
@@ -105,6 +105,11 @@ consensus_node:
   ### -----------------------------------------------------------------------------------
   ### `block_interval` is the time interval between two blocks. (ms)
   block_interval: 5000 # ms
+  ### -----------------------------------------------------------------------------------
+
+  ### -----------------------------------------------------------------------------------
+  ### `block_record_dir` is the directory of the block record information.
+  block_record_dir: "./exp/block_record/"
   ### -----------------------------------------------------------------------------------
 
 supervisor:

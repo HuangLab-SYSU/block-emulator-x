@@ -10,6 +10,8 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
+
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
@@ -35,6 +37,8 @@ type CLPARelayInsideOp struct {
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
 
+	blockCSVWriter
+
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
@@ -42,16 +46,22 @@ type CLPARelayInsideOp struct {
 func NewCLPARelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper,
 	chain *chain.Chain, txPool txpool.TxPool, amm *migration.AccMigrateMetadata,
 	cfg config.ConsensusNodeCfg, lp config.LocalParams,
-) *CLPARelayInsideOp {
-	return &CLPARelayInsideOp{
-		amm:      amm,
-		conn:     conn,
-		resolver: resolver,
-		chain:    chain,
-		txPool:   txPool,
-		cfg:      cfg,
-		lp:       lp,
+) (*CLPARelayInsideOp, error) {
+	bcw, err := newBlockCSVWriter(cfg, lp)
+	if err != nil {
+		return nil, fmt.Errorf("newBlockCSVWriter failed: %w", err)
 	}
+
+	return &CLPARelayInsideOp{
+		amm:            amm,
+		conn:           conn,
+		resolver:       resolver,
+		chain:          chain,
+		txPool:         txPool,
+		blockCSVWriter: *bcw,
+		cfg:            cfg,
+		lp:             lp,
+	}, nil
 }
 
 func (c *CLPARelayInsideOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
@@ -88,7 +98,7 @@ func (c *CLPARelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLead
 			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
 	case message.PartitionProposalType:
-		if err := c.partitionBlockCommit(ctx, proposal); err != nil {
+		if err := c.partitionBlockCommit(ctx, isLeader, proposal); err != nil {
 			return fmt.Errorf("commit partition block failed: %w", err)
 		}
 	default:
@@ -98,7 +108,10 @@ func (c *CLPARelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLead
 	return nil
 }
 
-func (c *CLPARelayInsideOp) Close() {}
+func (c *CLPARelayInsideOp) Close() {
+	_ = c.file.Close()
+	_ = c.chain.Close()
+}
 
 func (c *CLPARelayInsideOp) buildBlockProposal(ctx context.Context) (*message.Proposal, error) {
 	txs, err := c.packValidTxs(ctx, int(c.cfg.BlockSizeLimit))
@@ -345,10 +358,20 @@ func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeade
 		return nil
 	}
 
+	// record this block
+	line, err := convertBlock2Line(&b)
+	if err != nil {
+		return fmt.Errorf("convertBlock2Line failed: %w", err)
+	}
+
+	if err = utils.WriteLine2CSV(c.csvW, line); err != nil {
+		return fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
+
 	// deliver this block info to the supervisor
 	innerTxs, r1Txs, r2Txs := c.splitTxs(ctx, b.TxList)
 
-	if err := c.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
+	if err = c.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
 		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}
 
@@ -364,7 +387,7 @@ func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeade
 	return nil
 }
 
-func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, proposal *message.Proposal) error {
+func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	var b block.Block
 	if err := gob.NewDecoder(bytes.NewReader(proposal.Payload)).Decode(&b); err != nil {
 		return fmt.Errorf("invalid payload, decode as block failed: %w", err)
@@ -377,6 +400,19 @@ func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, proposal *
 	c.chain.UpdateEpoch(c.amm.Epoch)
 	c.amm.MigrationStatusReset()
 	slog.Info("block is added in clpa relay module", "block height", b.Header.Number)
+
+	if isLeader {
+		return nil
+	}
+	// record this block
+	line, err := convertBlock2Line(&b)
+	if err != nil {
+		return fmt.Errorf("convertBlock2Line failed: %w", err)
+	}
+
+	if err = utils.WriteLine2CSV(c.csvW, line); err != nil {
+		return fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
 
 	return nil
 }
@@ -440,7 +476,7 @@ func (c *CLPARelayInsideOp) sendRelayedTxs(ctx context.Context, r1Txs []transact
 			continue
 		}
 
-		// modify relay tx's RelayOpt
+		// modify relay transaction's RelayOpt
 		updatedRelayedTx := tx
 		updatedRelayedTx.RelayStage = transaction.Relay2Tx
 		relayedTxs[shardID] = append(relayedTxs[shardID], updatedRelayedTx)

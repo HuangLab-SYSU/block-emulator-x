@@ -9,7 +9,7 @@ import (
 )
 
 func WriteAllToCSV(path string, header []string, rows [][]string) error {
-	f, err := createFileWithDirs(path)
+	f, err := CreateFileWithDirs(path)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -33,7 +33,7 @@ func WriteAllToCSV(path string, header []string, rows [][]string) error {
 	return w.Error()
 }
 
-func createFileWithDirs(path string) (*os.File, error) {
+func CreateFileWithDirs(path string) (*os.File, error) {
 	// create the directory
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
@@ -51,6 +51,16 @@ func createFileWithDirs(path string) (*os.File, error) {
 	}
 
 	return f, nil
+}
+
+func WriteLine2CSV(w *csv.Writer, line []string) error {
+	if err := w.Write(line); err != nil {
+		return fmt.Errorf("failed to write line: %w", err)
+	}
+
+	w.Flush()
+
+	return w.Error()
 }
 
 func ConvertTime2Str(t time.Time) string {

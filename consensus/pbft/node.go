@@ -67,14 +67,23 @@ func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Consen
 
 	switch cfg.ConsensusType {
 	case config.StaticRelayConsensus:
-		iop = insideop.NewStaticRelayInsideOp(conn, r, bc, txp, cfg, lp)
+		if iop, err = insideop.NewStaticRelayInsideOp(conn, r, bc, txp, cfg, lp); err != nil {
+			return nil, fmt.Errorf("NewStaticRelayInsideOp err=%w", err)
+		}
+
 		omh = outsideop.NewStaticRelayOutsideOp(txp)
 	case config.StaticBrokerConsensus:
-		iop = insideop.NewStaticBrokerInsideOp(conn, r, bc, txp, cfg, lp)
+		if iop, err = insideop.NewStaticBrokerInsideOp(conn, r, bc, txp, cfg, lp); err != nil {
+			return nil, fmt.Errorf("NewStaticBrokerInsideOp err=%w", err)
+		}
+
 		omh = outsideop.NewStaticRelayOutsideOp(txp)
 	case config.CLPARelayConsensus:
 		amm := migration.NewAccMigrateMetadata(cfg.SystemCfg, lp)
-		iop = insideop.NewCLPARelayInsideOp(conn, r, bc, txp, amm, cfg, lp)
+		if iop, err = insideop.NewCLPARelayInsideOp(conn, r, bc, txp, amm, cfg, lp); err != nil {
+			return nil, fmt.Errorf("NewCLPARelayInsideOp err=%w", err)
+		}
+
 		omh = outsideop.NewCLPARelayOutsideOp(txp, amm)
 	case config.CLPABrokerConsensus:
 		return nil, fmt.Errorf("unimplemented consensus")

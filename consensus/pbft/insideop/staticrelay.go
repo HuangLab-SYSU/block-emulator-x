@@ -18,6 +18,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
 type StaticRelayInsideOp struct {
@@ -27,19 +28,27 @@ type StaticRelayInsideOp struct {
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
 
+	blockCSVWriter
+
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewStaticRelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) *StaticRelayInsideOp {
-	return &StaticRelayInsideOp{
-		conn:     conn,
-		resolver: resolver,
-		chain:    chain,
-		txPool:   txPool,
-		cfg:      cfg,
-		lp:       lp,
+func NewStaticRelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*StaticRelayInsideOp, error) {
+	bcw, err := newBlockCSVWriter(cfg, lp)
+	if err != nil {
+		return nil, fmt.Errorf("newBlockCSVWriter failed: %w", err)
 	}
+
+	return &StaticRelayInsideOp{
+		conn:           conn,
+		resolver:       resolver,
+		chain:          chain,
+		txPool:         txPool,
+		blockCSVWriter: *bcw,
+		cfg:            cfg,
+		lp:             lp,
+	}, nil
 }
 
 func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
@@ -103,7 +112,10 @@ func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLe
 	return nil
 }
 
-func (s *StaticRelayInsideOp) Close() {}
+func (s *StaticRelayInsideOp) Close() {
+	_ = s.file.Close()
+	_ = s.chain.Close()
+}
 
 func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	var b block.Block
@@ -122,10 +134,20 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 		return nil
 	}
 
+	// record this block
+	line, err := convertBlock2Line(&b)
+	if err != nil {
+		return fmt.Errorf("convertBlock2Line failed: %w", err)
+	}
+
+	if err = utils.WriteLine2CSV(s.csvW, line); err != nil {
+		return fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
+
 	// deliver this block info to the supervisor
 	innerTxs, r1Txs, r2Txs := s.splitTxs(ctx, b.TxList)
 
-	if err := s.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
+	if err = s.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
 		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}
 
@@ -200,7 +222,7 @@ func (s *StaticRelayInsideOp) sendRelayedTxs(ctx context.Context, r1Txs []transa
 			continue
 		}
 
-		// modify relay tx's RelayOpt
+		// modify relay transaction's RelayOpt
 		updatedRelayedTx := tx
 		updatedRelayedTx.RelayStage = transaction.Relay2Tx
 		relayedTxs[shardID] = append(relayedTxs[shardID], updatedRelayedTx)

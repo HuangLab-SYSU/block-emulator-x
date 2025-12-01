@@ -191,9 +191,9 @@ func (r *RelayStats) outputBriefEpochInfo(fp string) error {
 			fmt.Sprintf("%.2f", totalTxCnt/epochDuration),
 			fmt.Sprintf("%.2f", ctxCnt/totalTxCnt),
 			fmt.Sprintf("%.2f", totalTCL/totalTxCnt),
+			fmt.Sprintf("%.2f", innerShardTCL/float64(r.innerShardTxNum[epochID])),
 			fmt.Sprintf("%.2f", relay1TCL/float64(r.relay1TxNum[epochID])),
 			fmt.Sprintf("%.2f", relay2TCL/float64(r.relay2TxNum[epochID])),
-			fmt.Sprintf("%.2f", innerShardTCL/float64(r.innerShardTxNum[epochID])),
 		}
 		measureVals = append(measureVals, csvLine)
 	}
