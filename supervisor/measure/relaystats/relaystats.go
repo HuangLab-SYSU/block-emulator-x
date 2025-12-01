@@ -99,7 +99,7 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 	}
 
 	for _, tx := range bInfo.Relay1Txs {
-		// set broker 1 to the pair map
+		// set relay 1 to the pair map
 		strTxHash := string(tx.ROriginalHash)
 		if val := r.txLifecycles[strTxHash]; val == nil {
 			r.txLifecycles[strTxHash] = &txLifeCycle{
@@ -144,7 +144,7 @@ func (r *RelayStats) OutputResult(fp string) error {
 		return fmt.Errorf("failed to outputDetailTxInfo: %w", err)
 	}
 
-	slog.Info("broker stats has output all results")
+	slog.Info("relay stats has output all results")
 
 	return nil
 }
@@ -176,9 +176,9 @@ func (r *RelayStats) outputBriefEpochInfo(fp string) error {
 		ctxCnt := float64(r.relay1TxNum[epochID]+r.relay2TxNum[epochID]) / 2.0
 		totalTxCnt := float64(r.innerShardTxNum[epochID]) + ctxCnt
 
-		broker1TCL, broker2TCL := float64(r.relay1TCLSum[epochID]), float64(r.relay2TCLSum[epochID])
+		relay1TCL, relay2TCL := float64(r.relay1TCLSum[epochID]), float64(r.relay2TCLSum[epochID])
 		innerShardTCL := float64(r.innerShardTCLSum[epochID])
-		totalTCL := broker1TCL + broker2TCL + innerShardTCL
+		totalTCL := relay1TCL + relay2TCL + innerShardTCL
 
 		csvLine := []string{
 			fmt.Sprintf("%d", epochID),
@@ -191,8 +191,8 @@ func (r *RelayStats) outputBriefEpochInfo(fp string) error {
 			fmt.Sprintf("%.2f", totalTxCnt/epochDuration),
 			fmt.Sprintf("%.2f", ctxCnt/totalTxCnt),
 			fmt.Sprintf("%.2f", totalTCL/totalTxCnt),
-			fmt.Sprintf("%.2f", broker1TCL/float64(r.relay1TxNum[epochID])),
-			fmt.Sprintf("%.2f", broker2TCL/float64(r.relay2TxNum[epochID])),
+			fmt.Sprintf("%.2f", relay1TCL/float64(r.relay1TxNum[epochID])),
+			fmt.Sprintf("%.2f", relay2TCL/float64(r.relay2TxNum[epochID])),
 			fmt.Sprintf("%.2f", innerShardTCL/float64(r.innerShardTxNum[epochID])),
 		}
 		measureVals = append(measureVals, csvLine)
@@ -210,10 +210,10 @@ func (r *RelayStats) outputDetailTxInfo(fp string) error {
 		"Tx finally commit time",
 		"Is cross-shard tx or not",
 		"Inner shard tx block propose time",
-		"Broker1 block propose time",
-		"Broker1 tx commit time",
-		"Broker2 block propose time",
-		"Broker2 tx commit time",
+		"Relay1 block propose time",
+		"Relay1 tx commit time",
+		"Relay2 block propose time",
+		"Relay2 tx commit time",
 	}
 
 	measureVals := make([][]string, 0, len(r.txLifecycles))

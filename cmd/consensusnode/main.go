@@ -33,6 +33,7 @@ func main() {
 	if err = logger.InitLogger(lp, cfg.LogCfg); err != nil {
 		log.Fatal(fmt.Errorf("init logger: %w", err))
 	}
+
 	defer logger.CloseLoggerFile()
 
 	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(lp)

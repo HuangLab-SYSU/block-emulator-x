@@ -74,7 +74,4 @@ func (c *CLPARelayOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpc
 	return nil
 }
 
-func (c *CLPARelayOutsideOp) Close() {
-	// TODO implement me
-	panic("implement me")
-}
+func (c *CLPARelayOutsideOp) Close() {}

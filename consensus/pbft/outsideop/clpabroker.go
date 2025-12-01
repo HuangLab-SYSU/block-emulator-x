@@ -13,7 +13,4 @@ func (c *CLPABrokerOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rp
 	panic("implement me")
 }
 
-func (c *CLPABrokerOutsideOp) Close() {
-	// TODO implement me
-	panic("implement me")
-}
+func (c *CLPABrokerOutsideOp) Close() {}
