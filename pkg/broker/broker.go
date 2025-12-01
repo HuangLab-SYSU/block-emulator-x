@@ -28,7 +28,7 @@ type txInfoStage struct {
 }
 
 type Manager struct {
-	broker2Nonce      map[account.Address]int64
+	broker2Nonce      map[account.Address]uint64
 	unconfirmedTxInfo map[rawTxHash]*txInfoStage // unconfirmed transactions information
 
 	readyBroker1TxHashes, readyBroker2TxHashes []rawTxHash // the hash of transactions those are ready to be created
@@ -71,7 +71,7 @@ func (s *Manager) CreateRawTxRandomBroker(tx transaction.Transaction) (*transact
 
 // CreateRawTx creates a raw tx with the given tx.
 func (s *Manager) CreateRawTx(tx transaction.Transaction, brokerAddr account.Address) (*transaction.Transaction, error) {
-	th, err := utils.CalcHash(&tx)
+	th, err := tx.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("calc hash: %w", err)
 	}
@@ -202,8 +202,8 @@ func (s *Manager) createBroker2Tx(txHash rawTxHash) (*transaction.Transaction, e
 	return &b2Tx, nil
 }
 
-func readBrokersFromFile(cfg config.BrokerModuleCfg) (map[account.Address]int64, error) {
-	brokerSet := make(map[account.Address]int64)
+func readBrokersFromFile(cfg config.BrokerModuleCfg) (map[account.Address]uint64, error) {
+	brokerSet := make(map[account.Address]uint64)
 
 	f, err := os.Open(cfg.BrokerFilePath)
 	if err != nil {

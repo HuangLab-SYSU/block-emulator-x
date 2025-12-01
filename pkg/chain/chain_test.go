@@ -47,23 +47,30 @@ func TestChain(t *testing.T) {
 
 	// create block but not add it to the chain
 	ctx := context.Background()
-	beforeHeader := *bc.GetCurHeader()
+	beforeHeader := bc.GetCurHeader()
 
 	b, err := bc.GenerateBlock(ctx, testMiner, testTxs)
 	require.NoError(t, err)
 	generateHeader := b.Header
 
-	headerAfterGenerate := *bc.GetCurHeader()
+	headerAfterGenerate := bc.GetCurHeader()
+	// the blockchain's 'curHeader' will not be modified after generating a block
 	require.Equal(t, beforeHeader, headerAfterGenerate)
+
 	encodedBeforeHeader, _ := beforeHeader.Encode()
-	encodedHeaderAfterHeader, _ := headerAfterGenerate.Encode()
-	require.Equal(t, encodedBeforeHeader, encodedHeaderAfterHeader)
+	encodedHeaderAfterGenerate, _ := headerAfterGenerate.Encode()
+	// block header in the blockchain is equal in bytes.
+	require.Equal(t, encodedBeforeHeader, encodedHeaderAfterGenerate)
 
 	err = bc.AddBlock(ctx, b)
 	require.NoError(t, err)
 
-	headerAfterAdd := *bc.GetCurHeader()
-	require.NotEqual(t, generateHeader, headerAfterAdd)
+	headerAfterAdd := bc.GetCurHeader()
+	require.Equal(t, generateHeader, headerAfterAdd)
+	require.NoError(t, err)
+
+	beforeHeaderHash, _ := beforeHeader.Hash()
+	require.Equal(t, beforeHeaderHash, generateHeader.ParentBlockHash)
 
 	migratedB, err := bc.GenerateMigrationBlock(ctx, testMiner, []account.Account{testSender}, []account.State{*account.NewState(testSender, 100)})
 	require.NoError(t, err)

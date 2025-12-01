@@ -3,11 +3,11 @@
 package transaction
 
 import (
-	"bytes"
-	"encoding/gob"
-	"fmt"
+	"crypto/sha256"
 	"math/big"
 	"time"
+
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 )
@@ -28,7 +28,7 @@ type Transaction struct {
 	Sender     account.Account
 	Recipient  account.Account
 	Value      *big.Int
-	Nonce      int64
+	Nonce      uint64
 	Signature  Signature
 	CreateTime time.Time
 
@@ -37,20 +37,20 @@ type Transaction struct {
 }
 
 type RelayTxOpt struct {
-	RelayStage    int
+	RelayStage    uint
 	ROriginalHash []byte
 }
 
 type BrokerTxOpt struct {
-	BrokerStage               int // label that this is a sigma_1 tx or a sigma_2 tx.
+	BrokerStage               uint // label that this is a sigma_1 tx or a sigma_2 tx.
 	Broker                    account.Account
 	BOriginalHash             []byte // the hash of raw message
 	OriginalTxCreateTime      time.Time
-	NonceBroker               int64
-	HeightLock, HeightCurrent int64
+	NonceBroker               uint64
+	HeightLock, HeightCurrent uint64
 }
 
-func NewTransaction(sender, recipient account.Account, value *big.Int, nonce int64, proposeTime time.Time) *Transaction {
+func NewTransaction(sender, recipient account.Account, value *big.Int, nonce uint64, proposeTime time.Time) *Transaction {
 	tx := &Transaction{
 		Sender:     sender,
 		Recipient:  recipient,
@@ -65,28 +65,16 @@ func NewTransaction(sender, recipient account.Account, value *big.Int, nonce int
 // Encode encodes transactions.
 // Transaction encode should be prepare
 func (tx *Transaction) Encode() ([]byte, error) {
-	var buff bytes.Buffer
-
-	enc := gob.NewEncoder(&buff)
-
-	err := enc.Encode(tx)
-	if err != nil {
-		return nil, fmt.Errorf("encode transaction err: %w", err)
-	}
-
-	return buff.Bytes(), nil
+	return rlp.EncodeToBytes(tx)
 }
 
-// DecodeTx decodes transaction.
-func DecodeTx(b []byte) (*Transaction, error) {
-	var tx Transaction
-
-	decoder := gob.NewDecoder(bytes.NewReader(b))
-
-	err := decoder.Decode(&tx)
+func (tx *Transaction) Hash() ([]byte, error) {
+	b, err := tx.Encode()
 	if err != nil {
-		return nil, fmt.Errorf("decode transaction err: %w", err)
+		return []byte{}, err
 	}
 
-	return &tx, nil
+	sum := sha256.Sum256(b)
+
+	return sum[:], nil
 }

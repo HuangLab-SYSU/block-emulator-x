@@ -7,7 +7,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor/txsource/randomsource"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +27,7 @@ func initInputMsg(t *testing.T) *rpcserver.WrappedMsg {
 	cTxs, _ := txSource.ReadTxs(txSize)
 	r1Txs, r2Txs := make([]transaction.Transaction, txSize), make([]transaction.Transaction, txSize)
 	for i, cTx := range cTxs {
-		txHash, err := utils.CalcHash(&cTx)
+		txHash, err := cTx.Hash()
 		require.NoError(t, err)
 		r1 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, cTx.Nonce, cTx.CreateTime)
 		r1.ROriginalHash = txHash

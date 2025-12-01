@@ -84,7 +84,7 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 
 	// update the sum of latency
 	for _, tx := range bInfo.InnerShardTxs {
-		th, err := utils.CalcHash(&tx)
+		th, err := tx.Hash()
 		if err != nil {
 			slog.Error("invalid hash", "CalcHash err", err)
 			continue

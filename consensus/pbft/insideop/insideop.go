@@ -121,7 +121,7 @@ func modifyTxRelayOpt(ctx context.Context, txs []transaction.Transaction, ch *ch
 		// this is a cross-shard tx, modify its RelayOpt
 		var thash []byte
 
-		if thash, err = utils.CalcHash(&tx); err != nil {
+		if thash, err = tx.Hash(); err != nil {
 			return nil, fmt.Errorf("CalcHash failed: %w", err)
 		}
 
@@ -157,20 +157,20 @@ func getAccountLocationsInTxs(ctx context.Context, c *chain.Chain, txs []transac
 }
 
 func convertBlock2Line(b *block.Block) ([]string, error) {
-	blockHash, err := utils.CalcHash(b)
+	blockHash, err := b.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("CalcHash failed: %w", err)
 	}
 
 	return []string{
-		hex.EncodeToString(b.Header.ParentBlockHash),      // "ParentHash"
-		hex.EncodeToString(blockHash),                     // "BlockHash"
-		hex.EncodeToString(b.Header.StateRoot),            // "StateRoot"
-		fmt.Sprintf("%d", b.Header.Number),                // "Number"
-		utils.ConvertTime2Str(b.Header.CreateTime),        // "CreateTime"
-		hex.EncodeToString(b.Header.TxRoot),               // "TxRoot"
-		fmt.Sprintf("%d", len(b.TxList)),                  // "TxBodyLen"
-		hex.EncodeToString(b.Header.MigratedAccountsRoot), // "MigratedAccountsRoot"
-		fmt.Sprintf("%d", len(b.MigratedAccounts)),        // "MigrationAccountLen"
+		hex.EncodeToString(b.ParentBlockHash),      // "ParentHash"
+		hex.EncodeToString(blockHash),              // "BlockHash"
+		hex.EncodeToString(b.StateRoot),            // "StateRoot"
+		fmt.Sprintf("%d", b.Number),                // "Number"
+		utils.ConvertTime2Str(b.CreateTime),        // "CreateTime"
+		hex.EncodeToString(b.TxRoot),               // "TxRoot"
+		fmt.Sprintf("%d", len(b.TxList)),           // "TxBodyLen"
+		hex.EncodeToString(b.MigratedAccountsRoot), // "MigratedAccountsRoot"
+		fmt.Sprintf("%d", len(b.MigratedAccounts)), // "MigrationAccountLen"
 	}, nil
 }

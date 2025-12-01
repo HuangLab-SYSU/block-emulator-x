@@ -73,7 +73,7 @@ func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Propo
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
 
-	slog.InfoContext(ctx, "block is generated in static relay module", "shard ID", s.chain.GetShardID(), "block height", b.Header.Number, "block create time", b.Header.CreateTime)
+	slog.InfoContext(ctx, "block is generated in static relay module", "shard ID", s.chain.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
 
 	return p, nil
 }
@@ -127,7 +127,7 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
-	slog.Info("block is added in static relay module", "block height", b.Header.Number)
+	slog.Info("block is added in static relay module", "block height", b.Number)
 
 	// if this node is not a leader, skip
 	if !isLeader {
@@ -190,7 +190,7 @@ func (s *StaticRelayInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, i
 		Relay2Txs:        r2Txs,
 		ShardID:          s.chain.GetShardID(),
 		Epoch:            s.chain.GetEpochID(),
-		BlockProposeTime: b.Header.CreateTime,
+		BlockProposeTime: b.CreateTime,
 		BlockCommitTime:  time.Now(),
 	}
 

@@ -65,7 +65,7 @@ func (s *StaticBrokerInsideOp) BuildProposal(ctx context.Context) (*message.Prop
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
 
-	slog.InfoContext(ctx, "block is generated in static broker module", "shard ID", s.chain.GetShardID(), "block height", b.Header.Number, "block create time", b.Header.CreateTime)
+	slog.InfoContext(ctx, "block is generated in static broker module", "shard ID", s.chain.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
 
 	return p, nil
 }
@@ -118,7 +118,7 @@ func (s *StaticBrokerInsideOp) blockProposalCommitAndDeliver(ctx context.Context
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
-	slog.Info("block is added in static broker module", "block height", b.Header.Number)
+	slog.Info("block is added in static broker module", "block height", b.Number)
 
 	// if this node is not the leader, skip it
 	if !isLeader {
@@ -170,7 +170,7 @@ func (s *StaticBrokerInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, 
 		Broker2Txs:       b2Txs,
 		Epoch:            s.chain.GetEpochID(),
 		ShardID:          s.chain.GetShardID(),
-		BlockProposeTime: b.Header.CreateTime,
+		BlockProposeTime: b.CreateTime,
 		BlockCommitTime:  time.Now(),
 	}
 

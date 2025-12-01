@@ -18,7 +18,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/partition"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/storage"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
 type Chain struct {
@@ -52,13 +51,13 @@ func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
 		return nil, fmt.Errorf("create genesis block err: %w", err)
 	}
 
-	chain.curHeader = genesisBlock.Header
+	chain.curHeader = &genesisBlock.Header
 
 	return chain, nil
 }
 
-func (c *Chain) GetCurHeader() *block.Header {
-	return c.curHeader
+func (c *Chain) GetCurHeader() block.Header {
+	return *c.curHeader
 }
 
 // GenerateBlock reads the current storage and tries to generate a normal block to handle the transactions.
@@ -73,7 +72,7 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 	}
 
 	for _, tx := range txs {
-		txHash, err := utils.CalcHash(&tx)
+		txHash, err := tx.Hash()
 		if err != nil {
 			return nil, fmt.Errorf("calc hash err: %w", err)
 		}
@@ -86,7 +85,7 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 		return nil, fmt.Errorf("preview updated trie by txs err: %w", err)
 	}
 
-	parentHeader, err := c.curHeader.Encode()
+	parentHeader, err := c.curHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("create parent header err: %w", err)
 	}
@@ -96,7 +95,7 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 		return nil, fmt.Errorf("get tx trie stateRoot err: %w", err)
 	}
 
-	header := &block.Header{
+	header := block.Header{
 		ParentBlockHash: parentHeader,
 		StateRoot:       stateRoot,
 		Number:          c.curHeader.Number + 1,
@@ -129,7 +128,7 @@ func (c *Chain) GenerateMigrationBlock(ctx context.Context, miner account.Addres
 		return nil, fmt.Errorf("get account state root err: %w", err)
 	}
 
-	header := &block.Header{
+	header := block.Header{
 		ParentBlockHash: parentHeader,
 		StateRoot:       stateRoot,
 		Number:          c.curHeader.Number + 1,
@@ -153,7 +152,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 		err                              error
 		blockHash, blockByte, headerByte []byte
 	)
-	if blockHash, err = utils.CalcHash(b); err != nil {
+	if blockHash, err = b.Hash(); err != nil {
 		return fmt.Errorf("calc hash err: %w", err)
 	}
 
@@ -177,7 +176,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	}
 
 	// update the current header
-	c.curHeader = b.Header
+	c.curHeader = &b.Header
 
 	return nil
 }
@@ -200,13 +199,13 @@ func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account
 // Note that, this function only validate block structure, but will not assert whether a block is valid to be added in this chain.
 func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
 	// This block is a transaction block.
-	if b.Header.TxRoot != nil {
+	if b.TxRoot != nil {
 		txRoot, err := c.getTxMerkleRoot(ctx, b.TxList)
 		if err != nil {
 			return fmt.Errorf("get tx trie stateRoot err: %w", err)
 		}
 
-		if !bytes.Equal(txRoot, b.Header.TxRoot) {
+		if !bytes.Equal(txRoot, b.TxRoot) {
 			return fmt.Errorf("tx root mismatch")
 		}
 
@@ -219,7 +218,7 @@ func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
 		return fmt.Errorf("get migrated account state merkle root err: %w", err)
 	}
 
-	if !bytes.Equal(mRoot, b.Header.MigratedAccountsRoot) {
+	if !bytes.Equal(mRoot, b.MigratedAccountsRoot) {
 		return fmt.Errorf("migration root mismatch")
 	}
 
@@ -301,7 +300,7 @@ func (c *Chain) previewTrieUpdatedByMigration(ctx context.Context, accounts []ac
 func (c *Chain) updateTrieByTxs(ctx context.Context, b *block.Block) ([]byte, error) {
 	var keys, values [][]byte
 
-	if b.Header.TxRoot != nil { // transaction block
+	if b.TxRoot != nil { // transaction block
 		var err error
 
 		keys, values, err = c.calculateAccountsAndStatesBytes(ctx, b.TxList)
@@ -511,7 +510,7 @@ func (c *Chain) getTxMerkleRoot(ctx context.Context, txs []transaction.Transacti
 	valBytes := make([][]byte, len(txs))
 
 	for i, tx := range txs {
-		keyBytes[i], err = utils.CalcHash(&tx)
+		keyBytes[i], err = tx.Hash()
 		if err != nil {
 			return nil, fmt.Errorf("hash err: %w", err)
 		}

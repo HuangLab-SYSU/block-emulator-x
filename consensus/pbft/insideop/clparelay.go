@@ -135,7 +135,7 @@ func (c *CLPARelayInsideOp) buildBlockProposal(ctx context.Context) (*message.Pr
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
 
-	slog.InfoContext(ctx, "block is generated in clpa relay module", "shard ID", c.chain.GetShardID(), "block height", b.Header.Number, "block create time", b.Header.CreateTime)
+	slog.InfoContext(ctx, "block is generated in clpa relay module", "shard ID", c.chain.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
 
 	return p, nil
 }
@@ -351,7 +351,7 @@ func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeade
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
-	slog.Info("block is added in clpa relay module", "block height", b.Header.Number, "epoch", c.amm.Epoch)
+	slog.Info("block is added in clpa relay module", "block height", b.Number, "epoch", c.amm.Epoch)
 
 	// if this node is not a leader, skip
 	if !isLeader {
@@ -399,7 +399,7 @@ func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, isLeader b
 
 	c.chain.UpdateEpoch(c.amm.Epoch)
 	c.amm.MigrationStatusReset()
-	slog.Info("block is added in clpa relay module", "block height", b.Header.Number)
+	slog.Info("block is added in clpa relay module", "block height", b.Number)
 
 	if isLeader {
 		return nil
@@ -444,7 +444,7 @@ func (c *CLPARelayInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, inn
 		Relay2Txs:        r2Txs,
 		ShardID:          c.chain.GetShardID(),
 		Epoch:            c.chain.GetEpochID(),
-		BlockProposeTime: b.Header.CreateTime,
+		BlockProposeTime: b.CreateTime,
 		BlockCommitTime:  time.Now(),
 	}
 

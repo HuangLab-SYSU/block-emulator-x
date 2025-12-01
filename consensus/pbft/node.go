@@ -18,7 +18,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
 type messageHandleFunc func(context.Context, []byte) error
@@ -301,7 +300,7 @@ func (n *Node) propose(ctx context.Context) error {
 	}
 
 	// wrap and encode msg
-	digest, err := utils.CalcHash(p)
+	digest, err := p.Hash()
 	if err != nil {
 		return fmt.Errorf("CalcHash failed: %w", err)
 	}

@@ -1,10 +1,10 @@
 package block
 
 import (
-	"bytes"
-	"encoding/gob"
-	"fmt"
+	"crypto/sha256"
 	"time"
+
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/bloom"
@@ -13,7 +13,7 @@ import (
 type Header struct {
 	ParentBlockHash []byte
 	StateRoot       []byte
-	Number          int64
+	Number          uint64
 	Miner           account.Address
 	CreateTime      time.Time
 
@@ -37,29 +37,18 @@ type MigrationHeaderOpt struct {
 }
 
 // Encode encodes blockHeaders.
-func (h *Header) Encode() ([]byte, error) {
-	var buff bytes.Buffer
-
-	enc := gob.NewEncoder(&buff)
-
-	err := enc.Encode(h)
-	if err != nil {
-		return nil, fmt.Errorf("encode header failed: %w", err)
-	}
-
-	return buff.Bytes(), nil
+// Note that, gob is not useful here.
+func (h Header) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(h)
 }
 
-// DecodeBlockHeader decodes blockHeaders.
-func (h *Header) DecodeBlockHeader(b []byte) (*Header, error) {
-	var blockHeader Header
-
-	decoder := gob.NewDecoder(bytes.NewReader(b))
-
-	err := decoder.Decode(&blockHeader)
+func (h Header) Hash() ([]byte, error) {
+	b, err := h.Encode()
 	if err != nil {
-		return nil, fmt.Errorf("decode header failed: %w", err)
+		return []byte{}, err
 	}
 
-	return &blockHeader, nil
+	sum := sha256.Sum256(b)
+
+	return sum[:], nil
 }

@@ -42,5 +42,5 @@ func generateRandomTransaction(c int64) transaction.Transaction {
 	amount, _ := rand.Int(rand.Reader, big.NewInt(upperBoundTransferAmount))
 	amount.Add(amount, big.NewInt(1))
 
-	return *transaction.NewTransaction(sender, receiver, amount, c, time.Now())
+	return *transaction.NewTransaction(sender, receiver, amount, uint64(c), time.Now())
 }

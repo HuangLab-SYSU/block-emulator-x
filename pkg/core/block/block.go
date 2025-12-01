@@ -11,7 +11,7 @@ import (
 )
 
 type Block struct {
-	Header *Header
+	Header
 	Body
 	MigrationOpt
 }
@@ -25,12 +25,12 @@ type MigrationOpt struct {
 }
 
 // NewBlock creates the normal block with header and body.
-func NewBlock(h *Header, b Body) *Block {
+func NewBlock(h Header, b Body) *Block {
 	return &Block{Header: h, Body: b}
 }
 
 // NewMigrationBlock creates the block for account migration, with header and MigrationOpt.
-func NewMigrationBlock(h *Header, opt MigrationOpt) *Block {
+func NewMigrationBlock(h Header, opt MigrationOpt) *Block {
 	return &Block{Header: h, MigrationOpt: opt}
 }
 
@@ -46,18 +46,4 @@ func (b *Block) Encode() ([]byte, error) {
 	}
 
 	return buff.Bytes(), nil
-}
-
-// DecodeBlock decodes blocks.
-func DecodeBlock(b []byte) (*Block, error) {
-	var block Block
-
-	decoder := gob.NewDecoder(bytes.NewReader(b))
-
-	err := decoder.Decode(&block)
-	if err != nil {
-		return nil, fmt.Errorf("decode block failed: %w", err)
-	}
-
-	return &block, nil
 }
