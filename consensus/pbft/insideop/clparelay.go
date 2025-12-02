@@ -1,9 +1,7 @@
 package insideop
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"fmt"
 	"log/slog"
 	"time"
@@ -79,12 +77,12 @@ func (c *CLPARelayInsideOp) ValidateProposal(ctx context.Context, proposal *mess
 		return fmt.Errorf("invalid proposal type")
 	}
 
-	var b *block.Block
-	if err := gob.NewDecoder(bytes.NewReader(proposal.Payload)).Decode(&b); err != nil {
+	b, err := block.DecodeBlock(proposal.Payload)
+	if err != nil {
 		return fmt.Errorf("invalid payload, decode failed: %w", err)
 	}
 
-	if err := c.chain.ValidateBlock(ctx, b); err != nil {
+	if err = c.chain.ValidateBlock(ctx, b); err != nil {
 		return fmt.Errorf("validate block failed: %w", err)
 	}
 
@@ -342,12 +340,12 @@ func (c *CLPARelayInsideOp) migrateAccountsAndTxs(ctx context.Context) error {
 }
 
 func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	var b block.Block
-	if err := gob.NewDecoder(bytes.NewReader(proposal.Payload)).Decode(&b); err != nil {
-		return fmt.Errorf("invalid payload, decode as block failed: %w", err)
+	b, err := block.DecodeBlock(proposal.Payload)
+	if err != nil {
+		return fmt.Errorf("invalid payload, decode failed: %w", err)
 	}
 	// commit block - add block to the blockchain
-	if err := c.chain.AddBlock(ctx, &b); err != nil {
+	if err = c.chain.AddBlock(ctx, b); err != nil {
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
@@ -359,7 +357,7 @@ func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeade
 	}
 
 	// record this block
-	line, err := convertBlock2Line(&b)
+	line, err := convertBlock2Line(b)
 	if err != nil {
 		return fmt.Errorf("convertBlock2Line failed: %w", err)
 	}
@@ -371,7 +369,7 @@ func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeade
 	// deliver this block info to the supervisor
 	innerTxs, r1Txs, r2Txs := c.splitTxs(ctx, b.TxList)
 
-	if err = c.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, b); err != nil {
+	if err = c.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, *b); err != nil {
 		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}
 
@@ -388,12 +386,12 @@ func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeade
 }
 
 func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	var b block.Block
-	if err := gob.NewDecoder(bytes.NewReader(proposal.Payload)).Decode(&b); err != nil {
-		return fmt.Errorf("invalid payload, decode as block failed: %w", err)
+	b, err := block.DecodeBlock(proposal.Payload)
+	if err != nil {
+		return fmt.Errorf("invalid payload, decode failed: %w", err)
 	}
 	// commit block - add block to the blockchain
-	if err := c.chain.AddBlock(ctx, &b); err != nil {
+	if err = c.chain.AddBlock(ctx, b); err != nil {
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
@@ -405,7 +403,7 @@ func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, isLeader b
 		return nil
 	}
 	// record this block
-	line, err := convertBlock2Line(&b)
+	line, err := convertBlock2Line(b)
 	if err != nil {
 		return fmt.Errorf("convertBlock2Line failed: %w", err)
 	}

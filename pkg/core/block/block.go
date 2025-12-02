@@ -6,22 +6,12 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 )
 
 type Block struct {
 	Header
 	Body
 	MigrationOpt
-}
-
-// MigrationOpt is the struct for account migration.
-// It saves the information of accounts which are to migrated to this shard.
-// Note that, either MigrationOpt or Body is nil.
-type MigrationOpt struct {
-	MigratedAccounts []account.Account // MigratedAccounts is the list of accounts to be migrated in this stage.
-	MigratedStates   []account.State   // MigratedStates is the list of account states corresponding to accounts in MigratedAccounts.
 }
 
 // NewBlock creates the normal block with header and body.
@@ -46,4 +36,15 @@ func (b *Block) Encode() ([]byte, error) {
 	}
 
 	return buff.Bytes(), nil
+}
+
+func DecodeBlock(data []byte) (*Block, error) {
+	var block Block
+
+	err := gob.NewDecoder(bytes.NewReader(data)).Decode(&block)
+	if err != nil {
+		return nil, fmt.Errorf("decode block failed: %w", err)
+	}
+
+	return &block, nil
 }
