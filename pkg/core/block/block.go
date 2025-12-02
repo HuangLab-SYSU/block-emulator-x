@@ -5,8 +5,23 @@ package block
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
+
+	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
+
+var RecordHeader = []string{
+	"ParentHash",
+	"BlockHash",
+	"StateRoot",
+	"Number",
+	"CreateTime",
+	"TxRoot",
+	"TxBodyLen",
+	"MigratedAccountsRoot",
+	"MigrationAccountLen",
+}
 
 type Block struct {
 	Header
@@ -47,4 +62,23 @@ func DecodeBlock(data []byte) (*Block, error) {
 	}
 
 	return &block, nil
+}
+
+func ConvertBlock2Line(b *Block) ([]string, error) {
+	blockHash, err := b.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("CalcHash failed: %w", err)
+	}
+
+	return []string{
+		hex.EncodeToString(b.ParentBlockHash),      // "ParentHash"
+		hex.EncodeToString(blockHash),              // "BlockHash"
+		hex.EncodeToString(b.StateRoot),            // "StateRoot"
+		fmt.Sprintf("%d", b.Number),                // "Number"
+		utils.ConvertTime2Str(b.CreateTime),        // "CreateTime"
+		hex.EncodeToString(b.TxRoot),               // "TxRoot"
+		fmt.Sprintf("%d", len(b.TxList)),           // "TxBodyLen"
+		hex.EncodeToString(b.MigratedAccountsRoot), // "MigratedAccountsRoot"
+		fmt.Sprintf("%d", len(b.MigratedAccounts)), // "MigrationAccountLen"
+	}, nil
 }

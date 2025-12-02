@@ -155,42 +155,13 @@ func (c *CLPARelayCommittee) readTxsAndSend(ctx context.Context) error {
 		return fmt.Errorf("failed to read txs: %w", err)
 	}
 
-	if err = c.sendTxs2Shards(ctx, txs); err != nil {
-		return fmt.Errorf("failed to send txs2Shards: %w", err)
+	// send transactions
+	shardTxs := packShardTxs(txs, c.cfg.ShardNum, c.getTxLocByCLPAState)
+	if err = message.SendWrappedTxs2Shards(ctx, shardTxs, c.conn, c.r); err != nil {
+		return fmt.Errorf("failed to send txs to shards: %w", err)
 	}
 
 	c.unsentTxNum -= int64(len(txs))
-
-	return nil
-}
-
-func (c *CLPARelayCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
-	leaders := make(map[int]nodetopo.NodeInfo, c.cfg.ShardNum)
-	for i := range c.cfg.ShardNum {
-		dest, err := c.r.GetLeader(i)
-		if err != nil {
-			return fmt.Errorf("failed to get leader %d: %w", i, err)
-		}
-
-		leaders[int(i)] = dest
-	}
-
-	shardTxs, err := PackShardTxs(txs, c.cfg.ShardNum, c.getTxLocByCLPAState)
-	if err != nil {
-		return fmt.Errorf("failed to pack shard txs: %w", err)
-	}
-
-	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, c.cfg.ShardNum)
-
-	for i := range leaders {
-		if shardTxs[i] == nil {
-			continue
-		}
-
-		mMap[leaders[i]] = shardTxs[i]
-	}
-
-	c.conn.MSendDifferentMessages(ctx, mMap)
 
 	return nil
 }

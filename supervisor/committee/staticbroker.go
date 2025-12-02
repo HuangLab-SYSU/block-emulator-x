@@ -106,10 +106,8 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 
 	innerTxs, crossTxs := s.classifyTxs(txs)
 	// create raw transactions according to the cross-shard txs
-	for _, crossTx := range crossTxs {
-		if _, err = s.bManager.CreateRawTxRandomBroker(crossTx); err != nil {
-			slog.ErrorContext(ctx, "create raw tx failed", "err", err)
-		}
+	if _, err = s.bManager.CreateRawTxsRandomBroker(crossTxs); err != nil {
+		slog.ErrorContext(ctx, "create raw tx failed", "err", err)
 	}
 	// create broker accounts
 	b1Txs, b2Txs := s.bManager.CreateBrokerTxs()
@@ -117,42 +115,12 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 	sendTxs := append(innerTxs, append(b1Txs, b2Txs...)...)
 
 	// send transactions
-	if err = s.sendTxs2Shards(ctx, sendTxs); err != nil {
-		return fmt.Errorf("failed to send txs2Shards: %w", err)
+	shardTxs := packShardTxs(sendTxs, s.cfg.ShardNum, s.getTxLoc)
+	if err = message.SendWrappedTxs2Shards(ctx, shardTxs, s.conn, s.r); err != nil {
+		return fmt.Errorf("failed to send txs to shards: %w", err)
 	}
 
 	s.unsentTxNum -= int64(len(txs))
-
-	return nil
-}
-
-func (s *StaticBrokerCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
-	leaders := make(map[int]nodetopo.NodeInfo, s.cfg.ShardNum)
-	for i := range s.cfg.ShardNum {
-		dest, err := s.r.GetLeader(i)
-		if err != nil {
-			return fmt.Errorf("failed to get leader %d: %w", i, err)
-		}
-
-		leaders[int(i)] = dest
-	}
-
-	shardTxs, err := PackShardTxs(txs, s.cfg.ShardNum, s.getTxLoc)
-	if err != nil {
-		return fmt.Errorf("failed to pack shard txs: %w", err)
-	}
-
-	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, s.cfg.ShardNum)
-
-	for i := range leaders {
-		if shardTxs[i] == nil {
-			continue
-		}
-
-		mMap[leaders[i]] = shardTxs[i]
-	}
-
-	s.conn.MSendDifferentMessages(ctx, mMap)
 
 	return nil
 }

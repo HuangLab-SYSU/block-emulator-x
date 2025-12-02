@@ -3,7 +3,6 @@ package insideop
 import (
 	"context"
 	"encoding/csv"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -23,18 +22,6 @@ import (
 )
 
 const blockRecordPathFmt = "shard=%d_node=%d/block_record.csv"
-
-var blockRecordHeader = []string{
-	"ParentHash",
-	"BlockHash",
-	"StateRoot",
-	"Number",
-	"CreateTime",
-	"TxRoot",
-	"TxBodyLen",
-	"MigratedAccountsRoot",
-	"MigrationAccountLen",
-}
 
 type ShardInsideOp interface {
 	// BuildProposal build a proposal for a round of the PBFT consensus.
@@ -62,7 +49,7 @@ func newBlockCSVWriter(cfg config.ConsensusNodeCfg, lp config.LocalParams) (*blo
 	}
 
 	csvW := csv.NewWriter(file)
-	if err = utils.WriteLine2CSV(csvW, blockRecordHeader); err != nil {
+	if err = utils.WriteLine2CSV(csvW, block.RecordHeader); err != nil {
 		return nil, fmt.Errorf("WriteLine2CSV failed: %w", err)
 	}
 
@@ -154,23 +141,4 @@ func getAccountLocationsInTxs(ctx context.Context, c *chain.Chain, txs []transac
 	}
 
 	return accountLocations, nil
-}
-
-func convertBlock2Line(b *block.Block) ([]string, error) {
-	blockHash, err := b.Hash()
-	if err != nil {
-		return nil, fmt.Errorf("CalcHash failed: %w", err)
-	}
-
-	return []string{
-		hex.EncodeToString(b.ParentBlockHash),      // "ParentHash"
-		hex.EncodeToString(blockHash),              // "BlockHash"
-		hex.EncodeToString(b.StateRoot),            // "StateRoot"
-		fmt.Sprintf("%d", b.Number),                // "Number"
-		utils.ConvertTime2Str(b.CreateTime),        // "CreateTime"
-		hex.EncodeToString(b.TxRoot),               // "TxRoot"
-		fmt.Sprintf("%d", len(b.TxList)),           // "TxBodyLen"
-		hex.EncodeToString(b.MigratedAccountsRoot), // "MigratedAccountsRoot"
-		fmt.Sprintf("%d", len(b.MigratedAccounts)), // "MigrationAccountLen"
-	}, nil
 }

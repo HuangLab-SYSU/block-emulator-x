@@ -37,7 +37,7 @@ func TestBroker(t *testing.T) {
 		Nonce:      100,
 		CreateTime: time.Now(),
 	}
-	_, err = bm.CreateRawTxRandomBroker(tx)
+	_, err = bm.CreateRawTxsRandomBroker([]transaction.Transaction{tx})
 	require.NoError(t, err)
 
 	b1txs, b2txs := bm.CreateBrokerTxs()

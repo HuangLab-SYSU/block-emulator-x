@@ -2,11 +2,10 @@ package committee
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 )
 
@@ -35,33 +34,21 @@ type stopLogic struct {
 
 type txLocationFunc func(tx transaction.Transaction) int64
 
-func PackShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLocationFunc) (map[int]*rpcserver.WrappedMsg, error) {
+func packShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLocationFunc) [][]transaction.Transaction {
 	shardTxs := make([][]transaction.Transaction, shardNumber)
 
 	// classify the transactions by the locations of sender
 	for _, tx := range txs {
 		shardID := locFunc(tx)
-		shardTxs[shardID] = append(shardTxs[shardID], tx)
-	}
-
-	msg2Shard := make(map[int]*rpcserver.WrappedMsg, shardNumber)
-
-	for i := range shardTxs {
-		if len(shardTxs[i]) == 0 {
+		if shardID < 0 || shardID >= shardNumber {
+			slog.Info("packShardTxs get invalid shardID by locFunc", "invalid shardID", shardID)
 			continue
 		}
 
-		w, err := message.WrapMsg(&message.ReceiveTxsMsg{
-			Txs: shardTxs[i],
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to wrap message: %w", err)
-		}
-
-		msg2Shard[i] = w
+		shardTxs[shardID] = append(shardTxs[shardID], tx)
 	}
 
-	return msg2Shard, nil
+	return shardTxs
 }
 
 func transferMapAddr2Account(src map[[20]byte]int) map[account.Account]int {

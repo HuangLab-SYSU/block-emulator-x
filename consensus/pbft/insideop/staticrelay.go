@@ -14,7 +14,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
@@ -133,9 +132,9 @@ func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context,
 	}
 
 	// record this block
-	line, err := convertBlock2Line(b)
+	line, err := block.ConvertBlock2Line(b)
 	if err != nil {
-		return fmt.Errorf("convertBlock2Line failed: %w", err)
+		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
 	}
 
 	if err = utils.WriteLine2CSV(s.csvW, line); err != nil {
@@ -226,28 +225,9 @@ func (s *StaticRelayInsideOp) sendRelayedTxs(ctx context.Context, r1Txs []transa
 		relayedTxs[shardID] = append(relayedTxs[shardID], updatedRelayedTx)
 	}
 
-	node2Msg := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, s.cfg.ShardNum)
-
-	// pack messages and send them
-	for i, txs := range relayedTxs {
-		if len(txs) == 0 {
-			continue
-		}
-
-		l, err := s.resolver.GetLeader(int64(i))
-		if err != nil {
-			return fmt.Errorf("GetLeader failed: %w", err)
-		}
-
-		w, err := message.WrapMsg(&message.ReceiveTxsMsg{Txs: txs})
-		if err != nil {
-			return fmt.Errorf("WrapMsg failed: %w", err)
-		}
-
-		node2Msg[l] = w
+	if err := message.SendWrappedTxs2Shards(ctx, relayedTxs, s.conn, s.resolver); err != nil {
+		return fmt.Errorf("SendWrappedTxs2Shards failed: %w", err)
 	}
-
-	s.conn.MSendDifferentMessages(ctx, node2Msg)
 
 	return nil
 }

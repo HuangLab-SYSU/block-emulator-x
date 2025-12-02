@@ -64,9 +64,20 @@ func (s *Manager) IsBroker(addr account.Address) bool {
 	return ok
 }
 
-func (s *Manager) CreateRawTxRandomBroker(tx transaction.Transaction) (*transaction.Transaction, error) {
-	broker := s.brokers[rand.Intn(len(s.brokers))]
-	return s.CreateRawTx(tx, broker)
+func (s *Manager) CreateRawTxsRandomBroker(txs []transaction.Transaction) ([]transaction.Transaction, error) {
+	rawTxs := make([]transaction.Transaction, len(txs))
+	for i, tx := range txs {
+		broker := s.brokers[rand.Intn(len(s.brokers))]
+
+		rawTx, err := s.CreateRawTx(tx, broker)
+		if err != nil {
+			return nil, fmt.Errorf("CreateRawTx failed: %w", err)
+		}
+
+		rawTxs[i] = *rawTx
+	}
+
+	return rawTxs, nil
 }
 
 // CreateRawTx creates a raw tx with the given tx.
@@ -120,7 +131,8 @@ func (s *Manager) CreateBrokerTxs() ([]transaction.Transaction, []transaction.Tr
 		b1Txs = append(b1Txs, *b1Tx)
 	}
 
-	s.readyBroker1TxHashes = []rawTxHash{}
+	// Clear readyBroker1TxHashes
+	s.readyBroker1TxHashes = make([]rawTxHash, 0)
 
 	for _, tx := range s.readyBroker2TxHashes {
 		b2Tx, err := s.createBroker2Tx(tx)
@@ -132,7 +144,8 @@ func (s *Manager) CreateBrokerTxs() ([]transaction.Transaction, []transaction.Tr
 		b2Txs = append(b2Txs, *b2Tx)
 	}
 
-	s.readyBroker2TxHashes = []rawTxHash{}
+	// Clear readyBroker2TxHashes
+	s.readyBroker2TxHashes = make([]rawTxHash, 0)
 
 	return b1Txs, b2Txs
 }

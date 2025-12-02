@@ -357,9 +357,9 @@ func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeade
 	}
 
 	// record this block
-	line, err := convertBlock2Line(b)
+	line, err := block.ConvertBlock2Line(b)
 	if err != nil {
-		return fmt.Errorf("convertBlock2Line failed: %w", err)
+		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
 	}
 
 	if err = utils.WriteLine2CSV(c.csvW, line); err != nil {
@@ -403,9 +403,9 @@ func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, isLeader b
 		return nil
 	}
 	// record this block
-	line, err := convertBlock2Line(b)
+	line, err := block.ConvertBlock2Line(b)
 	if err != nil {
-		return fmt.Errorf("convertBlock2Line failed: %w", err)
+		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
 	}
 
 	if err = utils.WriteLine2CSV(c.csvW, line); err != nil {
@@ -480,28 +480,9 @@ func (c *CLPARelayInsideOp) sendRelayedTxs(ctx context.Context, r1Txs []transact
 		relayedTxs[shardID] = append(relayedTxs[shardID], updatedRelayedTx)
 	}
 
-	node2Msg := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, c.cfg.ShardNum)
-
-	// pack messages and send them
-	for i, txs := range relayedTxs {
-		if len(txs) == 0 {
-			continue
-		}
-
-		l, err := c.resolver.GetLeader(int64(i))
-		if err != nil {
-			return fmt.Errorf("GetLeader failed: %w", err)
-		}
-
-		w, err := message.WrapMsg(&message.ReceiveTxsMsg{Txs: txs})
-		if err != nil {
-			return fmt.Errorf("WrapMsg failed: %w", err)
-		}
-
-		node2Msg[l] = w
+	if err := message.SendWrappedTxs2Shards(ctx, relayedTxs, c.conn, c.resolver); err != nil {
+		return fmt.Errorf("SendWrappedTxs2Shards failed: %w", err)
 	}
-
-	c.conn.MSendDifferentMessages(ctx, node2Msg)
 
 	return nil
 }

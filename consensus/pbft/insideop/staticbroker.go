@@ -124,9 +124,9 @@ func (s *StaticBrokerInsideOp) blockProposalCommitAndDeliver(ctx context.Context
 	}
 
 	// record this block
-	line, err := convertBlock2Line(b)
+	line, err := block.ConvertBlock2Line(b)
 	if err != nil {
-		return fmt.Errorf("convertBlock2Line failed: %w", err)
+		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
 	}
 
 	if err = utils.WriteLine2CSV(s.csvW, line); err != nil {

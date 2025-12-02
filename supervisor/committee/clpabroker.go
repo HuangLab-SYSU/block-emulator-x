@@ -150,53 +150,22 @@ func (c *CLPABrokerCommittee) readTxsAndSend(ctx context.Context) error {
 
 	innerTxs, crossTxs := c.classifyTxs(txs)
 	// create raw transactions according to the cross-shard txs
-	for _, crossTx := range crossTxs {
-		if _, err = c.bManager.CreateRawTxRandomBroker(crossTx); err != nil {
-			slog.ErrorContext(ctx, "create raw tx failed", "err", err)
-		}
+	if _, err = c.bManager.CreateRawTxsRandomBroker(crossTxs); err != nil {
+		slog.ErrorContext(ctx, "create raw tx failed", "err", err)
 	}
+
 	// create broker accounts according to the bManager's ready list.
 	b1Txs, b2Txs := c.bManager.CreateBrokerTxs()
 
 	sendTxs := append(innerTxs, append(b1Txs, b2Txs...)...)
 
 	// send transactions
-	if err = c.sendTxs2Shards(ctx, sendTxs); err != nil {
-		return fmt.Errorf("failed to send txs2Shards: %w", err)
+	shardTxs := packShardTxs(sendTxs, c.cfg.ShardNum, c.getTxLocByCLPAState)
+	if err = message.SendWrappedTxs2Shards(ctx, shardTxs, c.conn, c.r); err != nil {
+		return fmt.Errorf("failed to send txs to shards: %w", err)
 	}
 
 	c.unsentTxNum -= int64(len(txs))
-
-	return nil
-}
-
-func (c *CLPABrokerCommittee) sendTxs2Shards(ctx context.Context, txs []transaction.Transaction) error {
-	leaders := make(map[int]nodetopo.NodeInfo, c.cfg.ShardNum)
-	for i := range c.cfg.ShardNum {
-		dest, err := c.r.GetLeader(i)
-		if err != nil {
-			return fmt.Errorf("failed to get leader %d: %w", i, err)
-		}
-
-		leaders[int(i)] = dest
-	}
-
-	shardTxs, err := PackShardTxs(txs, c.cfg.ShardNum, c.getTxLocByCLPAState)
-	if err != nil {
-		return fmt.Errorf("failed to pack shard txs: %w", err)
-	}
-
-	mMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, c.cfg.ShardNum)
-
-	for i := range leaders {
-		if shardTxs[i] == nil {
-			continue
-		}
-
-		mMap[leaders[i]] = shardTxs[i]
-	}
-
-	c.conn.MSendDifferentMessages(ctx, mMap)
 
 	return nil
 }
@@ -264,10 +233,11 @@ func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *mes
 	}
 }
 
+// handleTxSendAgainMsg creates a raw broker tx with the given tx.
+// Because of the account migration, an inner-shard tx may be changed into a cross-shard one.
+// This supervisor should re-send this tx as a broker tx.
 func (c *CLPABrokerCommittee) handleTxSendAgainMsg(ctx context.Context, tsa *message.BrokerCLPATxSendAgainMsg) {
-	for _, tx := range tsa.Txs {
-		if _, err := c.bManager.CreateRawTxRandomBroker(tx); err != nil {
-			slog.ErrorContext(ctx, "create raw tx in handleTxSendAgainMsg failed", "err", err)
-		}
+	if _, err := c.bManager.CreateRawTxsRandomBroker(tsa.Txs); err != nil {
+		slog.ErrorContext(ctx, "create raw tx failed", "err", err)
 	}
 }

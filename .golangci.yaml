@@ -23,6 +23,7 @@ linters:
     - ineffassign
     - goconst
     - unparam
+    - dupl
     - misspell
     - tparallel
   settings:
