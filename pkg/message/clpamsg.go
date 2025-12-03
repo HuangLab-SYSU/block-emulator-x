@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	CLPARepartitionStartMessageType  = "CLPARepartitionStart"
-	AccountAndTxMigrationMessageType = "AccountAndTxMigration"
+	CLPARepartitionStartMessageType = "CLPARepartitionStart"
+	AccountMigrationMessageType     = "AccountMigration"
 )
 
 type CLPARepartitionStartMsg struct {
@@ -14,7 +14,7 @@ type CLPARepartitionStartMsg struct {
 	ModifiedMap map[account.Account]int
 }
 
-type AccountAndTxMigrationMsg struct {
+type AccountMigrationMsg struct {
 	SrcShard, DestShard int64
 	Epoch               int64
 	AccountStates       map[account.Account]*account.State

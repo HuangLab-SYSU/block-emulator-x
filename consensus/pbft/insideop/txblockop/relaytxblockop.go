@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
@@ -22,21 +20,12 @@ type RelayTxBlockOp struct {
 	conn     *network.P2PConn
 	resolver nodetopo.NodeMapper
 
-	cs *csvwrite.CSVSeqWriter
-
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewRelayTxBlockOp(c *chain.Chain, conn *network.P2PConn, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*RelayTxBlockOp, error) {
-	fp := filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID))
-
-	cc, err := csvwrite.NewCSVSeqWriter(fp, block.RecordTitle)
-	if err != nil {
-		return nil, fmt.Errorf("NewCSVSeqWriter: %w", err)
-	}
-
-	return &RelayTxBlockOp{c: c, conn: conn, resolver: rs, cs: cc, cfg: cfg, lp: lp}, nil
+func NewRelayTxBlockOp(c *chain.Chain, conn *network.P2PConn, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *RelayTxBlockOp {
+	return &RelayTxBlockOp{c: c, conn: conn, resolver: rs, cfg: cfg, lp: lp}
 }
 
 func (r *RelayTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []transaction.Transaction) (*message.Proposal, error) {
@@ -90,14 +79,6 @@ func (r *RelayTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader boo
 	}
 
 	return nil
-}
-
-func (r *RelayTxBlockOp) RecordBlock(b *block.Block) error {
-	return recordBlock(r.cs, b)
-}
-
-func (r *RelayTxBlockOp) Close() error {
-	return r.cs.Close()
 }
 
 // modifyTxRelayOpt sets the RelayOpt of txs.

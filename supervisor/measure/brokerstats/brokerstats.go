@@ -88,7 +88,8 @@ func NewBrokerStats(outputDir string) (*BrokerStats, error) {
 func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 	// ignore
 	if msg.MsgType != message.BrokerBlockInfoMessageType {
-		return fmt.Errorf("UpdateMeasureRecord failed, wrong message type: %s", msg.MsgType)
+		slog.Info("unexpected message type", "type", msg.MsgType)
+		return nil
 	}
 
 	var bInfo message.BrokerBlockInfoMsg

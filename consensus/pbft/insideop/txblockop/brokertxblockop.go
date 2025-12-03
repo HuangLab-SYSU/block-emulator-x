@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
@@ -22,21 +20,12 @@ type BrokerTxBlockOp struct {
 	conn     *network.P2PConn
 	resolver nodetopo.NodeMapper
 
-	cs *csvwrite.CSVSeqWriter
-
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewBrokerTxBlockOp(c *chain.Chain, conn *network.P2PConn, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*BrokerTxBlockOp, error) {
-	fp := filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID))
-
-	cc, err := csvwrite.NewCSVSeqWriter(fp, block.RecordTitle)
-	if err != nil {
-		return nil, fmt.Errorf("NewCSVSeqWriter: %w", err)
-	}
-
-	return &BrokerTxBlockOp{c: c, conn: conn, resolver: rs, cs: cc, cfg: cfg, lp: lp}, nil
+func NewBrokerTxBlockOp(c *chain.Chain, conn *network.P2PConn, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *BrokerTxBlockOp {
+	return &BrokerTxBlockOp{c: c, conn: conn, resolver: rs, cfg: cfg, lp: lp}
 }
 
 func (bto *BrokerTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []transaction.Transaction) (*message.Proposal, error) {
@@ -64,7 +53,7 @@ func (bto *BrokerTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader 
 		return fmt.Errorf("chain.AddBlock failed: %w", err)
 	}
 
-	slog.Info("block is added in static broker module", "block height", b.Number)
+	slog.Info("block is added", "block height", b.Number)
 
 	// if this node is not the leader, skip it
 	if !isLeader {
@@ -77,14 +66,6 @@ func (bto *BrokerTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader 
 	}
 
 	return nil
-}
-
-func (bto *BrokerTxBlockOp) RecordBlock(b *block.Block) error {
-	return recordBlock(bto.cs, b)
-}
-
-func (bto *BrokerTxBlockOp) Close() error {
-	return bto.cs.Close()
 }
 
 func (*BrokerTxBlockOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {

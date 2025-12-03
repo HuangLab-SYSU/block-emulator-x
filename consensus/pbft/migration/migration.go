@@ -16,7 +16,7 @@ type AccMigrateMetadata struct {
 	MigrationReady        bool
 
 	// unhandledStateMsg records those unhandled messages. The key is the epoch id of the messages.
-	unhandledStateMsg map[int64][]*message.AccountAndTxMigrationMsg
+	unhandledStateMsg map[int64][]*message.AccountMigrationMsg
 
 	cfg config.SystemCfg
 	lp  config.LocalParams
@@ -28,7 +28,7 @@ func NewAccMigrateMetadata(cfg config.SystemCfg, lp config.LocalParams) *AccMigr
 		CurModifiedMap:        make(map[account.Account]int),
 		MigratedAccountStates: make(map[int64]map[account.Account]*account.State),
 		MigrationReady:        false,
-		unhandledStateMsg:     make(map[int64][]*message.AccountAndTxMigrationMsg),
+		unhandledStateMsg:     make(map[int64][]*message.AccountMigrationMsg),
 		cfg:                   cfg,
 		lp:                    lp,
 	}
@@ -44,7 +44,7 @@ func (am *AccMigrateMetadata) MigrationStatusReset() {
 // UpdateByRepartitionStartMsg updates the AccMigrateMetadata by the given CLPARepartitionStartMsg.
 // If there are unhandled messages (with the same epoch id) in the unhandledStateMsg,
 // these messages will be handled by calling CollectStatesByMsg.
-// **Because the network is async., the AccountAndTxMigrationMsg may be early arrived but CLPARepartitionStartMsg not.**
+// **Because the network is async., the AccountMigrationMsg may be early arrived but CLPARepartitionStartMsg not.**
 func (am *AccMigrateMetadata) UpdateByRepartitionStartMsg(cr *message.CLPARepartitionStartMsg) error {
 	if cr.Epoch != am.Epoch+1 {
 		return fmt.Errorf("wrong epoch ID in CLPARepartitionStartMsg, expect=%d, got=%d", am.Epoch+1, cr.Epoch)
@@ -57,7 +57,7 @@ func (am *AccMigrateMetadata) UpdateByRepartitionStartMsg(cr *message.CLPARepart
 	// handle the messages before
 	for _, atMsg := range am.unhandledStateMsg[am.Epoch] {
 		if err := am.CollectStatesByMsg(atMsg); err != nil {
-			slog.Error("handle AccountAndTxMigrationMsg in unhandledStateMsg failed", "err", err)
+			slog.Error("handle AccountMigrationMsg in unhandledStateMsg failed", "err", err)
 		}
 	}
 	// clear this unhandled pool
@@ -68,9 +68,9 @@ func (am *AccMigrateMetadata) UpdateByRepartitionStartMsg(cr *message.CLPARepart
 
 // CollectStatesByMsg collects the MigratedAccountStates according to the given message.
 // Note that, if the message is newer than this AccMigrateMetadata, it will be added to unhandledStateMsg.
-// **Because the network is async., the AccountAndTxMigrationMsg may be early arrived but CLPARepartitionStartMsg not.**
+// **Because the network is async., the AccountMigrationMsg may be early arrived but CLPARepartitionStartMsg not.**
 // When the AccMigrateMetadata reaches the epoch id, the messages in unhandledStateMsg will be handled.
-func (am *AccMigrateMetadata) CollectStatesByMsg(atMsg *message.AccountAndTxMigrationMsg) error {
+func (am *AccMigrateMetadata) CollectStatesByMsg(atMsg *message.AccountMigrationMsg) error {
 	if atMsg.DestShard != am.lp.ShardID {
 		return fmt.Errorf("wrong dest shard ID=%d, current shard=%d", atMsg.DestShard, am.lp.ShardID)
 	}
@@ -80,12 +80,12 @@ func (am *AccMigrateMetadata) CollectStatesByMsg(atMsg *message.AccountAndTxMigr
 	}
 
 	if atMsg.Epoch < am.Epoch {
-		return fmt.Errorf("out-of-date epoch ID in AccountAndTxMigrationMsg, expect=%d, got=%d", am.Epoch, atMsg.Epoch)
+		return fmt.Errorf("out-of-date epoch ID in AccountMigrationMsg, expect=%d, got=%d", am.Epoch, atMsg.Epoch)
 	}
 
 	if atMsg.Epoch > am.Epoch {
 		am.unhandledStateMsg[atMsg.Epoch] = append(am.unhandledStateMsg[atMsg.Epoch], atMsg)
-		slog.Info("receives newer AccountAndTxMigrationMsg, epoch=%d, add it to buffer", "received epoch", atMsg.Epoch)
+		slog.Info("receives newer AccountMigrationMsg, epoch=%d, add it to buffer", "received epoch", atMsg.Epoch)
 
 		return nil
 	}
