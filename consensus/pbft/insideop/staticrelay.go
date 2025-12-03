@@ -3,48 +3,37 @@ package insideop
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/insideop/txblockop"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
 type StaticRelayInsideOp struct {
-	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
-	resolver nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
-
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
 
-	blockCSVWriter
+	*txblockop.RelayTxBlockOp
 
 	cfg config.ConsensusNodeCfg
-	lp  config.LocalParams
 }
 
 func NewStaticRelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*StaticRelayInsideOp, error) {
-	bcw, err := newBlockCSVWriter(cfg, lp)
+	rh, err := txblockop.NewRelayTxBlockOp(chain, conn, resolver, cfg, lp)
 	if err != nil {
-		return nil, fmt.Errorf("newBlockCSVWriter failed: %w", err)
+		return nil, fmt.Errorf("NewRelayTxBlockOp failed: %w", err)
 	}
 
 	return &StaticRelayInsideOp{
-		conn:           conn,
-		resolver:       resolver,
 		chain:          chain,
 		txPool:         txPool,
-		blockCSVWriter: *bcw,
+		RelayTxBlockOp: rh,
 		cfg:            cfg,
-		lp:             lp,
 	}, nil
 }
 
@@ -54,23 +43,10 @@ func (s *StaticRelayInsideOp) BuildProposal(ctx context.Context) (*message.Propo
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}
 
-	// if a transaction is a cross-shard tx, modify its RelayOpt
-	mTxs, err := modifyTxRelayOpt(ctx, txs, s.chain)
+	p, err := s.BuildTxBlockProposal(ctx, txs)
 	if err != nil {
-		return nil, fmt.Errorf("modifyTxRelayOpt failed: %w", err)
+		return nil, fmt.Errorf("build block proposal in relay mode failed: %w", err)
 	}
-
-	b, err := s.chain.GenerateBlock(ctx, s.lp.WalletAddr, mTxs)
-	if err != nil {
-		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
-	}
-
-	p, err := WrapProposal(b, message.BlockProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
-
-	slog.InfoContext(ctx, "block is generated in static relay module", "shard ID", s.chain.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
 
 	return p, nil
 }
@@ -92,142 +68,43 @@ func (s *StaticRelayInsideOp) ValidateProposal(ctx context.Context, proposal *me
 	return nil
 }
 
-// ProposalCommitAndDeliver of StaticRelayInsideOp contains:
-// 1. apply the proposal to the chain.
-// 2.1. send blockInfoMsg to the supervisor.
-// 2.2. send relay-txs to leaders of other shards.
 func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
+	var (
+		b   *block.Block
+		err error
+	)
+
 	switch proposal.ProposalType {
 	case message.BlockProposalType:
-		if err := s.blockProposalCommitAndDeliver(ctx, isLeader, proposal); err != nil {
+		b, err = block.DecodeBlock(proposal.Payload)
+		if err != nil {
+			return fmt.Errorf("invalid payload, decode failed: %w", err)
+		}
+
+		if err = s.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
 			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
+
+		if err = s.RecordBlock(b); err != nil {
+			return fmt.Errorf("record block failed: %w", err)
+		}
+
 	default:
 		return fmt.Errorf("invalid proposal type = %s", proposal.ProposalType)
+	}
+
+	if !isLeader {
+		return nil
+	}
+
+	if err = s.RecordBlock(b); err != nil {
+		return fmt.Errorf("record block failed: %w", err)
 	}
 
 	return nil
 }
 
 func (s *StaticRelayInsideOp) Close() {
-	_ = s.file.Close()
+	_ = s.RelayTxBlockOp.Close()
 	_ = s.chain.Close()
-}
-
-func (s *StaticRelayInsideOp) blockProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
-	// commit block - add block to the blockchain
-	if err = s.chain.AddBlock(ctx, b); err != nil {
-		return fmt.Errorf("chain.AddBlock failed: %w", err)
-	}
-
-	slog.Info("block is added in static relay module", "block height", b.Number)
-
-	// if this node is not a leader, skip
-	if !isLeader {
-		return nil
-	}
-
-	// record this block
-	line, err := block.ConvertBlock2Line(b)
-	if err != nil {
-		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
-	}
-
-	if err = utils.WriteLine2CSV(s.csvW, line); err != nil {
-		return fmt.Errorf("WriteLine2CSV failed: %w", err)
-	}
-
-	// deliver this block info to the supervisor
-	innerTxs, r1Txs, r2Txs := s.splitTxs(ctx, b.TxList)
-
-	if err = s.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, *b); err != nil {
-		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
-	}
-
-	accountLocations, err := getAccountLocationsInTxs(ctx, s.chain, b.TxList)
-	if err != nil {
-		return fmt.Errorf("getAccountLocationsInTxs failed: %w", err)
-	}
-
-	if err = s.sendRelayedTxs(ctx, r1Txs, accountLocations); err != nil {
-		return fmt.Errorf("sendRelayedTxs failed: %w", err)
-	}
-
-	return nil
-}
-
-// splitTxs split transactions to inner-shard txs, relay1 txs and relay2 txs.
-func (s *StaticRelayInsideOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
-	innerTxs, r1txs, r2txs := make([]transaction.Transaction, 0), make([]transaction.Transaction, 0), make([]transaction.Transaction, 0)
-
-	for _, tx := range txs {
-		switch tx.RelayStage {
-		case transaction.UndeterminedRelayTx:
-			innerTxs = append(innerTxs, tx)
-		case transaction.Relay1Tx:
-			r1txs = append(r1txs, tx)
-		case transaction.Relay2Tx:
-			r2txs = append(r2txs, tx)
-		default:
-			slog.ErrorContext(ctx, "invalid relay tx stage", "relay stage", tx.RelayStage)
-		}
-	}
-
-	return innerTxs, r1txs, r2txs
-}
-
-func (s *StaticRelayInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, innerTxs, r1Txs, r2Txs []transaction.Transaction, b block.Block) error {
-	rbm := &message.RelayBlockInfoMsg{
-		InnerShardTxs:    innerTxs,
-		Relay1Txs:        r1Txs,
-		Relay2Txs:        r2Txs,
-		ShardID:          s.chain.GetShardID(),
-		Epoch:            s.chain.GetEpochID(),
-		BlockProposeTime: b.CreateTime,
-		BlockCommitTime:  time.Now(),
-	}
-
-	w, err := message.WrapMsg(rbm)
-	if err != nil {
-		return fmt.Errorf("WrapMsg failed: %w", err)
-	}
-
-	spv, err := s.resolver.GetSupervisor()
-	if err != nil {
-		return fmt.Errorf("GetSupervisor failed: %w", err)
-	}
-
-	go s.conn.SendMessage(ctx, spv, w)
-
-	return nil
-}
-
-func (s *StaticRelayInsideOp) sendRelayedTxs(ctx context.Context, r1Txs []transaction.Transaction, accountLocations map[account.Account]int64) error {
-	// for relay1 txs, send relay messages to other shards.
-	relayedTxs := make([][]transaction.Transaction, s.cfg.ShardNum)
-
-	// split r1Txs into all shards
-	for _, tx := range r1Txs {
-		// the next destination of relay1 tx should be calculated according to the recipient addr.
-		shardID, ok := accountLocations[tx.Recipient]
-		if !ok {
-			slog.ErrorContext(ctx, "tx.Recipient is not found in accountLocations", "recipient", tx.Recipient)
-			continue
-		}
-
-		// modify relay transaction's RelayOpt
-		updatedRelayedTx := tx
-		updatedRelayedTx.RelayStage = transaction.Relay2Tx
-		relayedTxs[shardID] = append(relayedTxs[shardID], updatedRelayedTx)
-	}
-
-	if err := message.SendWrappedTxs2Shards(ctx, relayedTxs, s.conn, s.resolver); err != nil {
-		return fmt.Errorf("SendWrappedTxs2Shards failed: %w", err)
-	}
-
-	return nil
 }

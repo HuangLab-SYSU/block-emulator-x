@@ -11,7 +11,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
-var RecordHeader = []string{
+var RecordTitle = []string{
 	"ParentHash",
 	"BlockHash",
 	"StateRoot",

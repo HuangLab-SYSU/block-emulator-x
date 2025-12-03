@@ -2,7 +2,6 @@ package message
 
 import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 )
 
 const (
@@ -19,5 +18,4 @@ type AccountAndTxMigrationMsg struct {
 	SrcShard, DestShard int64
 	Epoch               int64
 	AccountStates       map[account.Account]*account.State
-	MigratedTxs         []transaction.Transaction
 }

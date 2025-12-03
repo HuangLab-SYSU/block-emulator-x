@@ -3,47 +3,37 @@ package insideop
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/insideop/txblockop"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
 
 type StaticBrokerInsideOp struct {
-	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
-	resolver nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
-
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
 
-	blockCSVWriter
+	*txblockop.BrokerTxBlockOp
 
 	cfg config.ConsensusNodeCfg
-	lp  config.LocalParams
 }
 
 func NewStaticBrokerInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*StaticBrokerInsideOp, error) {
-	bcw, err := newBlockCSVWriter(cfg, lp)
+	bh, err := txblockop.NewBrokerTxBlockOp(chain, conn, resolver, cfg, lp)
 	if err != nil {
-		return nil, fmt.Errorf("newBlockCSVWriter failed: %w", err)
+		return nil, fmt.Errorf("NewBrokerTxBlockOp failed: %w", err)
 	}
 
 	return &StaticBrokerInsideOp{
-		conn:           conn,
-		resolver:       resolver,
-		chain:          chain,
-		txPool:         txPool,
-		blockCSVWriter: *bcw,
-		cfg:            cfg,
-		lp:             lp,
+		chain:           chain,
+		txPool:          txPool,
+		BrokerTxBlockOp: bh,
+		cfg:             cfg,
 	}, nil
 }
 
@@ -53,17 +43,10 @@ func (s *StaticBrokerInsideOp) BuildProposal(ctx context.Context) (*message.Prop
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}
 
-	b, err := s.chain.GenerateBlock(ctx, s.lp.WalletAddr, txs)
+	p, err := s.BuildTxBlockProposal(ctx, txs)
 	if err != nil {
-		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
+		return nil, fmt.Errorf("BuildTxBlockProposal failed: %w", err)
 	}
-
-	p, err := WrapProposal(b, message.BlockProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
-
-	slog.InfoContext(ctx, "block is generated in static broker module", "shard ID", s.chain.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
 
 	return p, nil
 }
@@ -89,100 +72,33 @@ func (s *StaticBrokerInsideOp) ValidateProposal(ctx context.Context, proposal *m
 // 1. apply the proposal to the chain.
 // 2. send blockInfoMsg to the supervisor.
 func (s *StaticBrokerInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
+	var (
+		b   *block.Block
+		err error
+	)
+
 	switch proposal.ProposalType {
 	case message.BlockProposalType:
-		if err := s.blockProposalCommitAndDeliver(ctx, isLeader, proposal); err != nil {
+		b, err = block.DecodeBlock(proposal.Payload)
+		if err != nil {
+			return fmt.Errorf("invalid payload, decode failed: %w", err)
+		}
+
+		if err = s.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
 			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
 	default:
 		return fmt.Errorf("invalid proposal type = %s", proposal.ProposalType)
 	}
 
+	if err = s.RecordBlock(b); err != nil {
+		return fmt.Errorf("recordBlock failed: %w", err)
+	}
+
 	return nil
 }
 
 func (s *StaticBrokerInsideOp) Close() {
-	_ = s.file.Close()
+	_ = s.BrokerTxBlockOp.Close()
 	_ = s.chain.Close()
-}
-
-func (s *StaticBrokerInsideOp) blockProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
-	// commit block - add block to the blockchain
-	if err = s.chain.AddBlock(ctx, b); err != nil {
-		return fmt.Errorf("chain.AddBlock failed: %w", err)
-	}
-
-	slog.Info("block is added in static broker module", "block height", b.Number)
-
-	// if this node is not the leader, skip it
-	if !isLeader {
-		return nil
-	}
-
-	// record this block
-	line, err := block.ConvertBlock2Line(b)
-	if err != nil {
-		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
-	}
-
-	if err = utils.WriteLine2CSV(s.csvW, line); err != nil {
-		return fmt.Errorf("WriteLine2CSV failed: %w", err)
-	}
-
-	// deliver this block info to the supervisor
-	innerTxs, b1Txs, b2Txs := s.splitTxs(ctx, b.TxList)
-	if err = s.deliverBlockInfo2Supervisor(ctx, innerTxs, b1Txs, b2Txs, *b); err != nil {
-		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
-	}
-
-	return nil
-}
-
-func (s *StaticBrokerInsideOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
-	innerTxs, b1Txs, b2Txs := make([]transaction.Transaction, 0), make([]transaction.Transaction, 0), make([]transaction.Transaction, 0)
-
-	for _, tx := range txs {
-		switch tx.BrokerStage {
-		case transaction.RawTxBrokerStage:
-			innerTxs = append(innerTxs, tx)
-		case transaction.Sigma1BrokerStage:
-			b1Txs = append(b1Txs, tx)
-		case transaction.Sigma2BrokerStage:
-			b2Txs = append(b2Txs, tx)
-		default:
-			slog.ErrorContext(ctx, "split tx error, broker stage invalid", "broker stage", tx.BrokerStage)
-		}
-	}
-
-	return innerTxs, b1Txs, b2Txs
-}
-
-func (s *StaticBrokerInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, innerTxs, b1Txs, b2Txs []transaction.Transaction, b block.Block) error {
-	bbm := &message.BrokerBlockInfoMsg{
-		InnerShardTxs:    innerTxs,
-		Broker1Txs:       b1Txs,
-		Broker2Txs:       b2Txs,
-		Epoch:            s.chain.GetEpochID(),
-		ShardID:          s.chain.GetShardID(),
-		BlockProposeTime: b.CreateTime,
-		BlockCommitTime:  time.Now(),
-	}
-
-	w, err := message.WrapMsg(bbm)
-	if err != nil {
-		return fmt.Errorf("WrapMsg failed: %w", err)
-	}
-
-	spv, err := s.resolver.GetSupervisor()
-	if err != nil {
-		return fmt.Errorf("GetSupervisor failed: %w", err)
-	}
-
-	go s.conn.SendMessage(ctx, spv, w)
-
-	return nil
 }

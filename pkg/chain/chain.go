@@ -195,6 +195,32 @@ func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account
 	return states, nil
 }
 
+// GetAccountLocationsInTxs gets the locations of the accounts in the given transaction list.
+func (c *Chain) GetAccountLocationsInTxs(ctx context.Context, txs []transaction.Transaction) (map[account.Account]int64, error) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	// get all locations of accounts.
+	accountLocations := make(map[account.Account]int64)
+	for _, tx := range txs {
+		accountLocations[tx.Sender] = -1
+		accountLocations[tx.Recipient] = -1
+	}
+
+	requestAccounts := maps.Keys(accountLocations)
+
+	states, err := c.getAccountStates(ctx, requestAccounts)
+	if err != nil {
+		return nil, fmt.Errorf("GetAccountStates failed: %w", err)
+	}
+
+	for i, requestAccount := range requestAccounts {
+		accountLocations[requestAccount] = states[i].ShardLocation
+	}
+
+	return accountLocations, nil
+}
+
 // ValidateBlock validates blocks according to c's config.
 // Note that, this function only validate block structure, but will not assert whether a block is valid to be added in this chain.
 func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {

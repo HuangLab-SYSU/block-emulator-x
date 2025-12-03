@@ -4,17 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"golang.org/x/exp/maps"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
-
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
-
 	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/insideop/txblockop"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool"
@@ -35,7 +32,7 @@ type CLPARelayInsideOp struct {
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
 
-	blockCSVWriter
+	*txblockop.RelayTxBlockOp
 
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
@@ -45,9 +42,9 @@ func NewCLPARelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper,
 	chain *chain.Chain, txPool txpool.TxPool, amm *migration.AccMigrateMetadata,
 	cfg config.ConsensusNodeCfg, lp config.LocalParams,
 ) (*CLPARelayInsideOp, error) {
-	bcw, err := newBlockCSVWriter(cfg, lp)
+	rh, err := txblockop.NewRelayTxBlockOp(chain, conn, resolver, cfg, lp)
 	if err != nil {
-		return nil, fmt.Errorf("newBlockCSVWriter failed: %w", err)
+		return nil, fmt.Errorf("NewRelayTxBlockOp failed: %w", err)
 	}
 
 	return &CLPARelayInsideOp{
@@ -56,7 +53,7 @@ func NewCLPARelayInsideOp(conn *network.P2PConn, resolver nodetopo.NodeMapper,
 		resolver:       resolver,
 		chain:          chain,
 		txPool:         txPool,
-		blockCSVWriter: *bcw,
+		RelayTxBlockOp: rh,
 		cfg:            cfg,
 		lp:             lp,
 	}, nil
@@ -90,24 +87,51 @@ func (c *CLPARelayInsideOp) ValidateProposal(ctx context.Context, proposal *mess
 }
 
 func (c *CLPARelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
+	var (
+		b   *block.Block
+		err error
+	)
+
 	switch proposal.ProposalType {
 	case message.BlockProposalType:
-		if err := c.txBlockCommitAndDeliver(ctx, isLeader, proposal); err != nil {
+		b, err = block.DecodeBlock(proposal.Payload)
+		if err != nil {
+			return fmt.Errorf("invalid payload, decode failed: %w", err)
+		}
+
+		if err = c.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
 			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
+
+		if err = c.RecordBlock(b); err != nil {
+			return fmt.Errorf("record block failed: %w", err)
+		}
 	case message.PartitionProposalType:
-		if err := c.partitionBlockCommit(ctx, isLeader, proposal); err != nil {
+		b, err = block.DecodeBlock(proposal.Payload)
+		if err != nil {
+			return fmt.Errorf("invalid payload, decode failed: %w", err)
+		}
+
+		if err = c.partitionBlockCommit(ctx, proposal); err != nil {
 			return fmt.Errorf("commit partition block failed: %w", err)
 		}
 	default:
 		return fmt.Errorf("invalid proposal type = %s", proposal.ProposalType)
 	}
 
+	if !isLeader {
+		return nil
+	}
+
+	if err = c.RecordBlock(b); err != nil {
+		return fmt.Errorf("record block failed: %w", err)
+	}
+
 	return nil
 }
 
 func (c *CLPARelayInsideOp) Close() {
-	_ = c.file.Close()
+	_ = c.RelayTxBlockOp.Close()
 	_ = c.chain.Close()
 }
 
@@ -117,23 +141,10 @@ func (c *CLPARelayInsideOp) buildBlockProposal(ctx context.Context) (*message.Pr
 		return nil, fmt.Errorf("txPool.PackTxs failed: %w", err)
 	}
 
-	// if a transaction is a cross-shard tx, modify its RelayOpt
-	mTxs, err := modifyTxRelayOpt(ctx, txs, c.chain)
+	p, err := c.BuildTxBlockProposal(ctx, txs)
 	if err != nil {
-		return nil, fmt.Errorf("modifyTxRelayOpt failed: %w", err)
+		return nil, fmt.Errorf("build block proposal in relay mode failed: %w", err)
 	}
-
-	b, err := c.chain.GenerateBlock(ctx, c.lp.WalletAddr, mTxs)
-	if err != nil {
-		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
-	}
-
-	p, err := WrapProposal(b, message.BlockProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
-
-	slog.InfoContext(ctx, "block is generated in clpa relay module", "shard ID", c.chain.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
 
 	return p, nil
 }
@@ -165,7 +176,7 @@ func (c *CLPARelayInsideOp) buildPartitionProposal(ctx context.Context) (*messag
 		return nil, fmt.Errorf("GenerateMigrationBlock failed: %w", err)
 	}
 
-	p, err := WrapProposal(b, message.PartitionProposalType)
+	p, err := message.WrapProposal(b, message.PartitionProposalType)
 	if err != nil {
 		return nil, fmt.Errorf("WrapProposal failed: %w", err)
 	}
@@ -192,7 +203,7 @@ func (c *CLPARelayInsideOp) packValidTxs(ctx context.Context, size int) ([]trans
 			break
 		}
 		// Get all account states of this txs.
-		accountLoc, err := getAccountLocationsInTxs(ctx, c.chain, txs)
+		accountLoc, err := c.chain.GetAccountLocationsInTxs(ctx, txs)
 		if err != nil {
 			return nil, fmt.Errorf("GetAccountLocationsInTxs failed: %w", err)
 		}
@@ -255,16 +266,24 @@ func (c *CLPARelayInsideOp) packValidTxs(ctx context.Context, size int) ([]trans
 // migrateAccountsAndTxs collects accounts and txs and sends them to other shards.
 // The account states are fetched from the chain and the txs are fetched from the txPool.
 func (c *CLPARelayInsideOp) migrateAccountsAndTxs(ctx context.Context) error {
+	if err := c.migrateAccounts(ctx); err != nil {
+		return fmt.Errorf("migrateAccounts failed: %w", err)
+	}
+
+	if err := c.migrateTxs(ctx); err != nil {
+		return fmt.Errorf("migrateTxs failed: %w", err)
+	}
+
+	return nil
+}
+
+// migrateAccounts migrates accounts.
+func (c *CLPARelayInsideOp) migrateAccounts(ctx context.Context) error {
 	accountsMigratedOut := maps.Keys(c.amm.CurModifiedMap)
 
 	states, err := c.chain.GetAccountStates(ctx, accountsMigratedOut)
 	if err != nil {
 		return fmt.Errorf("GetAccountStates failed: %w", err)
-	}
-
-	allTxs, err := c.txPool.PackTxs(migratedTxNum)
-	if err != nil {
-		return fmt.Errorf("PackTxs failed: %w", err)
 	}
 
 	atMsgList := make([]message.AccountAndTxMigrationMsg, c.cfg.ShardNum)
@@ -280,43 +299,13 @@ func (c *CLPARelayInsideOp) migrateAccountsAndTxs(ctx context.Context) error {
 	}
 
 	for i, acc := range accountsMigratedOut {
-		// If this account is not in this shard, skip it
-		if states[i].ShardLocation != c.lp.ShardID {
-			continue
+		// If this shard is in this shard now, add this account to the dest shard.
+		srcShardID := states[i].ShardLocation
+
+		destShardID := int64(c.amm.CurModifiedMap[acc])
+		if srcShardID == c.lp.ShardID && destShardID != c.lp.ShardID {
+			atMsgList[destShardID].AccountStates[acc] = states[i]
 		}
-
-		destShardID := c.amm.CurModifiedMap[acc]
-		if int64(destShardID) == c.lp.ShardID { // If this dest shard is it, skip it
-			continue
-		}
-
-		atMsgList[destShardID].AccountStates[acc] = states[i]
-	}
-
-	addBackTxs := make([]transaction.Transaction, 0)
-
-	for _, tx := range allTxs {
-		senderDestShard, senderModified := c.amm.CurModifiedMap[tx.Sender]
-		recipientDestShard, recipientModified := c.amm.CurModifiedMap[tx.Recipient]
-		// If this transaction is a relay-2 transaction, it should be sent to the recipient's shard
-		if tx.RelayStage == transaction.Relay2Tx {
-			if recipientModified {
-				atMsgList[recipientDestShard].MigratedTxs = append(atMsgList[recipientDestShard].MigratedTxs, tx)
-			} else {
-				addBackTxs = append(addBackTxs, tx)
-			}
-		} else { // Otherwise, it should be sent to the sender's shard.
-			if senderModified {
-				atMsgList[senderDestShard].MigratedTxs = append(atMsgList[senderDestShard].MigratedTxs, tx)
-			} else {
-				addBackTxs = append(addBackTxs, tx)
-			}
-		}
-	}
-
-	// Add the unmigrated txs back to the tx pool.
-	if err = c.txPool.AddTxs(addBackTxs); err != nil {
-		return fmt.Errorf("AddTxs failed: %w", err)
 	}
 
 	sendMsgMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, len(atMsgList))
@@ -339,53 +328,43 @@ func (c *CLPARelayInsideOp) migrateAccountsAndTxs(ctx context.Context) error {
 	return nil
 }
 
-func (c *CLPARelayInsideOp) txBlockCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	b, err := block.DecodeBlock(proposal.Payload)
+// migrateTxs migrates transactions.
+func (c *CLPARelayInsideOp) migrateTxs(ctx context.Context) error {
+	allTxs, err := c.txPool.PackTxs(migratedTxNum)
 	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
-	// commit block - add block to the blockchain
-	if err = c.chain.AddBlock(ctx, b); err != nil {
-		return fmt.Errorf("chain.AddBlock failed: %w", err)
+		return fmt.Errorf("PackTxs failed: %w", err)
 	}
 
-	slog.Info("block is added in clpa relay module", "block height", b.Number, "epoch", c.amm.Epoch)
+	tx2Shards := make([][]transaction.Transaction, c.cfg.ShardNum)
+	addBackTxs := make([]transaction.Transaction, 0)
 
-	// if this node is not a leader, skip
-	if !isLeader {
-		return nil
+	for _, tx := range allTxs {
+		destShard, modified := c.amm.CurModifiedMap[tx.Sender]
+		if tx.RelayStage == transaction.Relay2Tx {
+			// If this transaction is a relay-2 transaction, it should be sent to the recipient's shard
+			destShard, modified = c.amm.CurModifiedMap[tx.Recipient]
+		}
+
+		if modified {
+			tx2Shards[destShard] = append(tx2Shards[destShard], tx)
+		} else {
+			addBackTxs = append(addBackTxs, tx)
+		}
 	}
 
-	// record this block
-	line, err := block.ConvertBlock2Line(b)
-	if err != nil {
-		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
+	// Add the unmigrated txs back to the tx pool.
+	if err = c.txPool.AddTxs(addBackTxs); err != nil {
+		return fmt.Errorf("AddTxs failed: %w", err)
 	}
 
-	if err = utils.WriteLine2CSV(c.csvW, line); err != nil {
-		return fmt.Errorf("WriteLine2CSV failed: %w", err)
-	}
-
-	// deliver this block info to the supervisor
-	innerTxs, r1Txs, r2Txs := c.splitTxs(ctx, b.TxList)
-
-	if err = c.deliverBlockInfo2Supervisor(ctx, innerTxs, r1Txs, r2Txs, *b); err != nil {
-		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
-	}
-
-	accountLocations, err := getAccountLocationsInTxs(ctx, c.chain, b.TxList)
-	if err != nil {
-		return fmt.Errorf("getAccountLocationsInTxs failed: %w", err)
-	}
-
-	if err = c.sendRelayedTxs(ctx, r1Txs, accountLocations); err != nil {
-		return fmt.Errorf("sendRelayedTxs failed: %w", err)
+	if err = message.SendWrappedTxs2Shards(ctx, tx2Shards, c.conn, c.resolver); err != nil {
+		return fmt.Errorf("SendWrappedTxs2Shards failed: %w", err)
 	}
 
 	return nil
 }
 
-func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
+func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, proposal *message.Proposal) error {
 	b, err := block.DecodeBlock(proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("invalid payload, decode failed: %w", err)
@@ -398,91 +377,6 @@ func (c *CLPARelayInsideOp) partitionBlockCommit(ctx context.Context, isLeader b
 	c.chain.UpdateEpoch(c.amm.Epoch)
 	c.amm.MigrationStatusReset()
 	slog.Info("block is added in clpa relay module", "block height", b.Number)
-
-	if isLeader {
-		return nil
-	}
-	// record this block
-	line, err := block.ConvertBlock2Line(b)
-	if err != nil {
-		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
-	}
-
-	if err = utils.WriteLine2CSV(c.csvW, line); err != nil {
-		return fmt.Errorf("WriteLine2CSV failed: %w", err)
-	}
-
-	return nil
-}
-
-// splitTxs split transactions to inner-shard txs, relay1 txs and relay2 txs.
-func (c *CLPARelayInsideOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
-	innerTxs, r1txs, r2txs := make([]transaction.Transaction, 0), make([]transaction.Transaction, 0), make([]transaction.Transaction, 0)
-
-	for _, tx := range txs {
-		switch tx.RelayStage {
-		case transaction.UndeterminedRelayTx:
-			innerTxs = append(innerTxs, tx)
-		case transaction.Relay1Tx:
-			r1txs = append(r1txs, tx)
-		case transaction.Relay2Tx:
-			r2txs = append(r2txs, tx)
-		default:
-			slog.ErrorContext(ctx, "invalid relay tx stage", "relay stage", tx.RelayStage)
-		}
-	}
-
-	return innerTxs, r1txs, r2txs
-}
-
-func (c *CLPARelayInsideOp) deliverBlockInfo2Supervisor(ctx context.Context, innerTxs, r1Txs, r2Txs []transaction.Transaction, b block.Block) error {
-	rbm := &message.RelayBlockInfoMsg{
-		InnerShardTxs:    innerTxs,
-		Relay1Txs:        r1Txs,
-		Relay2Txs:        r2Txs,
-		ShardID:          c.chain.GetShardID(),
-		Epoch:            c.chain.GetEpochID(),
-		BlockProposeTime: b.CreateTime,
-		BlockCommitTime:  time.Now(),
-	}
-
-	w, err := message.WrapMsg(rbm)
-	if err != nil {
-		return fmt.Errorf("WrapMsg failed: %w", err)
-	}
-
-	spv, err := c.resolver.GetSupervisor()
-	if err != nil {
-		return fmt.Errorf("GetSupervisor failed: %w", err)
-	}
-
-	go c.conn.SendMessage(ctx, spv, w)
-
-	return nil
-}
-
-func (c *CLPARelayInsideOp) sendRelayedTxs(ctx context.Context, r1Txs []transaction.Transaction, accountLocations map[account.Account]int64) error {
-	// for relay1 txs, send relay messages to other shards.
-	relayedTxs := make([][]transaction.Transaction, c.cfg.ShardNum)
-
-	// split r1Txs into all shards
-	for _, tx := range r1Txs {
-		// the next destination of relay1 tx should be calculated according to the recipient addr.
-		shardID, ok := accountLocations[tx.Recipient]
-		if !ok {
-			slog.ErrorContext(ctx, "tx.Recipient is not found in accountLocations", "recipient", tx.Recipient)
-			continue
-		}
-
-		// modify relay transaction's RelayOpt
-		updatedRelayedTx := tx
-		updatedRelayedTx.RelayStage = transaction.Relay2Tx
-		relayedTxs[shardID] = append(relayedTxs[shardID], updatedRelayedTx)
-	}
-
-	if err := message.SendWrappedTxs2Shards(ctx, relayedTxs, c.conn, c.resolver); err != nil {
-		return fmt.Errorf("SendWrappedTxs2Shards failed: %w", err)
-	}
 
 	return nil
 }

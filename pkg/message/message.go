@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 )
 
@@ -28,6 +29,20 @@ func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
 		MsgType: msgType,
 		Payload: buf.Bytes(),
 	}, nil
+}
+
+func WrapProposal(b *block.Block, proposalType string) (*Proposal, error) {
+	var p Proposal
+
+	payload, err := b.Encode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode block payload: %w", err)
+	}
+
+	p.Payload = payload
+	p.ProposalType = proposalType
+
+	return &p, nil
 }
 
 func getMsgType(msg any) (string, error) {

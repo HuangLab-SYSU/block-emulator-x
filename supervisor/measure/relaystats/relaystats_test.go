@@ -1,14 +1,16 @@
 package relaystats
 
 import (
+	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor/txsource/randomsource"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -16,8 +18,10 @@ const (
 )
 
 func TestRelayStats_UpdateMeasureRecord(t *testing.T) {
-	b := NewRelayStats()
-	err := b.UpdateMeasureRecord(initInputMsg(t))
+	b, err := NewRelayStats("test_dir/")
+	defer func() { _ = os.RemoveAll("test_dir") }()
+	require.NoError(t, err)
+	err = b.UpdateMeasureRecord(initInputMsg(t))
 	require.NoError(t, err)
 }
 

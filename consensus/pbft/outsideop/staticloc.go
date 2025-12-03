@@ -12,11 +12,15 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 )
 
-type StaticBrokerOutsideOp struct {
+type StaticLocOutsideOp struct {
 	txPool txpool.TxPool
 }
 
-func (s *StaticBrokerOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpcserver.WrappedMsg) error {
+func NewStaticLocOutsideOp(txPool txpool.TxPool) *StaticLocOutsideOp {
+	return &StaticLocOutsideOp{txPool: txPool}
+}
+
+func (s *StaticLocOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	switch msg.GetMsgType() {
 	case message.ReceiveTxsMessageType:
 		var rt message.ReceiveTxsMsg
@@ -37,4 +41,4 @@ func (s *StaticBrokerOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *
 	return nil
 }
 
-func (s *StaticBrokerOutsideOp) Close() {}
+func (s *StaticLocOutsideOp) Close() {}

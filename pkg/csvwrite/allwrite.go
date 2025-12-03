@@ -1,15 +1,14 @@
-package utils
+package csvwrite
 
 import (
 	"encoding/csv"
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 func WriteAllToCSV(path string, header []string, rows [][]string) error {
-	f, err := CreateFileWithDirs(path)
+	f, err := createFileWithDirs(path)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -33,7 +32,7 @@ func WriteAllToCSV(path string, header []string, rows [][]string) error {
 	return w.Error()
 }
 
-func CreateFileWithDirs(path string) (*os.File, error) {
+func createFileWithDirs(path string) (*os.File, error) {
 	// create the directory
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
@@ -51,22 +50,4 @@ func CreateFileWithDirs(path string) (*os.File, error) {
 	}
 
 	return f, nil
-}
-
-func WriteLine2CSV(w *csv.Writer, line []string) error {
-	if err := w.Write(line); err != nil {
-		return fmt.Errorf("failed to write line: %w", err)
-	}
-
-	w.Flush()
-
-	return w.Error()
-}
-
-func ConvertTime2Str(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-
-	return t.Format(time.RFC3339)
 }

@@ -13,19 +13,16 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 )
 
-type CLPARelayOutsideOp struct {
+type CLPALocOutsideOp struct {
 	amm    *migration.AccMigrateMetadata
 	txPool txpool.TxPool
 }
 
-func NewCLPARelayOutsideOp(txp txpool.TxPool, amm *migration.AccMigrateMetadata) *CLPARelayOutsideOp {
-	return &CLPARelayOutsideOp{
-		amm:    amm,
-		txPool: txp,
-	}
+func NewCLPALocOutsideOp(txPool txpool.TxPool, amm *migration.AccMigrateMetadata) *CLPALocOutsideOp {
+	return &CLPALocOutsideOp{amm: amm, txPool: txPool}
 }
 
-func (c *CLPARelayOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpcserver.WrappedMsg) error {
+func (c *CLPALocOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	switch msg.GetMsgType() {
 	case message.ReceiveTxsMessageType:
 		var rt message.ReceiveTxsMsg
@@ -57,10 +54,6 @@ func (c *CLPARelayOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpc
 			return fmt.Errorf("decode AccountAndTxMigrationMsg failed: %w", err)
 		}
 
-		if err := c.txPool.AddTxs(aat.MigratedTxs); err != nil {
-			return fmt.Errorf("tx pool add txs from AccountAndTxMigrationMsg failed: %w", err)
-		}
-
 		if err := c.amm.CollectStatesByMsg(&aat); err != nil {
 			return fmt.Errorf("collect states by AccountAndTxMigrationMsg failed: %w", err)
 		}
@@ -74,4 +67,4 @@ func (c *CLPARelayOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpc
 	return nil
 }
 
-func (c *CLPARelayOutsideOp) Close() {}
+func (c *CLPALocOutsideOp) Close() {}

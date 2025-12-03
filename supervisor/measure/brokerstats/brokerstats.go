@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"path"
+	"path/filepath"
 	"slices"
 	"time"
 
+	"github.com/HuangLab-SYSU/block-emulator/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
@@ -25,6 +26,25 @@ type txLifeCycle struct {
 	isBrokerTx                                       bool
 }
 
+const (
+	detailTxInfoPath = "broker_stats_detail_tx_info.csv"
+	briefTxInfoPath  = "broker_stats_brief_info.csv"
+)
+
+var detailTxInfoMeasures = []string{
+	"OriginalHash",
+	"Tx create time",
+	"Tx finally commit time",
+	"Is broker tx or not",
+	"Inner shard tx block propose time",
+	"Broker1 tx create time",
+	"Broker1 block propose time",
+	"Broker1 tx commit time",
+	"Broker2 tx create time",
+	"Broker2 block propose time",
+	"Broker2 tx commit time",
+}
+
 type BrokerStats struct {
 	// TCL, i.e., Transaction Commit Latency
 	broker1TCLSum, broker2TCLSum map[int]time.Duration // the commit latency sum of broker1/broker2 transactions in each epoch
@@ -37,9 +57,19 @@ type BrokerStats struct {
 	epochStartTime, epochEndTime map[int]time.Time // the start/end time for each epoch
 
 	txLifecycles map[string]*txLifeCycle // the lifecycle of all transactions
+
+	outputDir string
+	cs        *csvwrite.CSVSeqWriter
 }
 
-func NewBrokerStats() *BrokerStats {
+func NewBrokerStats(outputDir string) (*BrokerStats, error) {
+	fp := filepath.Join(outputDir, detailTxInfoPath)
+
+	cs, err := csvwrite.NewCSVSeqWriter(fp, detailTxInfoMeasures)
+	if err != nil {
+		return nil, fmt.Errorf("error creating CSV sequence writer: %w", err)
+	}
+
 	return &BrokerStats{
 		broker1TCLSum:    make(map[int]time.Duration),
 		broker2TCLSum:    make(map[int]time.Duration),
@@ -50,7 +80,9 @@ func NewBrokerStats() *BrokerStats {
 		epochStartTime:   make(map[int]time.Time),
 		epochEndTime:     make(map[int]time.Time),
 		txLifecycles:     make(map[string]*txLifeCycle),
-	}
+		outputDir:        outputDir,
+		cs:               cs,
+	}, nil
 }
 
 func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
@@ -102,7 +134,9 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 	for _, tx := range bInfo.Broker1Txs {
 		// set broker 1 to the pair map
 		strTxHash := string(tx.BOriginalHash)
-		if val := b.txLifecycles[strTxHash]; val == nil {
+
+		_, b2Exist := b.txLifecycles[strTxHash]
+		if !b2Exist {
 			b.txLifecycles[strTxHash] = &txLifeCycle{
 				originalTxCreateTime: tx.OriginalTxCreateTime,
 				isBrokerTx:           true,
@@ -114,11 +148,19 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		b.txLifecycles[strTxHash].broker1CommitTime = bInfo.BlockCommitTime
 
 		b.broker1TCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
+
+		if b2Exist {
+			if err := b.writeTxInfo(tx.BOriginalHash, b.txLifecycles[strTxHash]); err != nil {
+				slog.Error("writeTxInfo (broker tx) failed", "err", err)
+			}
+		}
 	}
 
 	for _, tx := range bInfo.Broker2Txs {
 		strTxHash := string(tx.BOriginalHash)
-		if val := b.txLifecycles[strTxHash]; val == nil {
+
+		_, b1Exist := b.txLifecycles[strTxHash]
+		if !b1Exist {
 			b.txLifecycles[strTxHash] = &txLifeCycle{
 				originalTxCreateTime: tx.OriginalTxCreateTime,
 				isBrokerTx:           true,
@@ -131,24 +173,46 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		b.txLifecycles[strTxHash].originalTxCommitTime = bInfo.BlockCommitTime
 
 		b.broker2TCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
+
+		if b1Exist {
+			if err := b.writeTxInfo(tx.BOriginalHash, b.txLifecycles[strTxHash]); err != nil {
+				slog.Error("writeTxInfo (broker tx) failed", "err", err)
+			}
+		}
 	}
 
 	return nil
 }
 
-// OutputResult outputs the metrics of all messages
-func (b *BrokerStats) OutputResult(fp string) error {
-	briefInfoFp := path.Join(fp, "broker_stats_brief_info.csv")
+// OutputResultAndClose outputs the metrics of all messages
+func (b *BrokerStats) OutputResultAndClose() error {
+	briefInfoFp := filepath.Join(b.outputDir, briefTxInfoPath)
 	if err := b.outputBriefEpochInfo(briefInfoFp); err != nil {
 		return fmt.Errorf("failed to output BriefEpochInfo: %w", err)
 	}
 
-	detailTxInfoFp := path.Join(fp, "broker_stats_detail_tx_info.csv")
-	if err := b.outputDetailTxInfo(detailTxInfoFp); err != nil {
-		return fmt.Errorf("failed to outputDetailTxInfo: %w", err)
-	}
-
 	slog.Info("broker stats has output all results")
+
+	return b.cs.Close()
+}
+
+func (b *BrokerStats) writeTxInfo(txHash []byte, tl *txLifeCycle) error {
+	csvLine := []string{
+		hex.EncodeToString(txHash),
+		utils.ConvertTime2Str(tl.originalTxCreateTime),
+		utils.ConvertTime2Str(tl.originalTxCommitTime),
+		fmt.Sprintf("%t", tl.isBrokerTx),
+		utils.ConvertTime2Str(tl.innerShardTxBlockProposeTime),
+		utils.ConvertTime2Str(tl.broker1TxCreateTime),
+		utils.ConvertTime2Str(tl.broker1BlockProposeTime),
+		utils.ConvertTime2Str(tl.broker1CommitTime),
+		utils.ConvertTime2Str(tl.broker2TxCreateTime),
+		utils.ConvertTime2Str(tl.broker2BlockProposeTime),
+		utils.ConvertTime2Str(tl.broker2CommitTime),
+	}
+	if err := b.cs.WriteLine2CSV(csvLine); err != nil {
+		return fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
 
 	return nil
 }
@@ -202,43 +266,5 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 		measureVals = append(measureVals, csvLine)
 	}
 
-	return utils.WriteAllToCSV(fp, measureName, measureVals)
-}
-
-func (b *BrokerStats) outputDetailTxInfo(fp string) error {
-	slog.Info("output broker stats", "metric", "detail tx info", "file", fp)
-
-	measureName := []string{
-		"OriginalHash",
-		"Tx create time",
-		"Tx finally commit time",
-		"Is broker tx or not",
-		"Inner shard tx block propose time",
-		"Broker1 tx create time",
-		"Broker1 block propose time",
-		"Broker1 tx commit time",
-		"Broker2 tx create time",
-		"Broker2 block propose time",
-		"Broker2 tx commit time",
-	}
-
-	measureVals := make([][]string, 0, len(b.txLifecycles))
-	for hash, txDetail := range b.txLifecycles {
-		csvLine := []string{
-			hex.EncodeToString([]byte(hash)),
-			utils.ConvertTime2Str(txDetail.originalTxCreateTime),
-			utils.ConvertTime2Str(txDetail.originalTxCommitTime),
-			fmt.Sprintf("%t", txDetail.isBrokerTx),
-			utils.ConvertTime2Str(txDetail.innerShardTxBlockProposeTime),
-			utils.ConvertTime2Str(txDetail.broker1TxCreateTime),
-			utils.ConvertTime2Str(txDetail.broker1BlockProposeTime),
-			utils.ConvertTime2Str(txDetail.broker1CommitTime),
-			utils.ConvertTime2Str(txDetail.broker2TxCreateTime),
-			utils.ConvertTime2Str(txDetail.broker2BlockProposeTime),
-			utils.ConvertTime2Str(txDetail.broker2CommitTime),
-		}
-		measureVals = append(measureVals, csvLine)
-	}
-
-	return utils.WriteAllToCSV(fp, measureName, measureVals)
+	return csvwrite.WriteAllToCSV(fp, measureName, measureVals)
 }

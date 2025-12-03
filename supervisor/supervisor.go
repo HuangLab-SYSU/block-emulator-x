@@ -45,28 +45,40 @@ func NewSupervisor(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Supe
 
 	switch cfg.ConsensusType {
 	case config.StaticRelayConsensus:
-		ms = relaystats.NewRelayStats()
+		ms, err = relaystats.NewRelayStats(cfg.ResultOutputDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize relay stats: %w", err)
+		}
 
 		com, err = committee.NewStaticRelayCommittee(conn, r, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init a StaticRelayCommittee: %w", err)
 		}
 	case config.StaticBrokerConsensus:
-		ms = brokerstats.NewBrokerStats()
+		ms, err = brokerstats.NewBrokerStats(cfg.ResultOutputDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize broker stats: %w", err)
+		}
 
 		com, err = committee.NewStaticBrokerCommittee(conn, r, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init a StaticBrokerCommittee: %w", err)
 		}
 	case config.CLPARelayConsensus:
-		ms = relaystats.NewRelayStats()
+		ms, err = relaystats.NewRelayStats(cfg.ResultOutputDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize relay stats: %w", err)
+		}
 
 		com, err = committee.NewCLPARelayCommittee(conn, r, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init a CLPARelayCommittee: %w", err)
 		}
 	case config.CLPABrokerConsensus:
-		ms = brokerstats.NewBrokerStats()
+		ms, err = brokerstats.NewBrokerStats(cfg.ResultOutputDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize broker stats: %w", err)
+		}
 
 		com, err = committee.NewCLPABrokerCommittee(conn, r, cfg)
 		if err != nil {
@@ -132,7 +144,7 @@ func (s *Supervisor) Start() error {
 	<-s.measureDone
 
 	// output the measure result
-	if err := s.measure.OutputResult(s.cfg.ResultOutputDir); err != nil {
+	if err := s.measure.OutputResultAndClose(); err != nil {
 		slog.Error("failed to output result", "err", err)
 	} else {
 		slog.Info("successfully output the result", "dir", s.cfg.ResultOutputDir)

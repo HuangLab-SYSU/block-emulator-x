@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"path"
+	"path/filepath"
 	"slices"
 	"time"
 
+	"github.com/HuangLab-SYSU/block-emulator/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
@@ -22,6 +23,23 @@ type txLifeCycle struct {
 	relay1BlockProposeTime, relay2BlockProposeTime time.Time
 	relay1CommitTime, relay2CommitTime             time.Time
 	isCrossShardTx                                 bool
+}
+
+const (
+	detailTxInfoPath = "relay_stats_detail_tx_info.csv"
+	briefTxInfoPath  = "relay_stats_brief_info.csv"
+)
+
+var detailTxInfoMeasures = []string{
+	"OriginalHash",
+	"Tx create time",
+	"Tx finally commit time",
+	"Is cross-shard tx or not",
+	"Inner shard tx block propose time",
+	"Relay1 block propose time",
+	"Relay1 tx commit time",
+	"Relay2 block propose time",
+	"Relay2 tx commit time",
 }
 
 type RelayStats struct {
@@ -36,9 +54,19 @@ type RelayStats struct {
 	epochStartTime, epochEndTime map[int]time.Time // the start/end time for each epoch
 
 	txLifecycles map[string]*txLifeCycle // the lifecycle of all transactions
+
+	outputDir string
+	cs        *csvwrite.CSVSeqWriter
 }
 
-func NewRelayStats() *RelayStats {
+func NewRelayStats(outputDir string) (*RelayStats, error) {
+	fp := filepath.Join(outputDir, detailTxInfoPath)
+
+	cs, err := csvwrite.NewCSVSeqWriter(fp, detailTxInfoMeasures)
+	if err != nil {
+		return nil, fmt.Errorf("error creating CSV sequence writer: %w", err)
+	}
+
 	return &RelayStats{
 		relay1TCLSum:     make(map[int]time.Duration),
 		relay2TCLSum:     make(map[int]time.Duration),
@@ -49,7 +77,9 @@ func NewRelayStats() *RelayStats {
 		epochStartTime:   make(map[int]time.Time),
 		epochEndTime:     make(map[int]time.Time),
 		txLifecycles:     make(map[string]*txLifeCycle),
-	}
+		outputDir:        outputDir,
+		cs:               cs,
+	}, nil
 }
 
 func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
@@ -93,58 +123,92 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			originalTxCreateTime:         tx.CreateTime,
 			innerShardTxBlockProposeTime: bInfo.BlockProposeTime,
 			originalTxCommitTime:         bInfo.BlockCommitTime,
+			isCrossShardTx:               false,
 		}
 
 		r.innerShardTCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
+		if err = r.writeTxInfo(th, r.txLifecycles[string(th)]); err != nil {
+			slog.Error("writeTxInfo (relay tx) failed", "err", err)
+		}
 	}
 
 	for _, tx := range bInfo.Relay1Txs {
 		// set relay 1 to the pair map
 		strTxHash := string(tx.ROriginalHash)
-		if val := r.txLifecycles[strTxHash]; val == nil {
-			r.txLifecycles[strTxHash] = &txLifeCycle{
-				originalTxCreateTime: tx.CreateTime,
-				isCrossShardTx:       true,
-			}
+
+		_, r2Exist := r.txLifecycles[strTxHash]
+		if !r2Exist {
+			r.txLifecycles[strTxHash] = &txLifeCycle{originalTxCreateTime: tx.CreateTime, isCrossShardTx: true}
 		}
 
 		r.txLifecycles[strTxHash].relay1BlockProposeTime = bInfo.BlockProposeTime
 		r.txLifecycles[strTxHash].relay1CommitTime = bInfo.BlockCommitTime
 
-		r.relay1TCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
+		if r2Exist { // If the relay2 tx exists, the txLifecycle of this tx is filled because this relay1 tx.
+			r.updateRelayTxTCLByTxLifecycle(r.txLifecycles[strTxHash], epochID)
+
+			if err := r.writeTxInfo(tx.ROriginalHash, r.txLifecycles[strTxHash]); err != nil {
+				slog.Error("writeTxInfo (relay tx) failed", "err", err)
+			}
+		}
 	}
 
 	for _, tx := range bInfo.Relay2Txs {
 		strTxHash := string(tx.ROriginalHash)
-		if val := r.txLifecycles[strTxHash]; val == nil {
-			r.txLifecycles[strTxHash] = &txLifeCycle{
-				originalTxCreateTime: tx.CreateTime,
-				isCrossShardTx:       true,
-			}
+
+		_, r1Exist := r.txLifecycles[strTxHash]
+		if !r1Exist {
+			r.txLifecycles[strTxHash] = &txLifeCycle{originalTxCreateTime: tx.CreateTime, isCrossShardTx: true}
 		}
 
 		r.txLifecycles[strTxHash].relay2BlockProposeTime = bInfo.BlockProposeTime
 		r.txLifecycles[strTxHash].relay2CommitTime = bInfo.BlockCommitTime
 		r.txLifecycles[strTxHash].originalTxCommitTime = bInfo.BlockCommitTime
 
-		r.relay2TCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
+		if r1Exist { // If the relay1 tx exists, the txLifecycle of this tx is filled because this relay2 tx.
+			r.updateRelayTxTCLByTxLifecycle(r.txLifecycles[strTxHash], epochID)
+
+			if err := r.writeTxInfo(tx.ROriginalHash, r.txLifecycles[strTxHash]); err != nil {
+				slog.Error("writeTxInfo (relay tx) failed", "err", err)
+			}
+		}
 	}
 
 	return nil
 }
 
-func (r *RelayStats) OutputResult(fp string) error {
-	briefInfoFp := path.Join(fp, "relay_stats_brief_info.csv")
+func (r *RelayStats) OutputResultAndClose() error {
+	briefInfoFp := filepath.Join(r.outputDir, briefTxInfoPath)
 	if err := r.outputBriefEpochInfo(briefInfoFp); err != nil {
 		return fmt.Errorf("failed to output BriefEpochInfo: %w", err)
 	}
 
-	detailTxInfoFp := path.Join(fp, "relay_stats_detail_tx_info.csv")
-	if err := r.outputDetailTxInfo(detailTxInfoFp); err != nil {
-		return fmt.Errorf("failed to outputDetailTxInfo: %w", err)
-	}
-
 	slog.Info("relay stats has output all results")
+
+	return r.cs.Close()
+}
+
+func (r *RelayStats) updateRelayTxTCLByTxLifecycle(tl *txLifeCycle, epochID int) {
+	r1TCL, r2TCL := tl.relay1CommitTime.Sub(tl.originalTxCreateTime), tl.relay2CommitTime.Sub(tl.relay1CommitTime)
+	r.relay1TCLSum[epochID] += r1TCL
+	r.relay2TCLSum[epochID] += r2TCL
+}
+
+func (r *RelayStats) writeTxInfo(txHash []byte, tl *txLifeCycle) error {
+	csvLine := []string{
+		hex.EncodeToString(txHash),
+		utils.ConvertTime2Str(tl.originalTxCreateTime),
+		utils.ConvertTime2Str(tl.originalTxCommitTime),
+		fmt.Sprintf("%t", tl.isCrossShardTx),
+		utils.ConvertTime2Str(tl.innerShardTxBlockProposeTime),
+		utils.ConvertTime2Str(tl.relay1BlockProposeTime),
+		utils.ConvertTime2Str(tl.relay1CommitTime),
+		utils.ConvertTime2Str(tl.relay2BlockProposeTime),
+		utils.ConvertTime2Str(tl.relay2CommitTime),
+	}
+	if err := r.cs.WriteLine2CSV(csvLine); err != nil {
+		return fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
 
 	return nil
 }
@@ -198,39 +262,5 @@ func (r *RelayStats) outputBriefEpochInfo(fp string) error {
 		measureVals = append(measureVals, csvLine)
 	}
 
-	return utils.WriteAllToCSV(fp, measureName, measureVals)
-}
-
-func (r *RelayStats) outputDetailTxInfo(fp string) error {
-	slog.Info("output relay stats", "metric", "detail tx info", "file", fp)
-
-	measureName := []string{
-		"OriginalHash",
-		"Tx create time",
-		"Tx finally commit time",
-		"Is cross-shard tx or not",
-		"Inner shard tx block propose time",
-		"Relay1 block propose time",
-		"Relay1 tx commit time",
-		"Relay2 block propose time",
-		"Relay2 tx commit time",
-	}
-
-	measureVals := make([][]string, 0, len(r.txLifecycles))
-	for hash, txDetail := range r.txLifecycles {
-		csvLine := []string{
-			hex.EncodeToString([]byte(hash)),
-			utils.ConvertTime2Str(txDetail.originalTxCreateTime),
-			utils.ConvertTime2Str(txDetail.originalTxCommitTime),
-			fmt.Sprintf("%t", txDetail.isCrossShardTx),
-			utils.ConvertTime2Str(txDetail.innerShardTxBlockProposeTime),
-			utils.ConvertTime2Str(txDetail.relay1BlockProposeTime),
-			utils.ConvertTime2Str(txDetail.relay1CommitTime),
-			utils.ConvertTime2Str(txDetail.relay2BlockProposeTime),
-			utils.ConvertTime2Str(txDetail.relay2CommitTime),
-		}
-		measureVals = append(measureVals, csvLine)
-	}
-
-	return utils.WriteAllToCSV(fp, measureName, measureVals)
+	return csvwrite.WriteAllToCSV(fp, measureName, measureVals)
 }

@@ -1,0 +1,134 @@
+package txblockop
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"path/filepath"
+	"time"
+
+	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/csvwrite"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
+)
+
+type BrokerTxBlockOp struct {
+	c        *chain.Chain
+	conn     *network.P2PConn
+	resolver nodetopo.NodeMapper
+
+	cs *csvwrite.CSVSeqWriter
+
+	cfg config.ConsensusNodeCfg
+	lp  config.LocalParams
+}
+
+func NewBrokerTxBlockOp(c *chain.Chain, conn *network.P2PConn, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*BrokerTxBlockOp, error) {
+	fp := filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID))
+
+	cc, err := csvwrite.NewCSVSeqWriter(fp, block.RecordTitle)
+	if err != nil {
+		return nil, fmt.Errorf("NewCSVSeqWriter: %w", err)
+	}
+
+	return &BrokerTxBlockOp{c: c, conn: conn, resolver: rs, cs: cc, cfg: cfg, lp: lp}, nil
+}
+
+func (bto *BrokerTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []transaction.Transaction) (*message.Proposal, error) {
+	b, err := bto.c.GenerateBlock(ctx, bto.lp.WalletAddr, txs)
+	if err != nil {
+		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
+	}
+
+	p, err := message.WrapProposal(b, message.BlockProposalType)
+	if err != nil {
+		return nil, fmt.Errorf("WrapProposal failed: %w", err)
+	}
+
+	slog.InfoContext(ctx, "block is generated", "shard ID", bto.c.GetShardID(), "block height", b.Number, "epoch", bto.c.GetEpochID(), "block create time", b.CreateTime)
+
+	return p, nil
+}
+
+// BlockCommitAndDeliver contains:
+// 1. apply the proposal to the chain.
+// 2. send blockInfoMsg to the supervisor.
+func (bto *BrokerTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader bool, b *block.Block) error {
+	// commit block - add block to the blockchain
+	if err := bto.c.AddBlock(ctx, b); err != nil {
+		return fmt.Errorf("chain.AddBlock failed: %w", err)
+	}
+
+	slog.Info("block is added in static broker module", "block height", b.Number)
+
+	// if this node is not the leader, skip it
+	if !isLeader {
+		return nil
+	}
+
+	// deliver this block info to the supervisor
+	if err := bto.deliverBlockInfo2Supervisor(ctx, *b); err != nil {
+		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
+	}
+
+	return nil
+}
+
+func (bto *BrokerTxBlockOp) RecordBlock(b *block.Block) error {
+	return recordBlock(bto.cs, b)
+}
+
+func (bto *BrokerTxBlockOp) Close() error {
+	return bto.cs.Close()
+}
+
+func (*BrokerTxBlockOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
+	innerTxs, b1Txs, b2Txs := make([]transaction.Transaction, 0), make([]transaction.Transaction, 0), make([]transaction.Transaction, 0)
+
+	for _, tx := range txs {
+		switch tx.BrokerStage {
+		case transaction.RawTxBrokerStage:
+			innerTxs = append(innerTxs, tx)
+		case transaction.Sigma1BrokerStage:
+			b1Txs = append(b1Txs, tx)
+		case transaction.Sigma2BrokerStage:
+			b2Txs = append(b2Txs, tx)
+		default:
+			slog.ErrorContext(ctx, "broker-handler split tx error, broker stage invalid", "broker stage", tx.BrokerStage)
+		}
+	}
+
+	return innerTxs, b1Txs, b2Txs
+}
+
+func (bto *BrokerTxBlockOp) deliverBlockInfo2Supervisor(ctx context.Context, b block.Block) error {
+	innerTxs, b1Txs, b2Txs := bto.splitTxs(ctx, b.TxList)
+	bbm := &message.BrokerBlockInfoMsg{
+		InnerShardTxs:    innerTxs,
+		Broker1Txs:       b1Txs,
+		Broker2Txs:       b2Txs,
+		Epoch:            bto.c.GetEpochID(),
+		ShardID:          bto.c.GetShardID(),
+		BlockProposeTime: b.CreateTime,
+		BlockCommitTime:  time.Now(),
+	}
+
+	w, err := message.WrapMsg(bbm)
+	if err != nil {
+		return fmt.Errorf("WrapMsg failed: %w", err)
+	}
+
+	spv, err := bto.resolver.GetSupervisor()
+	if err != nil {
+		return fmt.Errorf("GetSupervisor failed: %w", err)
+	}
+
+	go bto.conn.SendMessage(ctx, spv, w)
+
+	return nil
+}
