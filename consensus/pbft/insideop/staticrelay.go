@@ -84,11 +84,6 @@ func (s *StaticRelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLe
 		if err = s.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
 			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
-
-		if err = s.RecordBlock(b); err != nil {
-			return fmt.Errorf("record block failed: %w", err)
-		}
-
 	default:
 		return fmt.Errorf("invalid proposal type = %s", proposal.ProposalType)
 	}

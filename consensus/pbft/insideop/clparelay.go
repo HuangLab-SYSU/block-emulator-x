@@ -102,10 +102,6 @@ func (c *CLPARelayInsideOp) ProposalCommitAndDeliver(ctx context.Context, isLead
 		if err = c.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
 			return fmt.Errorf("deliver and commit the tx block proposal failed: %w", err)
 		}
-
-		if err = c.RecordBlock(b); err != nil {
-			return fmt.Errorf("record block failed: %w", err)
-		}
 	case message.PartitionProposalType:
 		b, err = block.DecodeBlock(proposal.Payload)
 		if err != nil {
