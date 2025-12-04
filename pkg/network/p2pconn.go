@@ -14,7 +14,10 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 )
 
-const msgBufferSize = 1 << 20
+const (
+	msgBufferSize = 1 << 20
+	msgSizeLimit  = 100 * 1 << 20
+)
 
 type clientConnection struct {
 	conn   *grpc.ClientConn
@@ -51,7 +54,7 @@ func (p *P2PConn) StartServer() error {
 		return fmt.Errorf("failed to listen on %s: %w", listenAddr, err)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.MaxRecvMsgSize(msgSizeLimit), grpc.MaxSendMsgSize(msgSizeLimit))
 
 	rpcserver.RegisterReplicaConnServer(s, p)
 
@@ -155,7 +158,8 @@ func (p *P2PConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 	}
 	// if there's no client, create one and reuse it.
 	if _, ok := p.clientPool[dest]; !ok {
-		conn, err := grpc.NewClient(p.info2Host[dest], grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient(p.info2Host[dest], grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(msgSizeLimit), grpc.MaxCallSendMsgSize(msgSizeLimit)))
 		if err != nil {
 			return fmt.Errorf("grpc client fail to connect: %w", err)
 		}
@@ -169,7 +173,7 @@ func (p *P2PConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 		To:   &rpcserver.NodePosition{ShardID: dest.ShardID, NodeID: dest.NodeID},
 	})
 	if err != nil {
-		return fmt.Errorf("grpc client fail to send message: %w", err)
+		return fmt.Errorf("grpc client fail to send message, type: %s, err: %w", msg.GetMsgType(), err)
 	}
 
 	return nil

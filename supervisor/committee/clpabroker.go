@@ -158,6 +158,8 @@ func (c *CLPABrokerCommittee) readTxsAndSend(ctx context.Context) error {
 	// create broker accounts according to the bManager's ready list.
 	b1Txs, b2Txs := c.bManager.CreateBrokerTxs()
 
+	slog.InfoContext(ctx, "ready to send broker transactions", "b1tx size", len(b1Txs), "b2tx size", len(b2Txs))
+
 	sendTxs := append(innerTxs, append(b1Txs, b2Txs...)...)
 
 	// send transactions
@@ -243,5 +245,6 @@ func (c *CLPABrokerCommittee) handleTxSendAgainMsg(ctx context.Context, tsa *mes
 		slog.ErrorContext(ctx, "create raw tx failed", "err", err)
 		return
 	}
+
 	slog.Info("create raw txs from BrokerCLPATxSendAgainMsg", "tx size", len(tsa.Txs))
 }

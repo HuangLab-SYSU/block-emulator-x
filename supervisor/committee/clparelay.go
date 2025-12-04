@@ -146,6 +146,7 @@ func (c *CLPARelayCommittee) repartition(ctx context.Context) error {
 	// set epoch-synced to false
 	c.epochSynced = false
 	c.sl.stopCnt = 0
+
 	return nil
 }
 

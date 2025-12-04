@@ -282,6 +282,7 @@ func (c *DynamicShardOp) packValidTxsInBroker(ctx context.Context, size int) ([]
 	for i, txs := range txs2Shard {
 		slog.Debug("dynamic-broker: migrate txs to the other shard when packing from pool", "tx size", len(txs), "shard", i)
 	}
+
 	slog.Debug("dynamic-broker: migrate txs to the supervisor when packing from pool", "tx size", len(txs2Supervisor))
 
 	if err := message.SendWrappedTxs2Shards(ctx, txs2Shard, c.conn, c.resolver); err != nil {
@@ -362,6 +363,7 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	for i, txs := range tx2Shards {
 		slog.Debug("dynamic-broker: migrate txs to the other shard when operating account-migration", "tx size", len(txs), "shard", i)
 	}
+
 	slog.Debug("dynamic-broker: migrate txs to the supervisor when operating account-migration", "tx size", len(tx2Supervisor))
 
 	// Add the unmigrated txs back to the tx pool.
