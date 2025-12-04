@@ -279,6 +279,11 @@ func (c *DynamicShardOp) packValidTxsInBroker(ctx context.Context, size int) ([]
 		txsPacked = append(txsPacked, iterPackedTxs...)
 	}
 
+	for i, txs := range txs2Shard {
+		slog.Debug("dynamic-broker: migrate txs to the other shard when packing from pool", "tx size", len(txs), "shard", i)
+	}
+	slog.Debug("dynamic-broker: migrate txs to the supervisor when packing from pool", "tx size", len(txs2Supervisor))
+
 	if err := message.SendWrappedTxs2Shards(ctx, txs2Shard, c.conn, c.resolver); err != nil {
 		return nil, fmt.Errorf("SendWrappedTxs2Shard failed: %w", err)
 	}
@@ -345,7 +350,7 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	tx2Supervisor := make([]transaction.Transaction, 0)
 
 	for _, tx := range allTxs {
-		if dest := c.getTxDestLocByModifiedMap(tx); dest == supervisorShardID {
+		if dest := c.getBrokerTxDestLocByModifiedMap(tx); dest == supervisorShardID {
 			tx2Supervisor = append(tx2Supervisor, tx)
 		} else if dest == c.lp.ShardID {
 			addBackTxs = append(addBackTxs, tx)
@@ -353,6 +358,11 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 			tx2Shards[dest] = append(tx2Shards[dest], tx)
 		}
 	}
+
+	for i, txs := range tx2Shards {
+		slog.Debug("dynamic-broker: migrate txs to the other shard when operating account-migration", "tx size", len(txs), "shard", i)
+	}
+	slog.Debug("dynamic-broker: migrate txs to the supervisor when operating account-migration", "tx size", len(tx2Supervisor))
 
 	// Add the unmigrated txs back to the tx pool.
 	if err = c.txPool.AddTxs(addBackTxs); err != nil {
@@ -370,7 +380,7 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	return nil
 }
 
-func (c *DynamicShardOp) getTxDestLocByModifiedMap(tx transaction.Transaction) int64 {
+func (c *DynamicShardOp) getBrokerTxDestLocByModifiedMap(tx transaction.Transaction) int64 {
 	sDestShard, sModified := c.amm.CurModifiedMap[tx.Sender]
 	rDestShard, rModified := c.amm.CurModifiedMap[tx.Recipient]
 
@@ -393,7 +403,7 @@ func (c *DynamicShardOp) getTxDestLocByModifiedMap(tx transaction.Transaction) i
 	if tx.BrokerStage == transaction.Sigma1BrokerStage { // broker-1 tx
 		// After the account-migration, this transaction should be set in sDestShard.
 		if !sModified {
-			sDestShard = int(c.lp.ShardID)
+			return c.lp.ShardID
 		}
 
 		return int64(sDestShard)
@@ -402,7 +412,7 @@ func (c *DynamicShardOp) getTxDestLocByModifiedMap(tx transaction.Transaction) i
 	if tx.BrokerStage == transaction.Sigma2BrokerStage { // broker-2 tx
 		// After the account-migration, this transaction should be set in rDestShard.
 		if !rModified {
-			rDestShard = int(c.lp.ShardID)
+			return c.lp.ShardID
 		}
 
 		return int64(rDestShard)
@@ -414,10 +424,10 @@ func (c *DynamicShardOp) getTxDestLocByModifiedMap(tx transaction.Transaction) i
 }
 
 func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, accountLoc map[account.Account]int64) int64 {
-	sDestShard, sModified := accountLoc[tx.Sender]
-	rDestShard, rModified := accountLoc[tx.Recipient]
+	sDestShard, sExist := accountLoc[tx.Sender]
+	rDestShard, rExist := accountLoc[tx.Recipient]
 
-	if !sModified || !rModified {
+	if !sExist || !rExist {
 		slog.Error("sender or recipient is not found in accountLoc", "sender", tx.Sender, "recipient", tx.Recipient)
 		return supervisorShardID
 	}
@@ -447,6 +457,9 @@ func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, 
 }
 
 func (c *DynamicShardOp) brokerCLPATxSendAgain(ctx context.Context, txSentAgain []transaction.Transaction) error {
+	if len(txSentAgain) == 0 {
+		return nil
+	}
 	// Send to the supervisor
 	w, err := message.WrapMsg(&message.BrokerCLPATxSendAgainMsg{Txs: txSentAgain})
 	if err != nil {

@@ -68,7 +68,7 @@ func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Consen
 	case config.StaticRelayConsensus, config.StaticBrokerConsensus:
 		omh = outsideop.NewStaticLocOutsideOp(txp)
 		if iop, err = insideop.NewStaticShardOp(conn, r, bc, txp, cfg, lp); err != nil {
-			return nil, fmt.Errorf("NewStaticRelayInsideOp err=%w", err)
+			return nil, fmt.Errorf("NewStaticShardOp err=%w", err)
 		}
 
 	case config.CLPARelayConsensus, config.CLPABrokerConsensus:
@@ -76,7 +76,7 @@ func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.Consen
 
 		omh = outsideop.NewCLPALocOutsideOp(txp, amm)
 		if iop, err = insideop.NewDynamicShardOp(conn, r, bc, txp, amm, cfg, lp); err != nil {
-			return nil, fmt.Errorf("NewCLPARelayInsideOp err=%w", err)
+			return nil, fmt.Errorf("NewDynamicShardOp err=%w", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid consensus type=%s", cfg.ConsensusType)

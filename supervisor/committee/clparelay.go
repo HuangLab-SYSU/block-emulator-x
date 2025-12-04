@@ -145,7 +145,7 @@ func (c *CLPARelayCommittee) repartition(ctx context.Context) error {
 	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch)
 	// set epoch-synced to false
 	c.epochSynced = false
-
+	c.sl.stopCnt = 0
 	return nil
 }
 

@@ -2,6 +2,7 @@ package queue
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
@@ -60,6 +61,8 @@ func (t *TxPool) PackTxs(limit int) ([]transaction.Transaction, error) {
 	}
 
 	t.queue = q
+
+	slog.Debug("txs are packed from the tx pool", "packed tx size", len(packed), "tx pool size", len(q))
 
 	return packed, nil
 }

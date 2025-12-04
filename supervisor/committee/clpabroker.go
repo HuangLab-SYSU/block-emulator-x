@@ -138,6 +138,7 @@ func (c *CLPABrokerCommittee) repartition(ctx context.Context) error {
 	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch)
 	// set epoch-synced to false
 	c.epochSynced = false
+	c.sl.stopCnt = 0
 
 	return nil
 }
@@ -206,16 +207,17 @@ func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *mes
 	// update the stop module
 	if len(bInfo.InnerShardTxs)+len(bInfo.Broker1Txs)+len(bInfo.Broker2Txs) == 0 {
 		c.sl.stopCnt++
-	} else {
-		c.sl.stopCnt = 0 // reset 0 if there are transactions in a block
+		return
 	}
+
+	c.sl.stopCnt = 0 // reset 0 if there are transactions in a block
 
 	// update the clpa module - graph
 	for _, tx := range bInfo.InnerShardTxs {
 		c.state.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
 	}
 
-	for _, tx := range bInfo.Broker1Txs {
+	for _, tx := range bInfo.Broker2Txs {
 		c.state.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
 	}
 
@@ -239,5 +241,7 @@ func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *mes
 func (c *CLPABrokerCommittee) handleTxSendAgainMsg(ctx context.Context, tsa *message.BrokerCLPATxSendAgainMsg) {
 	if _, err := c.bManager.CreateRawTxsRandomBroker(tsa.Txs); err != nil {
 		slog.ErrorContext(ctx, "create raw tx failed", "err", err)
+		return
 	}
+	slog.Info("create raw txs from BrokerCLPATxSendAgainMsg", "tx size", len(tsa.Txs))
 }
