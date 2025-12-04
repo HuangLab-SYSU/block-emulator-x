@@ -206,6 +206,14 @@ func (c *CLPABrokerCommittee) getTxLocByCLPAState(tx transaction.Transaction) in
 }
 
 func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *message.BrokerBlockInfoMsg) {
+	if bInfo.ShardID >= c.cfg.ShardNum {
+		slog.ErrorContext(ctx, "block info msg is out of range", "shardID", bInfo.ShardID)
+		return
+	}
+
+	// update the clpa module - shardEpoch
+	c.shardEpoch[bInfo.ShardID] = max(c.shardEpoch[bInfo.ShardID], bInfo.Epoch)
+
 	// update the stop module
 	if len(bInfo.InnerShardTxs)+len(bInfo.Broker1Txs)+len(bInfo.Broker2Txs) == 0 {
 		c.sl.stopCnt++
