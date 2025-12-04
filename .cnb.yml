@@ -8,3 +8,32 @@ $:
       stages:
         - name: ls
           script: ls -al
+
+main:
+  pull_request:
+    - name: pipeline-golint
+      docker:
+        build: .ide/Dockerfile
+      stages:
+        - name: stage-version
+          script: go version
+        - name: stage-mod
+          script: go mod download
+        - name: stage-test
+          script: go test ./...
+        - name: stage-lint
+          script: golangci-lint run ./...
+
+    - name: commit-lint
+      stages:
+        - name: commit lint
+          image: cnbcool/commitlint
+
+  pull_request.mergeable:
+    - name: auto-merge
+      stages:
+        - name: CR 通过后自动合并
+          type: git:auto-merge
+          options:
+            mergeType: squash
+            removeSourceBranch: true
