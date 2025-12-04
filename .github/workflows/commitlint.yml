@@ -1,0 +1,20 @@
+name: Commitlint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, master]
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 必须是 0 才能读取全部 commit
+
+      - name: Run Commitlint
+        uses: wagoid/commitlint-github-action@v5
