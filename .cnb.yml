@@ -2,6 +2,9 @@ $:
   vscode:
     - docker:
         build: .ide/Dockerfile
+        volumes:
+          - /go/pkg/mod
+          - /root/.cache/go-build
       services:
         - vscode
         - docker
@@ -10,10 +13,13 @@ $:
           script: ls -al
 
 main:
-  pull_request:
+  pull_request: &pr-lint
     - name: pipeline-golint
       docker:
         build: .ide/Dockerfile
+        volumes:
+          - /go/pkg/mod
+          - /root/.cache/go-build
       stages:
         - name: stage-version
           script: go version
@@ -28,6 +34,9 @@ main:
       stages:
         - name: commit lint
           image: cnbcool/commitlint
+
+  push:
+    - <<: *pr-lint
 
   pull_request.mergeable:
     - name: auto-merge
