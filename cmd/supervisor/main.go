@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
@@ -12,9 +14,15 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/supervisor"
 )
 
-const supervisorWaitingTime = 8 * time.Second
+const (
+	supervisorWaitingTime = 8 * time.Second
+	pprofPortLowerBound   = 5000
+)
 
-var configPath = flag.String("config", "config.yaml", "path to config file")
+var (
+	configPath = flag.String("config", "config.yaml", "path to config file")
+	pprofPort  = flag.Int("pprof-port", 0, fmt.Sprintf("port to serve pprof; the port should be larger than %d", pprofPortLowerBound))
+)
 
 func main() {
 	flag.Parse()
@@ -27,6 +35,10 @@ func main() {
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		log.Fatal(fmt.Errorf("load config: %w", err))
+	}
+
+	if pprofPort != nil && *pprofPort >= pprofPortLowerBound {
+		go func() { log.Println(http.ListenAndServe(fmt.Sprintf(":%d", *pprofPort), nil)) }()
 	}
 
 	// set the default logger here
