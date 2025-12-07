@@ -371,6 +371,11 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 }
 
 func (n *Node) closeAll() {
+	slog.Info("consensus node is closing")
+
+	// wait a block-interval
+	time.Sleep(time.Duration(n.pbftMeta.cfg.BlockInterval) * time.Millisecond)
+
 	n.conn.Close()
 	n.iop.Close()
 	n.omh.Close()

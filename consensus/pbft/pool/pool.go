@@ -1,6 +1,8 @@
 package pool
 
 import (
+	"log/slog"
+
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
 )
 
@@ -31,6 +33,10 @@ func (m *MsgPool) ReadPreprepareMsg(endView, endSeq int64) []*message.Preprepare
 		ret = append(ret, top)
 	}
 
+	if len(ret) > 0 {
+		slog.Debug("read PreprepareMsg successfully", "endView", endView, "endSeq", endSeq, "fetched size", len(ret), "rest size", m.preprepares.Len())
+	}
+
 	return ret
 }
 
@@ -47,6 +53,10 @@ func (m *MsgPool) ReadPrepareMsg(endView, endSeq int64) []*message.PrepareMsg {
 		ret = append(ret, top)
 	}
 
+	if len(ret) > 0 {
+		slog.Debug("read PrepareMsg successfully", "endView", endView, "endSeq", endSeq, "fetched size", len(ret), "rest size", m.preprepares.Len())
+	}
+
 	return ret
 }
 
@@ -61,6 +71,10 @@ func (m *MsgPool) ReadCommitMsg(endView, endSeq int64) []*message.CommitMsg {
 		}
 
 		ret = append(ret, top)
+	}
+
+	if len(ret) > 0 {
+		slog.Debug("read CommitMsg successfully", "endView", endView, "endSeq", endSeq, "fetched size", len(ret), "rest size", m.preprepares.Len())
 	}
 
 	return ret

@@ -130,6 +130,8 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		if err = r.writeTxInfo(th, r.txLifecycles[string(th)]); err != nil {
 			slog.Error("writeTxInfo (relay tx) failed", "err", err)
 		}
+
+		delete(r.txLifecycles, string(th))
 	}
 
 	for _, tx := range bInfo.Relay1Txs {
@@ -150,6 +152,8 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			if err := r.writeTxInfo(tx.ROriginalHash, r.txLifecycles[strTxHash]); err != nil {
 				slog.Error("writeTxInfo (relay tx) failed", "err", err)
 			}
+
+			delete(r.txLifecycles, strTxHash)
 		}
 	}
 
@@ -171,6 +175,8 @@ func (r *RelayStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			if err := r.writeTxInfo(tx.ROriginalHash, r.txLifecycles[strTxHash]); err != nil {
 				slog.Error("writeTxInfo (relay tx) failed", "err", err)
 			}
+
+			delete(r.txLifecycles, strTxHash)
 		}
 	}
 

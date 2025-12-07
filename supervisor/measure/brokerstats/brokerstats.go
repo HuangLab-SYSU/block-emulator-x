@@ -130,6 +130,7 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 		}
 
 		b.innerShardTCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
+		delete(b.txLifecycles, string(th))
 	}
 
 	for _, tx := range bInfo.Broker1Txs {
@@ -154,6 +155,8 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			if err := b.writeTxInfo(tx.BOriginalHash, b.txLifecycles[strTxHash]); err != nil {
 				slog.Error("writeTxInfo (broker tx) failed", "err", err)
 			}
+
+			delete(b.txLifecycles, strTxHash)
 		}
 	}
 
@@ -179,6 +182,8 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			if err := b.writeTxInfo(tx.BOriginalHash, b.txLifecycles[strTxHash]); err != nil {
 				slog.Error("writeTxInfo (broker tx) failed", "err", err)
 			}
+
+			delete(b.txLifecycles, strTxHash)
 		}
 	}
 

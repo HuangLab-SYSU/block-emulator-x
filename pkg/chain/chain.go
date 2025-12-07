@@ -22,7 +22,7 @@ import (
 
 type Chain struct {
 	s         *storage.Storage
-	curHeader *block.Header
+	curHeader block.Header
 	shardID   int64
 	epochID   int64
 
@@ -43,7 +43,7 @@ func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
 		epochID:   0,
 		s:         s,
 		cfg:       cfg,
-		curHeader: &block.Header{},
+		curHeader: block.Header{},
 	}
 
 	genesisBlock, err := chain.initWithGenesisBlock()
@@ -51,13 +51,13 @@ func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
 		return nil, fmt.Errorf("create genesis block err: %w", err)
 	}
 
-	chain.curHeader = &genesisBlock.Header
+	chain.curHeader = genesisBlock.Header
 
 	return chain, nil
 }
 
 func (c *Chain) GetCurHeader() block.Header {
-	return *c.curHeader
+	return c.curHeader
 }
 
 // GenerateBlock reads the current storage and tries to generate a normal block to handle the transactions.
@@ -176,7 +176,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	}
 
 	// update the current header
-	c.curHeader = &b.Header
+	c.curHeader = b.Header
 
 	return nil
 }
