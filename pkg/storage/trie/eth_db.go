@@ -140,6 +140,9 @@ func (e *EthereumDefaultTrieDB) MAddAccountStatesAndCommit(_ context.Context, ke
 	}
 
 	e.curStateRoot = newRoot
+	if err = e.trieDB.Commit(newRoot, true); err != nil {
+		return nil, fmt.Errorf("commit trie db failed, err=%w", err)
+	}
 
 	return e.curStateRoot.Bytes(), nil
 }
