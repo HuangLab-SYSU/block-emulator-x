@@ -10,7 +10,12 @@ import (
 )
 
 const (
-	Key                      = "random_source"
+	Key = "random_source"
+
+	// accountPrefixZeroBytes is the number of zero bytes in the generated random accounts.
+	// The smaller accountPrefixZeroBytes is, the randomer the account addresses are.
+	accountPrefixZeroBytes = 18
+	// upperBoundTransferAmount is the upper bound of transfer number.
 	upperBoundTransferAmount = 1000
 )
 
@@ -37,9 +42,13 @@ func (r *RandomSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 func generateRandomTransaction(c int64) transaction.Transaction {
 	var sender, receiver account.Account
 
-	_, _ = rand.Read(sender.Addr[:])
-	_, _ = rand.Read(receiver.Addr[:])
+	for sender.Addr != receiver.Addr {
+		_, _ = rand.Read(sender.Addr[accountPrefixZeroBytes:])
+		_, _ = rand.Read(receiver.Addr[accountPrefixZeroBytes:])
+	}
+
 	amount, _ := rand.Int(rand.Reader, big.NewInt(upperBoundTransferAmount))
+	// The random transfer number should be at least 1.
 	amount.Add(amount, big.NewInt(1))
 
 	return *transaction.NewTransaction(sender, receiver, amount, uint64(c), time.Now())
