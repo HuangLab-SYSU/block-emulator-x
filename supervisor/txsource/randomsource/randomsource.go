@@ -42,8 +42,10 @@ func (r *RandomSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 func generateRandomTransaction(c int64) transaction.Transaction {
 	var sender, receiver account.Account
 
-	for sender.Addr != receiver.Addr {
-		_, _ = rand.Read(sender.Addr[accountPrefixZeroBytes:])
+	_, _ = rand.Read(sender.Addr[accountPrefixZeroBytes:])
+
+	_, _ = rand.Read(receiver.Addr[accountPrefixZeroBytes:])
+	for sender.Addr == receiver.Addr {
 		_, _ = rand.Read(receiver.Addr[accountPrefixZeroBytes:])
 	}
 
