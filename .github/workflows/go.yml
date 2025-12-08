@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [ "1.24" ]
+        go-version: [ "1.25" ]
     env:
       GO111MODULE: "on"
 
@@ -51,7 +51,7 @@ jobs:
       - name: Run unit tests (with coverage)
         run: |
           mkdir -p test-coverage
-          go test -v -covermode=atomic -coverprofile=test-coverage/coverage.out ./...
+          go test -v -covermode=atomic -coverprofile=test-coverage/coverage.out -gcflags=all='-N -l' ./...
 
       - name: Build binaries
         run: go build -v ./...

@@ -33,10 +33,9 @@ func TestChain(t *testing.T) {
 	cfg := getTestConfig()
 	// create test dir
 	err := os.MkdirAll(cfg.BoltCfg.FilePathDir, os.ModePerm)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clearChainStorage()
+	require.NoError(t, err)
+
+	t.Cleanup(func() { clearChainStorage() })
 
 	// create block
 	bc, err := NewChain(getTestConfig(), config.LocalParams{ShardID: 0})

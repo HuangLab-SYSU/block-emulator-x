@@ -14,9 +14,11 @@ import (
 func RunComplianceTests(t *testing.T, store Store, clear func() error) {
 	ctx := context.Background()
 
-	defer func() {
-		require.NoError(t, clear())
-	}()
+	t.Cleanup(func() {
+		if err := clear(); err != nil {
+			t.Fatalf("failed to remove test directory: %v", err)
+		}
+	})
 
 	// Predefined test constants
 	const (

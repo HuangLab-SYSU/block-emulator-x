@@ -16,10 +16,19 @@ import (
 const txSize = 10
 
 func TestBrokerStats_UpdateMeasureRecord(t *testing.T) {
+	_ = os.RemoveAll("test_dir")
 	b, err := NewBrokerStats("test_dir/")
-	defer func() { _ = os.RemoveAll("test_dir") }()
+
+	t.Cleanup(func() {
+		if err = os.RemoveAll("test_dir"); err != nil {
+			t.Fatalf("failed to remove test directory: %v", err)
+		}
+	})
+
 	require.NoError(t, err)
 	err = b.UpdateMeasureRecord(initInputMsg(t))
+	require.NoError(t, err)
+	err = b.OutputResultAndClose()
 	require.NoError(t, err)
 }
 

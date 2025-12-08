@@ -18,10 +18,19 @@ const (
 )
 
 func TestRelayStats_UpdateMeasureRecord(t *testing.T) {
-	b, err := NewRelayStats("test_dir/")
-	defer func() { _ = os.RemoveAll("test_dir") }()
+	_ = os.RemoveAll("test_dir")
+	r, err := NewRelayStats("test_dir/")
+
+	t.Cleanup(func() {
+		if err = os.RemoveAll("test_dir"); err != nil {
+			t.Fatalf("failed to remove test directory: %v", err)
+		}
+	})
+
 	require.NoError(t, err)
-	err = b.UpdateMeasureRecord(initInputMsg(t))
+	err = r.UpdateMeasureRecord(initInputMsg(t))
+	require.NoError(t, err)
+	err = r.OutputResultAndClose()
 	require.NoError(t, err)
 }
 

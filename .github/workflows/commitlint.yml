@@ -17,4 +17,4 @@ jobs:
           fetch-depth: 0  # 必须是 0 才能读取全部 commit
 
       - name: Run Commitlint
-        uses: wagoid/commitlint-github-action@v5
+        uses: wagoid/commitlint-github-action@v6
