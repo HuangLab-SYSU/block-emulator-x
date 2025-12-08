@@ -86,13 +86,17 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 	}
 
 	for i, acc := range accountsMigratedOut {
-		// If this shard is in this shard now, add this account to the dest shard.
-		srcShardID := states[i].ShardLocation
+		// If this shard is in not this shard, skip it
+		if states[i].ShardLocation != m.lp.ShardID {
+			continue
+		}
 
 		destShardID := int64(m.amm.CurModifiedMap[acc])
-		if srcShardID == m.lp.ShardID && destShardID != m.lp.ShardID {
-			atMsgList[destShardID].AccountStates[acc] = states[i]
+		if destShardID == m.lp.ShardID {
+			slog.Warn("unexpected CLPA result: destShardID == srcShardID", "ShardID", m.lp.ShardID)
 		}
+
+		atMsgList[destShardID].AccountStates[acc] = states[i]
 	}
 
 	sendMsgMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, len(atMsgList))

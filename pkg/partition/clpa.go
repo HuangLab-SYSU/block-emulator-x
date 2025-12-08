@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"math"
 	"slices"
+	"sync"
 )
 
 const updateThreshold = 50
@@ -21,6 +22,8 @@ type CLPAState struct {
 	maxIterations int     // hyperparameter, the max iteration times, for the \tau in the paper.
 	weightPenalty float64 // hyperparameter, the weight penalty, for the beta in the paper.
 	shardNum      int     // hyperparameter, the number of shards.
+
+	mux sync.Mutex
 }
 
 func NewCLPAState(wp float64, maxIterations, shardNum int) *CLPAState {
@@ -36,26 +39,18 @@ func NewCLPAState(wp float64, maxIterations, shardNum int) *CLPAState {
 	}
 }
 
-// AddVertex adds vertexes to the graph and locate it to a default shard.
-func (cs *CLPAState) AddVertex(v Vertex) {
-	cs.netGraph.AddVertex(v)
-
-	// if this vertex is not added before, add it to this map
-	if _, ok := cs.partitionMap[v]; !ok {
-		cs.partitionMap[v] = int(DefaultAccountLoc(v.Addr, int64(cs.shardNum)))
-		cs.vertexNumInShard[cs.partitionMap[v]]++
-	}
-}
-
 // AddEdge adds edges.
 // if the vertexes of this edge are not existed, add them first.
 func (cs *CLPAState) AddEdge(u, v Vertex) {
+	cs.mux.Lock()
+	defer cs.mux.Unlock()
+
 	if _, ok := cs.netGraph.VertexSet[u]; !ok {
-		cs.AddVertex(u)
+		cs.addVertex(u)
 	}
 
 	if _, ok := cs.netGraph.VertexSet[v]; !ok {
-		cs.AddVertex(v)
+		cs.addVertex(v)
 	}
 
 	cs.netGraph.AddEdge(u, v)
@@ -63,11 +58,10 @@ func (cs *CLPAState) AddEdge(u, v Vertex) {
 
 // GetVertexLocation gets the location of a vertex
 func (cs *CLPAState) GetVertexLocation(v Vertex) int {
-	if val, ok := cs.partitionMap[v]; ok {
-		return val
-	}
+	cs.mux.Lock()
+	defer cs.mux.Unlock()
 
-	return int(DefaultAccountLoc(v.Addr, int64(cs.shardNum)))
+	return cs.getVertexLocation(v)
 }
 
 // computeEdges2Shard calculates shardWeight according to current graph.
@@ -80,10 +74,10 @@ func (cs *CLPAState) computeEdges2Shard() {
 
 	for v, lst := range cs.netGraph.EdgeSet {
 		// get the shard of vertex v
-		vShard := cs.partitionMap[v]
+		vShard := cs.getVertexLocation(v)
 		for _, u := range lst {
 			// get the shard of vertex u
-			uShard := cs.partitionMap[u]
+			uShard := cs.getVertexLocation(u)
 			if vShard != uShard {
 				// if u and v are not in the same shard, increase shardWeight
 				// according to the equation (5) in the paper, calculate out-degree only.
@@ -110,9 +104,9 @@ func (cs *CLPAState) computeEdges2Shard() {
 
 // changeShardRecompute calculates each parameter when the locations of accounts are changed.
 func (cs *CLPAState) changeShardRecompute(v Vertex, old int) {
-	newShard := cs.partitionMap[v]
+	newShard := cs.getVertexLocation(v)
 	for _, u := range cs.netGraph.EdgeSet[v] {
-		uShard := cs.partitionMap[u]
+		uShard := cs.getVertexLocation(u)
 		if uShard != newShard && uShard != old {
 			cs.shardWeight[newShard] += 1.0
 			cs.shardWeight[old] -= 1.0
@@ -129,10 +123,15 @@ func (cs *CLPAState) changeShardRecompute(v Vertex, old int) {
 // CLPAPartition runs CLPA.
 func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	cs.computeEdges2Shard()
-	slog.Info("Before running CLPA", "cross-shard edge number: ", cs.crossShardEdgeNum)
+	slog.Info("before running CLPA", "cross-shard edge number: ", cs.crossShardEdgeNum)
 
+	originalLoc := make(map[[20]byte]int, len(cs.netGraph.VertexSet))
 	ret := make(map[[20]byte]int)
 	updateTimes := make(map[Vertex]int)
+
+	for v := range cs.netGraph.VertexSet {
+		originalLoc[v.Addr] = cs.getVertexLocation(v)
+	}
 
 	for range cs.maxIterations { // first loop, constraint the max iterations
 		for v := range cs.netGraph.VertexSet {
@@ -143,9 +142,12 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 			neighborShardScore := make(map[int]float64)
 			maxScore := -9999.0
 
-			vNowShard, maxScoreShard := cs.partitionMap[v], cs.partitionMap[v]
+			vNowShard, maxScoreShard := cs.getVertexLocation(v), cs.getVertexLocation(v)
 			for _, u := range cs.netGraph.EdgeSet[v] {
-				uShard := cs.partitionMap[u]
+				uShard := cs.getVertexLocation(u)
+				if uShard == vNowShard {
+					continue
+				}
 				// calculate only once for each neighbor shard.
 				if _, computed := neighborShardScore[uShard]; !computed {
 					neighborShardScore[uShard] = cs.getShardScore(v, uShard)
@@ -169,14 +171,33 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 		}
 	}
 
+	// Accounts may be migrated back into the original shard, thus prune the useless result in 'ret'.
+	for acc, loc := range originalLoc {
+		if ret[acc] == loc { // If the shard-location of this account is not changed
+			delete(ret, acc)
+		}
+	}
+
 	for sid, n := range cs.vertexNumInShard {
-		slog.Info("Vertex number in shard", "sharID", sid, "vertex number", n)
+		slog.Info("vertex number in shard", "sharID", sid, "vertex number", n)
 	}
 
 	cs.computeEdges2Shard()
-	slog.Info("After running CLPA", "cross-shard edge number", cs.crossShardEdgeNum)
+	slog.Info("after running CLPA", "cross-shard edge number", cs.crossShardEdgeNum)
 
 	return ret, cs.crossShardEdgeNum
+}
+
+// addVertex adds vertexes to the graph and locate it to a default shard.
+func (cs *CLPAState) addVertex(v Vertex) {
+	cs.netGraph.AddVertex(v)
+
+	// if this vertex is not added before, add it to this map
+	if _, ok := cs.partitionMap[v]; !ok {
+		loc := int(DefaultAccountLoc(v.Addr, int64(cs.shardNum)))
+		cs.partitionMap[v] = loc
+		cs.vertexNumInShard[loc]++
+	}
 }
 
 // getShardScore calculate the earning score that moving vertex v to uShard.
@@ -187,7 +208,7 @@ func (cs *CLPAState) getShardScore(v Vertex, uShard int) float64 {
 	edge2uShard := 0
 
 	for _, item := range cs.netGraph.EdgeSet[v] {
-		if cs.partitionMap[item] == uShard {
+		if cs.getVertexLocation(item) == uShard {
 			edge2uShard++
 		}
 	}
@@ -195,4 +216,12 @@ func (cs *CLPAState) getShardScore(v Vertex, uShard int) float64 {
 	score := float64(edge2uShard) / float64(vOutdegree) * (1 - cs.weightPenalty*cs.shardWeight[uShard]/cs.minShardWeight)
 
 	return score
+}
+
+func (cs *CLPAState) getVertexLocation(v Vertex) int {
+	if val, ok := cs.partitionMap[v]; ok {
+		return val
+	}
+
+	return int(DefaultAccountLoc(v.Addr, int64(cs.shardNum)))
 }

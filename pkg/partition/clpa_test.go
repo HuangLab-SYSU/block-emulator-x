@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const (
-	edgesNum      = 10000
+	edgesNum      = 30000
 	vertexNum     = 100
 	w             = 0.5
 	maxIterations = 100
@@ -20,7 +22,11 @@ func TestCLPA(t *testing.T) {
 	for _, e := range edges {
 		c.AddEdge(e[0], e[1])
 	}
-	c.CLPAPartition()
+
+	result, _ := c.CLPAPartition()
+	for k, v := range result {
+		require.NotEqual(t, DefaultAccountLoc(k, shardNum), int64(v))
+	}
 }
 
 func generateRandomEdges() [][]Vertex {
