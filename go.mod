@@ -1,6 +1,6 @@
 module github.com/HuangLab-SYSU/block-emulator
 
-go 1.25.1
+go 1.24.1
 
 require (
 	github.com/bits-and-blooms/bitset v1.24.4
