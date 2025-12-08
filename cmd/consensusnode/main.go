@@ -21,7 +21,8 @@ const (
 
 var (
 	configPath = flag.String("config", "config.yaml", "path to config file")
-	pprofPort  = flag.Int("pprof-port", 0, fmt.Sprintf("port to serve pprof; the port should be larger than %d", pprofPortLowerBound))
+	// pprof is a tool to sample the program and collect the runtime data.
+	pprofPort = flag.Int("pprof-port", 0, fmt.Sprintf("port to serve pprof; the port should be larger than %d", pprofPortLowerBound))
 )
 
 func main() {

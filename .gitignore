@@ -16,3 +16,4 @@ exp
 # Do not upload large files!
 **.zip
 **.csv
+**.out
