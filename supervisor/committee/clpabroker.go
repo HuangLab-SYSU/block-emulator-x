@@ -20,7 +20,7 @@ import (
 )
 
 type CLPABrokerCommittee struct {
-	conn *network.P2PConn
+	conn *network.ConnHandler
 	r    nodetopo.NodeMapper
 
 	clpaComponent
@@ -33,7 +33,7 @@ type CLPABrokerCommittee struct {
 	cfg config.SupervisorCfg
 }
 
-func NewCLPABrokerCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*CLPABrokerCommittee, error) {
+func NewCLPABrokerCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*CLPABrokerCommittee, error) {
 	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)

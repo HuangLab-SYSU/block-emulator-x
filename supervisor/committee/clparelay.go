@@ -19,7 +19,7 @@ import (
 )
 
 type CLPARelayCommittee struct {
-	conn *network.P2PConn
+	conn *network.ConnHandler
 	r    nodetopo.NodeMapper
 
 	clpaComponent
@@ -31,7 +31,7 @@ type CLPARelayCommittee struct {
 	cfg config.SupervisorCfg
 }
 
-func NewCLPARelayCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*CLPARelayCommittee, error) {
+func NewCLPARelayCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*CLPARelayCommittee, error) {
 	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)

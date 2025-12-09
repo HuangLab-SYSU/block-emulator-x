@@ -17,14 +17,14 @@ import (
 
 type RelayTxBlockOp struct {
 	c        *chain.Chain
-	conn     *network.P2PConn
+	conn     *network.ConnHandler
 	resolver nodetopo.NodeMapper
 
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewRelayTxBlockOp(c *chain.Chain, conn *network.P2PConn, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *RelayTxBlockOp {
+func NewRelayTxBlockOp(c *chain.Chain, conn *network.ConnHandler, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *RelayTxBlockOp {
 	return &RelayTxBlockOp{c: c, conn: conn, resolver: rs, cfg: cfg, lp: lp}
 }
 

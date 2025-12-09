@@ -11,6 +11,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/logger"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/supervisor"
 )
 
@@ -54,7 +55,9 @@ func main() {
 		log.Fatal(fmt.Errorf("getNetworkAndNodeTopo: %w", err))
 	}
 
-	spv, err := supervisor.NewSupervisor(p2p, nodeM, cfg.SupervisorCfg)
+	networkConn := network.NewConnHandler(p2p)
+
+	spv, err := supervisor.NewSupervisor(networkConn, nodeM, cfg.SupervisorCfg)
 	if err != nil {
 		log.Fatal(fmt.Errorf("supervisor.NewSupervisor error: %w", err))
 	}

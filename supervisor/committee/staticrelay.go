@@ -17,8 +17,8 @@ import (
 )
 
 type StaticRelayCommittee struct {
-	r    nodetopo.NodeMapper // r give the information of other nodes.
-	conn *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
+	r    nodetopo.NodeMapper  // r give the information of other nodes.
+	conn *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
 
 	txSource    txsource.TxSource // txSource brings the txs into the blockchain system.
 	sl          stopLogic         // sl is the logic of stop.
@@ -27,7 +27,7 @@ type StaticRelayCommittee struct {
 	cfg config.SupervisorCfg
 }
 
-func NewStaticRelayCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*StaticRelayCommittee, error) {
+func NewStaticRelayCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*StaticRelayCommittee, error) {
 	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)

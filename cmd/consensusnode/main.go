@@ -12,6 +12,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/logger"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 )
 
 const (
@@ -54,7 +55,9 @@ func main() {
 		log.Fatal(fmt.Errorf("getNetworkAndNodeTopo: %w", err))
 	}
 
-	consensusNode, err := pbft.NewPBFTNode(p2p, nodeM, cfg.ConsensusNodeCfg, *lp)
+	networkConn := network.NewConnHandler(p2p)
+
+	consensusNode, err := pbft.NewPBFTNode(networkConn, nodeM, cfg.ConsensusNodeCfg, *lp)
 	if err != nil {
 		log.Fatal(fmt.Errorf("newPBFTNode: %w", err))
 	}

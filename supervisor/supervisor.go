@@ -22,8 +22,8 @@ import (
 const wmBufferSize = 1 << 16
 
 type Supervisor struct {
-	r    nodetopo.NodeMapper // r give the information of other nodes.
-	conn *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
+	r    nodetopo.NodeMapper  // r give the information of other nodes.
+	conn *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
 
 	measure     measure.Measure            // measure is the stats' module.
 	committee   committee.Committee        // committee controls the message sending and some consensus algorithms.
@@ -33,7 +33,7 @@ type Supervisor struct {
 	cfg config.SupervisorCfg
 }
 
-func NewSupervisor(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*Supervisor, error) {
+func NewSupervisor(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*Supervisor, error) {
 	if meShardID := conn.GetMeNodeInfo().ShardID; meShardID != nodetopo.SupervisorShardID {
 		return nil, fmt.Errorf("invalid shardID for a supervisor node, expeted=0x%x, actually=0x%x", nodetopo.SupervisorShardID, meShardID)
 	}

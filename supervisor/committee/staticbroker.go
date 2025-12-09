@@ -19,8 +19,8 @@ import (
 )
 
 type StaticBrokerCommittee struct {
-	r    nodetopo.NodeMapper // r give the information of other nodes.
-	conn *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
+	r    nodetopo.NodeMapper  // r give the information of other nodes.
+	conn *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
 
 	bManager *broker.Manager // bManager controls the brokers and their states.
 
@@ -31,7 +31,7 @@ type StaticBrokerCommittee struct {
 	cfg config.SupervisorCfg
 }
 
-func NewStaticBrokerCommittee(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*StaticBrokerCommittee, error) {
+func NewStaticBrokerCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*StaticBrokerCommittee, error) {
 	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)

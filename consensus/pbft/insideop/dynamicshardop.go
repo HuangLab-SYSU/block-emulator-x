@@ -29,8 +29,8 @@ const (
 type DynamicShardOp struct {
 	amm *migration.AccMigrateMetadata
 
-	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
-	resolver nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
+	conn     *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
+	resolver nodetopo.NodeMapper  // resolver gives the information of all consensus nodes and shards.
 
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.
@@ -43,10 +43,7 @@ type DynamicShardOp struct {
 	lp  config.LocalParams
 }
 
-func NewDynamicShardOp(conn *network.P2PConn, resolver nodetopo.NodeMapper,
-	chain *chain.Chain, txPool txpool.TxPool, amm *migration.AccMigrateMetadata,
-	cfg config.ConsensusNodeCfg, lp config.LocalParams,
-) (*DynamicShardOp, error) {
+func NewDynamicShardOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, amm *migration.AccMigrateMetadata, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*DynamicShardOp, error) {
 	tbo, err := txblockop.NewTxBlockOp(conn, resolver, chain, cfg, lp)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxBlockOp: %w", err)

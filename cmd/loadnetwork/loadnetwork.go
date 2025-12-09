@@ -9,12 +9,13 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
+	"github.com/HuangLab-SYSU/block-emulator/pkg/network/clientconnrpc"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 )
 
 var ipTablePath = flag.String("ip_table", "ip_table.json", "path to ip_table.json")
 
-func GetNetworkAndNodeInfo(lp *config.LocalParams) (*network.P2PConn, nodetopo.NodeMapper, error) {
+func GetNetworkAndNodeInfo(lp *config.LocalParams) (network.P2PConn, nodetopo.NodeMapper, error) {
 	info2Host, err := readIpTableFromFile()
 	if err != nil {
 		return nil, nil, fmt.Errorf("getNetworkAndNodeTopo: %w", err)
@@ -25,7 +26,8 @@ func GetNetworkAndNodeInfo(lp *config.LocalParams) (*network.P2PConn, nodetopo.N
 		info2Host[nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}])
 	meNode := nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}
 
-	p2p := network.NewP2PConn(meNode, info2Host)
+	// Set an RPC Connection as the P2P Connection.
+	p2p := clientconnrpc.NewRPCConn(meNode, info2Host)
 	shardNodeInfo := make(map[int64][]nodetopo.NodeInfo)
 	shardLeader := make(map[int64]nodetopo.NodeInfo)
 

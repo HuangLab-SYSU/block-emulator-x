@@ -17,14 +17,14 @@ import (
 
 type BrokerTxBlockOp struct {
 	c        *chain.Chain
-	conn     *network.P2PConn
+	conn     *network.ConnHandler
 	resolver nodetopo.NodeMapper
 
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewBrokerTxBlockOp(c *chain.Chain, conn *network.P2PConn, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *BrokerTxBlockOp {
+func NewBrokerTxBlockOp(c *chain.Chain, conn *network.ConnHandler, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *BrokerTxBlockOp {
 	return &BrokerTxBlockOp{c: c, conn: conn, resolver: rs, cfg: cfg, lp: lp}
 }
 

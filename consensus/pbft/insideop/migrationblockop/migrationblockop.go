@@ -7,21 +7,22 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
+
 	"github.com/HuangLab-SYSU/block-emulator/config"
 	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 )
 
 type MigrationBlockOp struct {
 	amm      *migration.AccMigrateMetadata
-	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
-	resolver nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
+	conn     *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
+	resolver nodetopo.NodeMapper  // resolver gives the information of all consensus nodes and shards.
 
 	chain *chain.Chain // chain is the data-structure of blockchain.
 
@@ -29,10 +30,7 @@ type MigrationBlockOp struct {
 	lp  config.LocalParams
 }
 
-func NewMigrationBlockOp(conn *network.P2PConn, resolver nodetopo.NodeMapper,
-	chain *chain.Chain, amm *migration.AccMigrateMetadata,
-	cfg config.ConsensusNodeCfg, lp config.LocalParams,
-) *MigrationBlockOp {
+func NewMigrationBlockOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, amm *migration.AccMigrateMetadata, cfg config.ConsensusNodeCfg, lp config.LocalParams) *MigrationBlockOp {
 	return &MigrationBlockOp{amm: amm, conn: conn, resolver: resolver, chain: chain, lp: lp, cfg: cfg}
 }
 

@@ -29,9 +29,9 @@ const (
 
 // Node is the node running the PBFT consensus.
 type Node struct {
-	conn     *network.P2PConn    // conn is the p2p-connections among consensus nodes, i.e., network layer.
-	resolver nodetopo.NodeMapper // resolver gives the information of all consensus nodes and shards.
-	pbftMeta *consensusMeta      // pbftMeta is the current consensus procedure
+	conn     *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
+	resolver nodetopo.NodeMapper  // resolver gives the information of all consensus nodes and shards.
+	pbftMeta *consensusMeta       // pbftMeta is the current consensus procedure
 
 	iop insideop.ShardInsideOp
 	omh outsideop.ShardOutsideMsgHandler
@@ -40,7 +40,7 @@ type Node struct {
 }
 
 // NewPBFTNode creates a new node running PBFT consensus with given configurations.
-func NewPBFTNode(conn *network.P2PConn, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*Node, error) {
+func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*Node, error) {
 	if cfg.ShardNum <= 0 || cfg.ShardNum <= lp.ShardID {
 		return nil, fmt.Errorf("invalid shardID=%d", lp.ShardID)
 	}

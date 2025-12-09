@@ -26,7 +26,7 @@ type StaticShardOp struct {
 	cfg config.ConsensusNodeCfg
 }
 
-func NewStaticShardOp(conn *network.P2PConn, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*StaticShardOp, error) {
+func NewStaticShardOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*StaticShardOp, error) {
 	tbo, err := txblockop.NewTxBlockOp(conn, resolver, chain, cfg, lp)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxBlockOp: %w", err)
