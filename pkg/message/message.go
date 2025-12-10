@@ -10,7 +10,6 @@ import (
 )
 
 // WrapMsg encodes different types of messages.
-// Note that this function's input should be a pointer
 func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
 	msgType, err := getMsgType(msg)
 	if err != nil {
@@ -49,28 +48,28 @@ func getMsgType(msg any) (string, error) {
 	var msgType string
 
 	switch msg.(type) {
-	case *StopConsensusMsg:
+	case *StopConsensusMsg, StopConsensusMsg:
 		msgType = StopConsensusMessageType
 
-	case *PreprepareMsg:
+	case *PreprepareMsg, PreprepareMsg:
 		msgType = PreprepareMessageType
-	case *PrepareMsg:
+	case *PrepareMsg, PrepareMsg:
 		msgType = PrepareMessageType
-	case *CommitMsg:
+	case *CommitMsg, CommitMsg:
 		msgType = CommitMessageType
-	case *ReceiveTxsMsg:
+	case *ReceiveTxsMsg, ReceiveTxsMsg:
 		msgType = ReceiveTxsMessageType
-	case *RelayBlockInfoMsg:
+	case *RelayBlockInfoMsg, RelayBlockInfoMsg:
 		msgType = RelayBlockInfoMessageType
 
-	case *BrokerBlockInfoMsg:
+	case *BrokerBlockInfoMsg, BrokerBlockInfoMsg:
 		msgType = BrokerBlockInfoMessageType
-	case *BrokerCLPATxSendAgainMsg:
+	case *BrokerCLPATxSendAgainMsg, BrokerCLPATxSendAgainMsg:
 		msgType = BrokerCLPATxSendAgainMessageType
 
-	case *CLPARepartitionStartMsg:
+	case *CLPARepartitionStartMsg, CLPARepartitionStartMsg:
 		msgType = CLPARepartitionStartMessageType
-	case *AccountMigrationMsg:
+	case *AccountMigrationMsg, AccountMigrationMsg:
 		msgType = AccountMigrationMessageType
 
 	default:

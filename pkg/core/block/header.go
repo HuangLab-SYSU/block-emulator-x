@@ -23,15 +23,15 @@ type Header struct {
 
 // TxHeaderOpt is the struct for transaction handling.
 // This struct should be used when this block is a normal one (not a block for account migration).
-// Note that, either the variables in TxHeaderOpt or those in MigrationHeaderOpt is nil.
+// Note that either the variables in TxHeaderOpt or those in MigrationHeaderOpt are nil.
 type TxHeaderOpt struct {
 	TxRoot []byte
 	Bloom  bloom.Filter
 }
 
 // MigrationHeaderOpt is the struct for the account migration.
-// This struct should be used when this block is account migration.
-// Note that, either the variables in MigrationHeaderOpt or those in TxHeaderOpt is nil.
+// This struct should be used when this block is an account migration one.
+// Note that either the variables in MigrationHeaderOpt or those in TxHeaderOpt are nil.
 type MigrationHeaderOpt struct {
 	MigratedAccountsRoot []byte // MigratedAccountsRoot is the merkle root of MigratedAccounts in MigrationOpt.
 }

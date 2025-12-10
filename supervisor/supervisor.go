@@ -34,10 +34,6 @@ type Supervisor struct {
 }
 
 func NewSupervisor(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*Supervisor, error) {
-	if meShardID := conn.GetMeNodeInfo().ShardID; meShardID != nodetopo.SupervisorShardID {
-		return nil, fmt.Errorf("invalid shardID for a supervisor node, expeted=0x%x, actually=0x%x", nodetopo.SupervisorShardID, meShardID)
-	}
-
 	var (
 		ms  measure.Measure
 		com committee.Committee

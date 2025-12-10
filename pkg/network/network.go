@@ -8,10 +8,13 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
 )
 
+// P2PConn is a peer-to-peer connection that should contain a message buffer.
 type P2PConn interface {
+	// StartServer starts to listen to messages from other nodes as a server.
 	StartServer() error
-	GetMeNodeInfo() nodetopo.NodeInfo
+	// ReadMsgBuffer reads messages from the buffer.
 	ReadMsgBuffer() []*rpcserver.WrappedMsg
+	// SendMessage sends the given message to the given dest node.
 	SendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg)
 	Close()
 }

@@ -20,9 +20,10 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator/pkg/storage"
 )
 
+// Chain describes a blockchain.
 type Chain struct {
-	s         *storage.Storage
-	curHeader block.Header
+	s         *storage.Storage // the storage for both block-storage and trie-storage.
+	curHeader block.Header     // the current header in this blockchain.
 	shardID   int64
 	epochID   int64
 
@@ -165,7 +166,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	}
 
 	// Update trie in db.
-	if _, err = c.updateTrieByTxs(ctx, b); err != nil {
+	if _, err = c.updateTrieByBlock(ctx, b); err != nil {
 		return fmt.Errorf("update trie err: %w", err)
 	}
 
@@ -323,7 +324,7 @@ func (c *Chain) previewTrieUpdatedByMigration(ctx context.Context, accounts []ac
 	return root, nil
 }
 
-func (c *Chain) updateTrieByTxs(ctx context.Context, b *block.Block) ([]byte, error) {
+func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, error) {
 	var keys, values [][]byte
 
 	if b.TxRoot != nil { // transaction block

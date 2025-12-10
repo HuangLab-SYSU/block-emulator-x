@@ -73,10 +73,6 @@ func (r *RPCConn) HandleMessage(_ context.Context, req *rpcserver.HandleMessageR
 	return &rpcserver.HandleMessageResponse{Ack: true}, nil
 }
 
-func (r *RPCConn) GetMeNodeInfo() nodetopo.NodeInfo {
-	return r.me
-}
-
 func (r *RPCConn) ReadMsgBuffer() []*rpcserver.WrappedMsg {
 	r.mux.Lock()
 	defer r.mux.Unlock()

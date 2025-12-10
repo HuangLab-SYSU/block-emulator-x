@@ -32,8 +32,8 @@ type Transaction struct {
 	Signature  Signature
 	CreateTime time.Time
 
-	RelayTxOpt
-	BrokerTxOpt
+	RelayTxOpt  // the optional setting only for relay transactions.
+	BrokerTxOpt // the optional setting only for broker transactions.
 }
 
 type RelayTxOpt struct {

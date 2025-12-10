@@ -13,7 +13,7 @@ type Store interface {
 	// (3) adding the block into the storage.
 	// These 3 operations must be atomic.
 	AddBlock(ctx context.Context, blockHash, encodedBlock, encodedBlockHeader []byte) error
-	// GetBlockByHash gets the block according to its Hash.
+	// GetBlockByHash returns the block with the given Hash.
 	GetBlockByHash(ctx context.Context, blockHash []byte) ([]byte, error)
 
 	// AddBlockHeader adds the header of a block into the database. It contains the operations of
