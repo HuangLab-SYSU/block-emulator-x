@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"runtime"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
@@ -106,8 +105,6 @@ func NewSupervisor(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.
 func (s *Supervisor) Start() error {
 	tk := time.NewTicker(time.Second)
 
-	var m runtime.MemStats
-
 	go s.measureSubroutine()
 
 	defer tk.Stop()
@@ -120,9 +117,6 @@ func (s *Supervisor) Start() error {
 		}
 
 		ctx := context.Background()
-
-		runtime.ReadMemStats(&m)
-		slog.Debug("running consensus", "memo used", m.Alloc>>20, "go routines", runtime.NumGoroutine())
 
 		// handle messages from connections first
 		msgList := s.conn.ReadMsgBuffer()

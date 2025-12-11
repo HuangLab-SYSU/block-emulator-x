@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log/slog"
-	"runtime"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
@@ -108,17 +107,12 @@ func (n *Node) run() {
 	runTicker := time.NewTicker(executeInterval)
 	defer runTicker.Stop()
 
-	var m runtime.MemStats
-
 	for range runTicker.C {
 		ctx := context.Background()
 		// if the node is closed, break it
 		if n.pbftMeta.closed {
 			break
 		}
-
-		runtime.ReadMemStats(&m)
-		slog.Debug("running consensus", "memo used", m.Alloc>>20, "go routines", runtime.NumGoroutine())
 
 		// fetch messages from buffer to pool
 		msgList := n.conn.ReadMsgBuffer()

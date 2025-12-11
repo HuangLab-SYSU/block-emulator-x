@@ -42,6 +42,8 @@ func InitLogger(lp *config.LocalParams, cfg config.LogCfg) error {
 	slogger := slog.New(handler).With("NodeInfo", fmt.Sprintf(nodeInfoPrintFmt, lp.ShardID, lp.NodeID))
 	slog.SetDefault(slogger)
 
+	go resourceLog()
+
 	return nil
 }
 
