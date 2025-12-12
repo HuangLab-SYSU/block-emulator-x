@@ -26,8 +26,9 @@ type LocalParams struct {
 	WalletAddr account.Address
 }
 
-// local parameters are defined here, read from command lines.
+// local parameters are defined here, and they are read from command lines.
 var (
+	//
 	localNodeID  = flag.Int64("node_id", -1, "local node id")
 	localShardID = flag.Int64("shard_id", -1, "local shard id, 0x7fffffff denotes the supervisor shard")
 	accountAddr  = flag.String("account_addr", "", "miner address")

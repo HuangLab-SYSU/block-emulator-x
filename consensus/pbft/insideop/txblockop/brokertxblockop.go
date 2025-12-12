@@ -109,7 +109,7 @@ func (bto *BrokerTxBlockOp) deliverBlockInfo2Supervisor(ctx context.Context, b b
 		return fmt.Errorf("GetSupervisor failed: %w", err)
 	}
 
-	go bto.conn.SendMessage(ctx, spv, w)
+	go bto.conn.SendMsg2Dest(ctx, spv, w)
 
 	return nil
 }

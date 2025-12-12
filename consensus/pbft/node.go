@@ -115,7 +115,7 @@ func (n *Node) run() {
 		}
 
 		// fetch messages from buffer to pool
-		msgList := n.conn.ReadMsgBuffer()
+		msgList := n.conn.DrainMsgBuffer()
 		for _, msg := range msgList {
 			err := n.handleMessage(ctx, msg)
 			if err != nil {

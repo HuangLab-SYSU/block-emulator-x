@@ -10,12 +10,12 @@ import (
 
 // P2PConn is a peer-to-peer connection that should contain a message buffer.
 type P2PConn interface {
-	// StartServer starts to listen to messages from other nodes as a server.
-	StartServer() error
-	// ReadMsgBuffer reads messages from the buffer.
-	ReadMsgBuffer() []*rpcserver.WrappedMsg
-	// SendMessage sends the given message to the given dest node.
-	SendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg)
+	// ListenStart starts to listen to messages from other nodes as a server.
+	ListenStart() error
+	// DrainMsgBuffer drains (reads all and pops) messages in the buffer.
+	DrainMsgBuffer() []*rpcserver.WrappedMsg
+	// SendMsg2Dest sends the given message to the given dest node.
+	SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg)
 	Close()
 }
 
@@ -35,7 +35,7 @@ func (p *ConnHandler) MSendDifferentMessages(ctx context.Context, node2Msg map[n
 		go func(node nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
 			defer wg.Done()
 
-			p.SendMessage(ctx, node, msg)
+			p.SendMsg2Dest(ctx, node, msg)
 		}(node, msg)
 	}
 
@@ -50,7 +50,7 @@ func (p *ConnHandler) GroupBroadcastMessage(ctx context.Context, group []nodetop
 		go func(nif nodetopo.NodeInfo) {
 			defer wg.Done()
 
-			p.SendMessage(ctx, nif, msg)
+			p.SendMsg2Dest(ctx, nif, msg)
 		}(node)
 	}
 

@@ -24,12 +24,16 @@ type clientConnection struct {
 	client rpcserver.ReplicaConnClient
 }
 
+// RPCConn implements the interfaces 'P2PConn'.
+// It is based on the fixed IPs defined in the map `info2Host`.
+// RPCConn also implements the interface 'ReplicaConnServer', which is used to start a gRPC server, thus
+// it can listen messages from other nodes by gRPC.
 type RPCConn struct {
 	mux sync.Mutex
 
-	me        nodetopo.NodeInfo
-	info2Host map[nodetopo.NodeInfo]string
-	msgBuffer chan *rpcserver.WrappedMsg
+	me        nodetopo.NodeInfo            // the NodeInfo of this node
+	info2Host map[nodetopo.NodeInfo]string // the mapper from the NodeInfos to the node hosts
+	msgBuffer chan *rpcserver.WrappedMsg   // the buffer of a set of WrappedMsg
 
 	connLock   sync.Mutex
 	clientPool map[nodetopo.NodeInfo]*clientConnection
@@ -46,7 +50,7 @@ func NewRPCConn(me nodetopo.NodeInfo, info2Host map[nodetopo.NodeInfo]string) *R
 	}
 }
 
-func (r *RPCConn) StartServer() error {
+func (r *RPCConn) ListenStart() error {
 	listenAddr := r.info2Host[r.me]
 
 	lis, err := net.Listen("tcp", listenAddr)
@@ -73,7 +77,7 @@ func (r *RPCConn) HandleMessage(_ context.Context, req *rpcserver.HandleMessageR
 	return &rpcserver.HandleMessageResponse{Ack: true}, nil
 }
 
-func (r *RPCConn) ReadMsgBuffer() []*rpcserver.WrappedMsg {
+func (r *RPCConn) DrainMsgBuffer() []*rpcserver.WrappedMsg {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 
@@ -89,10 +93,10 @@ func (r *RPCConn) ReadMsgBuffer() []*rpcserver.WrappedMsg {
 	}
 }
 
-func (r *RPCConn) SendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
+func (r *RPCConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
 	err := r.sendMessage(ctx, dest, msg)
 	if err != nil {
-		slog.ErrorContext(ctx, "SendMessage failed", "dest", dest, "err", err)
+		slog.ErrorContext(ctx, "SendMsg2Dest failed", "dest", dest, "err", err)
 	}
 }
 
@@ -139,7 +143,7 @@ func (r *RPCConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 		conn, err := grpc.NewClient(r.info2Host[dest], grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(msgSizeLimit), grpc.MaxCallSendMsgSize(msgSizeLimit)))
 		if err != nil {
-			return fmt.Errorf("grpc client fail to connect: %w", err)
+			return fmt.Errorf("gRPC client fail to connect: %w", err)
 		}
 
 		r.clientPool[dest] = &clientConnection{conn, rpcserver.NewReplicaConnClient(conn)}
@@ -151,7 +155,7 @@ func (r *RPCConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 		To:   &rpcserver.NodePosition{ShardID: dest.ShardID, NodeID: dest.NodeID},
 	})
 	if err != nil {
-		return fmt.Errorf("grpc client fail to send message, type: %s, err: %w", msg.GetMsgType(), err)
+		return fmt.Errorf("gRPC client fail to send message, type: %s, err: %w", msg.GetMsgType(), err)
 	}
 
 	return nil

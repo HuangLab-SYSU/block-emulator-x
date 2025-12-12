@@ -119,7 +119,7 @@ func (s *Supervisor) Start() error {
 		ctx := context.Background()
 
 		// handle messages from connections first
-		msgList := s.conn.ReadMsgBuffer()
+		msgList := s.conn.DrainMsgBuffer()
 
 		for _, msg := range msgList {
 			// handle messages in measure module, this is run in another routine (measure routine)

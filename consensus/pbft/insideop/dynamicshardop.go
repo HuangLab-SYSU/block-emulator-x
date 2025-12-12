@@ -470,7 +470,7 @@ func (c *DynamicShardOp) brokerCLPATxSendAgain(ctx context.Context, txSentAgain 
 		return fmt.Errorf("GetSupervisor failed: %w", err)
 	}
 
-	go c.conn.SendMessage(ctx, s, w)
+	go c.conn.SendMsg2Dest(ctx, s, w)
 
 	return nil
 }

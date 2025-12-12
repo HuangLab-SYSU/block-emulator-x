@@ -45,26 +45,26 @@ func main() {
 
 	// set the default logger here
 	if err = logger.InitLogger(lp, cfg.LogCfg); err != nil {
-		log.Fatal(fmt.Errorf("init logger: %w", err))
+		log.Fatal(fmt.Errorf("init logger failed: %w", err))
 	}
 
 	defer logger.CloseLoggerFile()
 
 	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(lp)
 	if err != nil {
-		log.Fatal(fmt.Errorf("getNetworkAndNodeTopo: %w", err))
+		log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
 	}
 
 	networkConn := network.NewConnHandler(p2p)
 
 	spv, err := supervisor.NewSupervisor(networkConn, nodeM, cfg.SupervisorCfg)
 	if err != nil {
-		log.Fatal(fmt.Errorf("supervisor.NewSupervisor error: %w", err))
+		log.Fatal(fmt.Errorf("new a supervisor failed: %w", err))
 	}
 
-	// start grpc server
+	// start gRPC server
 	go func() {
-		if err = p2p.StartServer(); err != nil {
+		if err = p2p.ListenStart(); err != nil {
 			log.Fatal(fmt.Errorf("startServer: %w", err))
 		}
 	}()

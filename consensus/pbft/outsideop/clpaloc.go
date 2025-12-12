@@ -34,7 +34,7 @@ func (c *CLPALocOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpcse
 			return fmt.Errorf("tx pool add txs: %w", err)
 		}
 
-		slog.InfoContext(ctx, "Received txs are added in the tx pool successfully", "tx size", len(rt.Txs))
+		slog.InfoContext(ctx, "received txs are added in the tx pool successfully", "tx size", len(rt.Txs))
 
 	case message.CLPARepartitionStartMessageType:
 		var cr message.CLPARepartitionStartMsg

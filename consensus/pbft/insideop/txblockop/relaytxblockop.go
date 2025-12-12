@@ -172,7 +172,7 @@ func (r *RelayTxBlockOp) deliverBlockInfo2Supervisor(ctx context.Context, innerT
 		return fmt.Errorf("GetSupervisor failed: %w", err)
 	}
 
-	go r.conn.SendMessage(ctx, spv, w)
+	go r.conn.SendMsg2Dest(ctx, spv, w)
 
 	return nil
 }
