@@ -422,7 +422,7 @@ func (c *DynamicShardOp) getBrokerTxDestLocByModifiedMap(tx transaction.Transact
 	return supervisorShardID
 }
 
-func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, accountLoc map[account.Account]int64) int64 {
+func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, accountLoc map[account.Address]int64) int64 {
 	sDestShard, sExist := accountLoc[tx.Sender]
 	rDestShard, rExist := accountLoc[tx.Recipient]
 

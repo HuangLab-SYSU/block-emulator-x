@@ -92,5 +92,5 @@ func (s *StaticRelayCommittee) readTxsAndSend(ctx context.Context) error {
 }
 
 func (s *StaticRelayCommittee) getTxLoc(tx transaction.Transaction) int64 {
-	return partition.DefaultAccountLoc(tx.Sender.Addr, s.cfg.ShardNum)
+	return partition.DefaultAccountLoc(tx.Sender, s.cfg.ShardNum)
 }

@@ -51,10 +51,10 @@ func packShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLo
 	return shardTxs
 }
 
-func transferMapAddr2Account(src map[[20]byte]int) map[account.Account]int {
-	dest := make(map[account.Account]int, len(src))
+func transferMapBytes2Addr(src map[[20]byte]int) map[account.Address]int {
+	dest := make(map[account.Address]int, len(src))
 	for k, v := range src {
-		dest[account.Account{Addr: k}] = v
+		dest[k] = v
 	}
 
 	return dest

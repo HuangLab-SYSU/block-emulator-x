@@ -22,7 +22,9 @@ type State struct {
 	CodeHash      []byte // the code hash of the smart contract account
 }
 
-func NewState(account Account, loc int64) *State {
+func NewState(addr Address, loc int64) *State {
+	account := Account{Addr: addr}
+
 	return &State{
 		Account:       account,
 		ShardLocation: loc,

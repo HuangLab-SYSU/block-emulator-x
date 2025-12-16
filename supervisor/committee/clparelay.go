@@ -106,11 +106,11 @@ func (c *CLPARelayCommittee) HandleMsg(_ context.Context, msg *rpcserver.Wrapped
 
 	// update the clpa module - graph
 	for _, tx := range bInfo.InnerShardTxs {
-		c.state.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
+		c.state.AddEdge(partition.Vertex{Addr: tx.Sender}, partition.Vertex{Addr: tx.Recipient})
 	}
 
 	for _, tx := range bInfo.Relay2Txs {
-		c.state.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
+		c.state.AddEdge(partition.Vertex{Addr: tx.Sender}, partition.Vertex{Addr: tx.Recipient})
 	}
 
 	return nil
@@ -127,7 +127,7 @@ func (c *CLPARelayCommittee) repartition(ctx context.Context) error {
 	c.supervisorEpoch++
 	cr := &message.CLPARepartitionStartMsg{
 		Epoch:       c.supervisorEpoch,
-		ModifiedMap: transferMapAddr2Account(modifiedMap),
+		ModifiedMap: transferMapBytes2Addr(modifiedMap),
 	}
 
 	w, err := message.WrapMsg(cr)
@@ -168,5 +168,5 @@ func (c *CLPARelayCommittee) readTxsAndSend(ctx context.Context) error {
 }
 
 func (c *CLPARelayCommittee) getTxLocByCLPAState(tx transaction.Transaction) int64 {
-	return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender.Addr}))
+	return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender}))
 }

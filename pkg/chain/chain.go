@@ -110,7 +110,7 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 }
 
 // GenerateMigrationBlock generates a block for account migration, by the given accounts and their states.
-func (c *Chain) GenerateMigrationBlock(ctx context.Context, miner account.Address, accounts []account.Account, states []account.State) (*block.Block, error) {
+func (c *Chain) GenerateMigrationBlock(ctx context.Context, miner account.Address, accounts []account.Address, states []account.State) (*block.Block, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -184,7 +184,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 
 // GetAccountStates returns the shard-locations of all accounts by reading the MPT in the chain.
 // It calls getAccountStates with a mutex.
-func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account) ([]*account.State, error) {
+func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Address) ([]*account.State, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -197,12 +197,12 @@ func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Account
 }
 
 // GetAccountLocationsInTxs gets the locations of the accounts in the given transaction list.
-func (c *Chain) GetAccountLocationsInTxs(ctx context.Context, txs []transaction.Transaction) (map[account.Account]int64, error) {
+func (c *Chain) GetAccountLocationsInTxs(ctx context.Context, txs []transaction.Transaction) (map[account.Address]int64, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
 	// get all locations of accounts.
-	accountLocations := make(map[account.Account]int64)
+	accountLocations := make(map[account.Address]int64)
 	for _, tx := range txs {
 		accountLocations[tx.Sender] = -1
 		accountLocations[tx.Recipient] = -1
@@ -310,7 +310,7 @@ func (c *Chain) previewTrieUpdatedByTxs(ctx context.Context, txs []transaction.T
 	return root, nil
 }
 
-func (c *Chain) previewTrieUpdatedByMigration(ctx context.Context, accounts []account.Account, states []account.State) ([]byte, error) {
+func (c *Chain) previewTrieUpdatedByMigration(ctx context.Context, accounts []account.Address, states []account.State) ([]byte, error) {
 	keyBytes, valBytes, err := c.getMigrationAccountBytes(accounts, states)
 	if err != nil {
 		return nil, fmt.Errorf("get migration account bytes err: %w", err)
@@ -352,7 +352,7 @@ func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, 
 }
 
 func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []transaction.Transaction) ([][]byte, [][]byte, error) {
-	accountStates := make(map[account.Account]*account.State, len(txs)*2)
+	accountStates := make(map[account.Address]*account.State, len(txs)*2)
 	for _, tx := range txs {
 		accountStates[tx.Sender] = nil
 		accountStates[tx.Recipient] = nil
@@ -389,9 +389,7 @@ func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []trans
 
 		var kByte, vByte []byte
 
-		if kByte, err = k.Encode(); err != nil {
-			return nil, nil, fmt.Errorf("encode account from map err: %w", err)
-		}
+		kByte = k[:]
 
 		if vByte, err = v.Encode(); err != nil {
 			return nil, nil, fmt.Errorf("encode state from map err: %w", err)
@@ -404,17 +402,14 @@ func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []trans
 	return retAccountByteList, stateByteList, nil
 }
 
-func (c *Chain) getMigrationAccountBytes(accounts []account.Account, states []account.State) ([][]byte, [][]byte, error) {
+func (c *Chain) getMigrationAccountBytes(accounts []account.Address, states []account.State) ([][]byte, [][]byte, error) {
 	var err error
 
 	keyBytes := make([][]byte, len(accounts))
 
 	valBytes := make([][]byte, len(accounts))
 	for i, acc := range accounts {
-		keyBytes[i], err = acc.Encode()
-		if err != nil {
-			return nil, nil, fmt.Errorf("encode account: %w", err)
-		}
+		keyBytes[i] = acc[:]
 
 		valBytes[i], err = states[i].Encode()
 		if err != nil {
@@ -425,7 +420,7 @@ func (c *Chain) getMigrationAccountBytes(accounts []account.Account, states []ac
 	return keyBytes, valBytes, nil
 }
 
-func (c *Chain) updateStateMapByTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+func (c *Chain) updateStateMapByTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	if len(tx.ROriginalHash) != 0 { // relay transaction
 		c.updateStateMapByRelayTx(accountStates, tx)
 		return
@@ -439,7 +434,7 @@ func (c *Chain) updateStateMapByTx(accountStates map[account.Account]*account.St
 	c.modifyStateMapByNormalTx(accountStates, tx)
 }
 
-func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	switch tx.RelayStage {
 	case transaction.Relay1Tx:
 		// For a relay1 transaction, debit the sender's balance.
@@ -469,7 +464,7 @@ func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Account]*accou
 	}
 }
 
-func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	switch tx.BrokerStage {
 	case transaction.Sigma1BrokerStage:
 		// For a broker1 transaction, debit the sender's balance and credit the broker's balance.
@@ -510,7 +505,7 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Account]*acco
 	}
 }
 
-func (c *Chain) modifyStateMapByNormalTx(accountStates map[account.Account]*account.State, tx transaction.Transaction) {
+func (c *Chain) modifyStateMapByNormalTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	senderState := accountStates[tx.Sender]
 	recipientState := accountStates[tx.Recipient]
 
@@ -556,7 +551,7 @@ func (c *Chain) getTxMerkleRoot(ctx context.Context, txs []transaction.Transacti
 	return root, nil
 }
 
-func (c *Chain) getMigratedStateMerkleRoot(ctx context.Context, accounts []account.Account, states []account.State) ([]byte, error) {
+func (c *Chain) getMigratedStateMerkleRoot(ctx context.Context, accounts []account.Address, states []account.State) ([]byte, error) {
 	keyBytes, valBytes, err := c.getMigrationAccountBytes(accounts, states)
 	if err != nil {
 		return nil, fmt.Errorf("get migrated state merkle root err: %w", err)
@@ -572,15 +567,10 @@ func (c *Chain) getMigratedStateMerkleRoot(ctx context.Context, accounts []accou
 
 // getAccountStates get the states of accounts from the state trie.
 // Note that, if the node is not existed in this state-trie, return a default state of this account.
-func (c *Chain) getAccountStates(ctx context.Context, accounts []account.Account) ([]*account.State, error) {
-	accountByteList := make([][]byte, len(accounts))
-	for i, addr := range accounts {
-		aByte, err := addr.Encode()
-		if err != nil {
-			return nil, fmt.Errorf("encode addr err: %w", err)
-		}
-
-		accountByteList[i] = aByte
+func (c *Chain) getAccountStates(ctx context.Context, addresses []account.Address) ([]*account.State, error) {
+	accountByteList := make([][]byte, len(addresses))
+	for i, addr := range addresses {
+		accountByteList[i] = addr[:]
 	}
 
 	stateByteList, err := c.s.TrieStorage.MGetAccountStates(ctx, accountByteList)
@@ -588,12 +578,12 @@ func (c *Chain) getAccountStates(ctx context.Context, accounts []account.Account
 		return nil, fmt.Errorf("get account states from trie err: %w", err)
 	}
 
-	states := make([]*account.State, len(accounts))
+	states := make([]*account.State, len(addresses))
 
 	for i, stateByte := range stateByteList {
 		if stateByte == nil {
 			// set the default state
-			states[i] = account.NewState(accounts[i], partition.DefaultAccountLoc(accounts[i].Addr, c.cfg.ShardNum))
+			states[i] = account.NewState(addresses[i], partition.DefaultAccountLoc(addresses[i], c.cfg.ShardNum))
 			continue
 		}
 

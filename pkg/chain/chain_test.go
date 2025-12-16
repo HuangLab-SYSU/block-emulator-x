@@ -22,8 +22,8 @@ const (
 
 var (
 	testMiner     = generateAccountAddr("fake miner")
-	testSender    = account.Account{Addr: generateAccountAddr("fake sender    00000")}
-	testRecipient = account.Account{Addr: generateAccountAddr("fake recipient 11111")}
+	testSender    = generateAccountAddr("fake sender    00000")
+	testRecipient = generateAccountAddr("fake recipient 11111")
 	testTxs       = []transaction.Transaction{
 		*transaction.NewTransaction(testSender, testRecipient, big.NewInt(100), 0, time.Now()),
 	}
@@ -71,13 +71,13 @@ func TestChain(t *testing.T) {
 	beforeHeaderHash, _ := beforeHeader.Hash()
 	require.Equal(t, beforeHeaderHash, generateHeader.ParentBlockHash)
 
-	migratedB, err := bc.GenerateMigrationBlock(ctx, testMiner, []account.Account{testSender}, []account.State{*account.NewState(testSender, 100)})
+	migratedB, err := bc.GenerateMigrationBlock(ctx, testMiner, []account.Address{testSender}, []account.State{*account.NewState(testSender, 100)})
 	require.NoError(t, err)
 
 	err = bc.AddBlock(ctx, migratedB)
 	require.NoError(t, err)
 
-	as, err := bc.GetAccountStates(ctx, []account.Account{testSender})
+	as, err := bc.GetAccountStates(ctx, []account.Address{testSender})
 	require.NoError(t, err)
 	require.Len(t, as, 1)
 	require.Equal(t, *account.NewState(testSender, 100), *as[0])

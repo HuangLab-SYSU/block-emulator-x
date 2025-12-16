@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 	"github.com/stretchr/testify/require"
@@ -31,8 +30,8 @@ func TestBroker(t *testing.T) {
 	require.NoError(t, err)
 
 	tx := transaction.Transaction{
-		Sender:     account.Account{Addr: senderAddr},
-		Recipient:  account.Account{Addr: receiverAddr},
+		Sender:     senderAddr,
+		Recipient:  receiverAddr,
 		Value:      big.NewInt(100),
 		Nonce:      100,
 		CreateTime: time.Now(),

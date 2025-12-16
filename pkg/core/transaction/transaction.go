@@ -25,8 +25,8 @@ const (
 type Signature []byte
 
 type Transaction struct {
-	Sender     account.Account
-	Recipient  account.Account
+	Sender     account.Address
+	Recipient  account.Address
 	Value      *big.Int
 	Nonce      uint64
 	Signature  Signature
@@ -43,14 +43,14 @@ type RelayTxOpt struct {
 
 type BrokerTxOpt struct {
 	BrokerStage               uint // label that this is a sigma_1 tx or a sigma_2 tx.
-	Broker                    account.Account
+	Broker                    account.Address
 	BOriginalHash             []byte // the hash of raw message
 	OriginalTxCreateTime      time.Time
 	NonceBroker               uint64
 	HeightLock, HeightCurrent uint64
 }
 
-func NewTransaction(sender, recipient account.Account, value *big.Int, nonce uint64, proposeTime time.Time) *Transaction {
+func NewTransaction(sender, recipient account.Address, value *big.Int, nonce uint64, proposeTime time.Time) *Transaction {
 	tx := &Transaction{
 		Sender:     sender,
 		Recipient:  recipient,

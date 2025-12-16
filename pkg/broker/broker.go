@@ -99,7 +99,7 @@ func (s *Manager) CreateRawTx(tx transaction.Transaction, brokerAddr account.Add
 	rawTx := tx
 	rawTx.BrokerTxOpt = transaction.BrokerTxOpt{
 		BrokerStage:          transaction.RawTxBrokerStage,
-		Broker:               account.Account{Addr: brokerAddr},
+		Broker:               brokerAddr,
 		BOriginalHash:        th,
 		OriginalTxCreateTime: tx.CreateTime,
 		NonceBroker:          s.broker2Nonce[brokerAddr],
@@ -152,7 +152,7 @@ func (s *Manager) CreateBrokerTxs() ([]transaction.Transaction, []transaction.Tr
 
 // ConfirmBrokerTx confirms the broker tx according to Manager local data
 func (s *Manager) ConfirmBrokerTx(tx transaction.Transaction) error {
-	if !s.IsBroker(tx.Broker.Addr) {
+	if !s.IsBroker(tx.Broker) {
 		return fmt.Errorf("%x is not a broker address", tx.Broker)
 	}
 

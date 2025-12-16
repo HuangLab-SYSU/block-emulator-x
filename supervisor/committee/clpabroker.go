@@ -120,7 +120,7 @@ func (c *CLPABrokerCommittee) repartition(ctx context.Context) error {
 	c.supervisorEpoch++
 	cr := &message.CLPARepartitionStartMsg{
 		Epoch:       c.supervisorEpoch,
-		ModifiedMap: transferMapAddr2Account(modifiedMap),
+		ModifiedMap: transferMapBytes2Addr(modifiedMap),
 	}
 
 	w, err := message.WrapMsg(cr)
@@ -176,7 +176,7 @@ func (c *CLPABrokerCommittee) readTxsAndSend(ctx context.Context) error {
 func (c *CLPABrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction) {
 	innerShardTxs, crossShardTxs := make([]transaction.Transaction, 0, len(txs)), make([]transaction.Transaction, 0, len(txs))
 	for _, tx := range txs {
-		senderAddr, receiverAddr := tx.Sender.Addr, tx.Recipient.Addr
+		senderAddr, receiverAddr := tx.Sender, tx.Recipient
 		senderShard := c.state.GetVertexLocation(partition.Vertex{Addr: senderAddr})
 
 		receiverShard := c.state.GetVertexLocation(partition.Vertex{Addr: receiverAddr})
@@ -194,15 +194,15 @@ func (c *CLPABrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]tran
 func (c *CLPABrokerCommittee) getTxLocByCLPAState(tx transaction.Transaction) int64 {
 	// inner-shard tx
 	if len(tx.BOriginalHash) == 0 {
-		return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender.Addr}))
+		return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender}))
 	}
 	// broker tx
 	// broker 1
 	if tx.BrokerStage == transaction.Sigma1BrokerStage {
-		return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender.Addr}))
+		return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender}))
 	}
 	// broker 2
-	return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Recipient.Addr}))
+	return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Recipient}))
 }
 
 func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *message.BrokerBlockInfoMsg) {
@@ -224,11 +224,11 @@ func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *mes
 
 	// update the clpa module - graph
 	for _, tx := range bInfo.InnerShardTxs {
-		c.state.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
+		c.state.AddEdge(partition.Vertex{Addr: tx.Sender}, partition.Vertex{Addr: tx.Recipient})
 	}
 
 	for _, tx := range bInfo.Broker2Txs {
-		c.state.AddEdge(partition.Vertex{Addr: tx.Sender.Addr}, partition.Vertex{Addr: tx.Recipient.Addr})
+		c.state.AddEdge(partition.Vertex{Addr: tx.Sender}, partition.Vertex{Addr: tx.Recipient})
 	}
 
 	// operate as a broker, confirm the transactions.

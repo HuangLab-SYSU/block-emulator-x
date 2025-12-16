@@ -42,9 +42,9 @@ func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message
 		return nil, nil
 	}
 
-	accounts, states, err := m.amm.GetMigratedAccountsAndStates()
+	accounts, states, err := m.amm.GetMigratedAddrStates()
 	if err != nil {
-		return nil, fmt.Errorf("GetMigratedAccountsAndStates failed: %w", err)
+		return nil, fmt.Errorf("GetMigratedAddrStates failed: %w", err)
 	}
 
 	b, err := m.chain.GenerateMigrationBlock(ctx, m.lp.WalletAddr, accounts, states)
@@ -79,7 +79,7 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 			SrcShard:      m.lp.ShardID,
 			DestShard:     int64(i),
 			Epoch:         m.amm.Epoch,
-			AccountStates: make(map[account.Account]*account.State),
+			AccountStates: make(map[account.Address]*account.State),
 		}
 	}
 

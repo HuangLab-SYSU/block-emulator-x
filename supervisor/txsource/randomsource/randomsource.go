@@ -40,13 +40,13 @@ func (r *RandomSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 }
 
 func generateRandomTransaction(c int64) transaction.Transaction {
-	var sender, receiver account.Account
+	var sender, receiver account.Address
 
-	_, _ = rand.Read(sender.Addr[accountPrefixZeroBytes:])
+	_, _ = rand.Read(sender[accountPrefixZeroBytes:])
 
-	_, _ = rand.Read(receiver.Addr[accountPrefixZeroBytes:])
-	for sender.Addr == receiver.Addr {
-		_, _ = rand.Read(receiver.Addr[accountPrefixZeroBytes:])
+	_, _ = rand.Read(receiver[accountPrefixZeroBytes:])
+	for sender == receiver {
+		_, _ = rand.Read(receiver[accountPrefixZeroBytes:])
 	}
 
 	amount, _ := rand.Int(rand.Reader, big.NewInt(upperBoundTransferAmount))

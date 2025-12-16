@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
 )
@@ -50,8 +49,8 @@ func (ds *CSVSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 		return nil, nil
 	}
 
-	ret := make([]transaction.Transaction, size)
-	for i := range ret {
+	ret := make([]transaction.Transaction, 0, size)
+	for range size {
 		txLine, err := ds.cr.Read()
 		if err == io.EOF {
 			ds.close()
@@ -69,7 +68,7 @@ func (ds *CSVSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 			return nil, fmt.Errorf("failed to transfer line to tx: %w", err)
 		}
 
-		ret[i] = *tx
+		ret = append(ret, *tx)
 	}
 
 	return ret, nil
@@ -100,7 +99,7 @@ func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 		return nil, fmt.Errorf("failed to parse receiver address: %w", err)
 	}
 
-	tx := transaction.NewTransaction(account.Account{Addr: senderAddr}, account.Account{Addr: receiverAddr}, val, uint64(count), time.Now())
+	tx := transaction.NewTransaction(senderAddr, receiverAddr, val, uint64(count), time.Now())
 
 	return tx, nil
 }

@@ -128,7 +128,7 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 func (s *StaticBrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction) {
 	innerShardTxs, crossShardTxs := make([]transaction.Transaction, 0, len(txs)), make([]transaction.Transaction, 0, len(txs))
 	for _, tx := range txs {
-		senderAddr, receiverAddr := tx.Sender.Addr, tx.Recipient.Addr
+		senderAddr, receiverAddr := tx.Sender, tx.Recipient
 		senderShard := partition.DefaultAccountLoc(senderAddr, s.cfg.ShardNum)
 
 		receiverShard := partition.DefaultAccountLoc(receiverAddr, s.cfg.ShardNum)
@@ -147,13 +147,13 @@ func (s *StaticBrokerCommittee) getTxLoc(tx transaction.Transaction) int64 {
 	shardNumber := s.cfg.ShardNum
 	// inner-shard tx
 	if len(tx.BOriginalHash) == 0 {
-		return partition.DefaultAccountLoc(tx.Sender.Addr, shardNumber)
+		return partition.DefaultAccountLoc(tx.Sender, shardNumber)
 	}
 	// broker tx
 	// broker 1
 	if tx.BrokerStage == transaction.Sigma1BrokerStage {
-		return partition.DefaultAccountLoc(tx.Sender.Addr, shardNumber)
+		return partition.DefaultAccountLoc(tx.Sender, shardNumber)
 	}
 	// broker 2
-	return partition.DefaultAccountLoc(tx.Recipient.Addr, shardNumber)
+	return partition.DefaultAccountLoc(tx.Recipient, shardNumber)
 }

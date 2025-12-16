@@ -11,11 +11,11 @@ const (
 
 type CLPARepartitionStartMsg struct {
 	Epoch       int64
-	ModifiedMap map[account.Account]int
+	ModifiedMap map[account.Address]int
 }
 
 type AccountMigrationMsg struct {
 	SrcShard, DestShard int64
 	Epoch               int64
-	AccountStates       map[account.Account]*account.State
+	AccountStates       map[account.Address]*account.State
 }

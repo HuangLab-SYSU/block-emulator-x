@@ -11,8 +11,8 @@ import (
 
 type AccMigrateMetadata struct {
 	Epoch                 int64
-	CurModifiedMap        map[account.Account]int
-	MigratedAccountStates map[int64]map[account.Account]*account.State
+	CurModifiedMap        map[account.Address]int
+	MigratedAccountStates map[int64]map[account.Address]*account.State
 	MigrationReady        bool
 
 	// unhandledStateMsg records those unhandled messages. The key is the epoch id of the messages.
@@ -25,8 +25,8 @@ type AccMigrateMetadata struct {
 func NewAccMigrateMetadata(cfg config.SystemCfg, lp config.LocalParams) *AccMigrateMetadata {
 	return &AccMigrateMetadata{
 		Epoch:                 0,
-		CurModifiedMap:        make(map[account.Account]int),
-		MigratedAccountStates: make(map[int64]map[account.Account]*account.State),
+		CurModifiedMap:        make(map[account.Address]int),
+		MigratedAccountStates: make(map[int64]map[account.Address]*account.State),
 		MigrationReady:        false,
 		unhandledStateMsg:     make(map[int64][]*message.AccountMigrationMsg),
 		cfg:                   cfg,
@@ -35,8 +35,8 @@ func NewAccMigrateMetadata(cfg config.SystemCfg, lp config.LocalParams) *AccMigr
 }
 
 func (am *AccMigrateMetadata) MigrationStatusReset() {
-	am.MigratedAccountStates = make(map[int64]map[account.Account]*account.State)
-	am.CurModifiedMap = make(map[account.Account]int)
+	am.MigratedAccountStates = make(map[int64]map[account.Address]*account.State)
+	am.CurModifiedMap = make(map[account.Address]int)
 	am.MigrationReady = false
 	am.unhandledStateMsg[am.Epoch] = nil
 }
@@ -95,13 +95,13 @@ func (am *AccMigrateMetadata) CollectStatesByMsg(atMsg *message.AccountMigration
 	return nil
 }
 
-// GetMigratedAccountsAndStates returns the migrated accounts and states if all MigratedAccountStates are collected.
-func (am *AccMigrateMetadata) GetMigratedAccountsAndStates() ([]account.Account, []account.State, error) {
+// GetMigratedAddrStates returns the migrated accounts and states if all MigratedAccountStates are collected.
+func (am *AccMigrateMetadata) GetMigratedAddrStates() ([]account.Address, []account.State, error) {
 	if len(am.MigratedAccountStates) != int(am.cfg.ShardNum) {
 		return nil, nil, fmt.Errorf("not all MigratedAccountStates is collected, expect=%d, got=%d", am.cfg.ShardNum, len(am.MigratedAccountStates))
 	}
 
-	accountMigratedIn := make(map[account.Account]*account.State, len(am.MigratedAccountStates))
+	accountMigratedIn := make(map[account.Address]*account.State, len(am.MigratedAccountStates))
 	// merge MigratedAccountStates into one map
 	for _, migratedStateMap := range am.MigratedAccountStates {
 		for k, v := range migratedStateMap {
@@ -109,7 +109,7 @@ func (am *AccMigrateMetadata) GetMigratedAccountsAndStates() ([]account.Account,
 		}
 	}
 
-	migratedAccounts := make([]account.Account, 0, len(am.MigratedAccountStates))
+	migratedAccounts := make([]account.Address, 0, len(am.MigratedAccountStates))
 
 	migratedStates := make([]account.State, 0, len(am.MigratedAccountStates))
 
@@ -117,7 +117,7 @@ func (am *AccMigrateMetadata) GetMigratedAccountsAndStates() ([]account.Account,
 		state := accountMigratedIn[acc]
 		if state == nil {
 			if int64(destShardID) == am.lp.ShardID {
-				slog.Warn("missing account in GetMigratedAccountsAndStates", "account", acc)
+				slog.Warn("missing account in GetMigratedAddrStates", "account", acc)
 			}
 
 			state = account.NewState(acc, int64(destShardID))
