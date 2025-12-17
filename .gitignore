@@ -10,9 +10,11 @@ exp
 
 # 不要上传可执行文件！
 # Do not upload your executable files!
-**.exe
+**/*.exe
 
 # 不要上传大文件
 # Do not upload large files!
-**.zip
-**.out
+**/*.zip
+**/*.out
+**/*.csv
+!supervisor/txsource/csvsource/testdata.csv

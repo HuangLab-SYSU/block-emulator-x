@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
 	"os"
 	"time"
@@ -50,7 +51,7 @@ func (ds *CSVSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 	}
 
 	ret := make([]transaction.Transaction, 0, size)
-	for range size {
+	for int64(len(ret)) < size {
 		txLine, err := ds.cr.Read()
 		if err == io.EOF {
 			ds.close()
@@ -64,9 +65,11 @@ func (ds *CSVSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 
 		tx, err := line2Tx(txLine, ds.count)
 		if err != nil {
-			ds.close()
-			return nil, fmt.Errorf("failed to transfer line to tx: %w", err)
+			slog.Debug("line2Tx failed", "line", txLine, "err", err)
+			continue
 		}
+
+		ds.count++
 
 		ret = append(ret, *tx)
 	}
@@ -81,7 +84,7 @@ func (ds *CSVSource) close() {
 
 func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 	if line[6] != "0" || line[7] != "0" || line[3] == line[4] {
-		return nil, fmt.Errorf("invalid line %v", line)
+		return nil, fmt.Errorf("the line format is not matched")
 	}
 
 	val := new(big.Int)

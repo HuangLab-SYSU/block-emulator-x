@@ -8,7 +8,7 @@ import (
 	"math/big"
 )
 
-const initBalance = 1_000_000_000
+const initBalanceStr = "1000000000000000000000000000000000000"
 
 var ErrNotEnoughBalance = errors.New("not enough balance")
 
@@ -23,12 +23,13 @@ type State struct {
 }
 
 func NewState(addr Address, loc int64) *State {
-	account := Account{Addr: addr}
+	var b big.Int
+	b.SetString(initBalanceStr, 10)
 
 	return &State{
-		Account:       account,
+		Account:       Account{Addr: addr},
 		ShardLocation: loc,
-		Balance:       big.NewInt(initBalance),
+		Balance:       &b,
 	}
 }
 

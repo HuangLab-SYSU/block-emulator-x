@@ -115,7 +115,7 @@ func (c *consensusMeta) curateMsg() {
 	}
 }
 
-// step2Next make pbft metadata step to next stage, returns (oldStage, newStage, err)
+// step2Next makes pbft metadata step to next stage, returns (oldStage, newStage, err)
 func (c *consensusMeta) step2Next() (int, int, error) {
 	switch c.stage {
 	case stagePreprepare:
