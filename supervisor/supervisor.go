@@ -165,6 +165,9 @@ func (s *Supervisor) Start() error {
 
 	s.conn.GroupBroadcastMessage(context.Background(), destNodes, wMsg)
 
+	slog.Info("supervisor is closing")
+	s.conn.Close()
+
 	return nil
 }
 
