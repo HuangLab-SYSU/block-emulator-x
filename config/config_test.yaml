@@ -11,7 +11,7 @@ consensus_node:
   blockchain:
     bloom_filter:
       bitset_len: 4096
-      filter_hash_func: [sha256, sha512, sha1]
+      filter_hash_func: [ sha256, sha512, sha1 ]
     storage:
       block_storage_type: "bolt"
       trie_storage_type: "eth_level_db"

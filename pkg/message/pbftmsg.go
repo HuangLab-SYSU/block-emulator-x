@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
 const (

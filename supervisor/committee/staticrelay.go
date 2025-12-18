@@ -6,14 +6,14 @@ import (
 	"encoding/gob"
 	"fmt"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/partition"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/txsource"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/partition"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/txsource"
 )
 
 type StaticRelayCommittee struct {

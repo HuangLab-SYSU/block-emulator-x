@@ -11,13 +11,13 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/block"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/bloom"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/partition"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/storage"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/bloom"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/partition"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/storage"
 )
 
 // Chain describes a blockchain.

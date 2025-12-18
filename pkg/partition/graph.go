@@ -1,6 +1,6 @@
 package partition
 
-import "github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
+import "github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 
 // Vertex is the account in the blockchain.
 type Vertex struct {

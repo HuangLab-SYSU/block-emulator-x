@@ -8,11 +8,11 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/HuangLab-SYSU/block-emulator/cmd/loadnetwork"
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/consensus/pbft"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/logger"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
+	"github.com/HuangLab-SYSU/block-emulator-x/cmd/loadnetwork"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/logger"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
 )
 
 const (

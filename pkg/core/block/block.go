@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
 )
 
 var RecordTitle = []string{

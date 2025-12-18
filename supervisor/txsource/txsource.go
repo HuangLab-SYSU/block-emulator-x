@@ -3,10 +3,10 @@ package txsource
 import (
 	"fmt"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/txsource/csvsource"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/txsource/randomsource"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/txsource/csvsource"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/txsource/randomsource"
 )
 
 type TxSource interface {

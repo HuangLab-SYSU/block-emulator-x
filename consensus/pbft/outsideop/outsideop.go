@@ -3,7 +3,7 @@ package outsideop
 import (
 	"context"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 )
 
 type ShardOutsideMsgHandler interface {

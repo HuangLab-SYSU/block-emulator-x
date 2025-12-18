@@ -52,7 +52,7 @@ consensus_node:
       ### `filter_hash_func` is the hash functions used in the bloom filter.
       ### Optional settings: [sha256, sha512, sha1].
       ### Note that `filter_hash_func` is a list, thus 3 all functions can be included.
-      filter_hash_func: [sha256, sha512, sha1]
+      filter_hash_func: [ sha256, sha512, sha1 ]
       ### -----------------------------------------------------------------------------------
 
     storage:

@@ -3,8 +3,8 @@ package pbft
 import (
 	"testing"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 	"github.com/stretchr/testify/require"
 )
 

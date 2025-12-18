@@ -3,7 +3,7 @@ package message
 import (
 	"time"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
 const (
