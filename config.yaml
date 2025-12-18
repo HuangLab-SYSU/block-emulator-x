@@ -20,7 +20,7 @@ system:
   ### `static_broker`: The location distribution of accounts is static, and accounts will not be migrated to other shards. For a cross-shard transaction, it will be handled by the broker accounts.
   ### `clpa_relay`: The locations distribution of accounts is dynamic. When each epoch ends, some accounts will be migrated to other shards by CLPA. For a cross-shard transaction, it will be handled by `Relay`.
   ### `clpa_broker`: The locations distribution of accounts is dynamic. When each epoch ends, some accounts will be migrated to other shards by CLPA. For a cross-shard transaction, it will be handled by the broker accounts.
-  consensus_type: "clpa_broker" # [static_relay, static_broker, clpa_relay, clpa_broker]
+  consensus_type: "static_relay" # [static_relay, static_broker, clpa_relay, clpa_broker]
   ### -----------------------------------------------------------------------------------
 
   log:
@@ -140,13 +140,13 @@ supervisor:
     ### `random_source`: The supervisor generates random transactions and inject them to the system.
     ### `csv_source`: The supervisor reads transactions from a .csv file and inject them to the system.
     ### Else: The supervisor will not inject any transactions.
-    tx_source_type: "csv_source" # [random_source, csv_source]
+    tx_source_type: "random_source" # [random_source, csv_source]
     ### -----------------------------------------------------------------------------------
 
     ### -----------------------------------------------------------------------------------
     ### `tx_source_file` is the .csv source file of transactions.
     ### This variable is valid when `tx_source_file` is `csv_source`.
-    tx_source_file: "2000000to2999999_BlockTransaction.csv" # valid when tx_source_type = csv_source
+    tx_source_file: "" # valid when tx_source_type = csv_source
     ### -----------------------------------------------------------------------------------
 
   broker_module:
