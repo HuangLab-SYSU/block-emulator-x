@@ -1,9 +1,9 @@
 package txpool
 
 import (
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/txpool/queue"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool/queue"
 )
 
 // TxPool is a pool that buffers transaction.

@@ -25,5 +25,4 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "Merging PR #${PR_NUMBER} with squash and deleting branch $PR_BRANCH"
           
-          # 使用 GitHub CLI 合并 PR 并删除分支
           gh pr merge $PR_NUMBER --squash --delete-branch --confirm

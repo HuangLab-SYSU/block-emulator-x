@@ -7,15 +7,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/committee"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/measure"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/measure/brokerstats"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/measure/relaystats"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/committee"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/measure"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/measure/brokerstats"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/measure/relaystats"
 )
 
 const wmBufferSize = 1 << 16

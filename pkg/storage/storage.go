@@ -3,9 +3,9 @@ package storage
 import (
 	"fmt"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/storage/block"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/storage/trie"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/storage/block"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/storage/trie"
 )
 
 // Storage consists of  both block.Store and trie.Store.

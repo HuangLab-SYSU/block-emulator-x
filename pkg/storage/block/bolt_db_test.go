@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
 )
 
 func TestBoltDb(t *testing.T) {

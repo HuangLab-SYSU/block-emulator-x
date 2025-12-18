@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
-	"github.com/HuangLab-SYSU/block-emulator/supervisor/txsource/randomsource"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
+	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/txsource/randomsource"
 )
 
 const txSize = 10

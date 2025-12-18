@@ -1,6 +1,6 @@
 package measure
 
-import "github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
+import "github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 
 type Measure interface {
 	// UpdateMeasureRecord updates this measure implementation by the WrappedMsg
