@@ -7,7 +7,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop/txblockop"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/chain"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
@@ -48,16 +47,7 @@ func (s *StaticShardOp) BuildProposal(ctx context.Context) (*message.Proposal, e
 }
 
 func (s *StaticShardOp) ValidateProposal(ctx context.Context, proposal *message.Proposal) error {
-	if proposal.ProposalType != message.BlockProposalType {
-		return fmt.Errorf("invalid proposal type")
-	}
-
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
-
-	if err = s.chain.ValidateBlock(ctx, b); err != nil {
+	if err := s.chain.ValidateBlock(ctx, proposal.Block); err != nil {
 		return fmt.Errorf("validate block failed: %w", err)
 	}
 
@@ -65,22 +55,12 @@ func (s *StaticShardOp) ValidateProposal(ctx context.Context, proposal *message.
 }
 
 func (s *StaticShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
-
-	switch proposal.ProposalType {
-	case message.BlockProposalType:
-		if err = s.tbo.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
-			return fmt.Errorf("block commit failed: %w", err)
-		}
-	default:
-		return fmt.Errorf("invalid proposal type=%s", proposal.ProposalType)
+	if err := s.tbo.BlockCommitAndDeliver(ctx, isLeader, proposal.Block); err != nil {
+		return fmt.Errorf("block commit failed: %w", err)
 	}
 
 	if isLeader {
-		if err = recordBlock(s.csw, b); err != nil {
+		if err := recordBlock(s.csw, proposal.Block); err != nil {
 			return fmt.Errorf("record block failed: %w", err)
 		}
 	}

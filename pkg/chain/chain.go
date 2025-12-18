@@ -252,6 +252,13 @@ func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
 	return nil
 }
 
+func (c *Chain) GetBlocksAfterHeight(begin int64) ([]block.Block, error) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	panic("not yet implemented")
+}
+
 func (c *Chain) GetShardID() int64 {
 	return c.shardID
 }

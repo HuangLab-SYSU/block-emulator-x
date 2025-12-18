@@ -34,10 +34,7 @@ func (bto *BrokerTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []tran
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
 
-	p, err := message.WrapProposal(b, message.BlockProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
+	p := message.WrapProposal(b)
 
 	slog.InfoContext(ctx, "block is generated", "shard ID", bto.c.GetShardID(), "block height", b.Number, "epoch", bto.c.GetEpochID(), "block create time", b.CreateTime)
 

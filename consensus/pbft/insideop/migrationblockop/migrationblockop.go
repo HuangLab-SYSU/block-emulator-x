@@ -52,10 +52,7 @@ func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message
 		return nil, fmt.Errorf("GenerateMigrationBlock failed: %w", err)
 	}
 
-	p, err := message.WrapProposal(b, message.PartitionProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
+	p := message.WrapProposal(b)
 
 	slog.InfoContext(ctx, "migration block proposal is generated", "height", b.Number)
 
