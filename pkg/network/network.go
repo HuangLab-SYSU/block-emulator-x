@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
 // P2PConn is a peer-to-peer connection that should contain a message buffer.

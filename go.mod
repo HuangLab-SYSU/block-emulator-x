@@ -1,4 +1,4 @@
-module github.com/HuangLab-SYSU/block-emulator
+module github.com/HuangLab-SYSU/block-emulator-x
 
 go 1.24.1
 

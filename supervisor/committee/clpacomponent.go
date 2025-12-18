@@ -3,7 +3,7 @@ package committee
 import (
 	"time"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/partition"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/partition"
 )
 
 type clpaComponent struct {

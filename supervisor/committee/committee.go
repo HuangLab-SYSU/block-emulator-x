@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 )
 
 // Committee is the interface for a committee.

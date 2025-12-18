@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
 type packTxFunc func(q []transaction.Transaction, n int) ([]transaction.Transaction, []transaction.Transaction, error)

@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/bloom"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/bloom"
 )
 
 type Header struct {

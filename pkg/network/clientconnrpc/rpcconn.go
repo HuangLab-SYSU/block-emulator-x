@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/rpcserver"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
 const (

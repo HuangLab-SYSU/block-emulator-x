@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
 type AccMigrateMetadata struct {

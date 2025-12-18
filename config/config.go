@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/utils"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
 )
 
 type Config struct {
