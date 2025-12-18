@@ -78,16 +78,7 @@ func (c *DynamicShardOp) BuildProposal(ctx context.Context) (*message.Proposal, 
 }
 
 func (c *DynamicShardOp) ValidateProposal(ctx context.Context, proposal *message.Proposal) error {
-	if proposal.ProposalType != message.BlockProposalType && proposal.ProposalType != message.PartitionProposalType {
-		return fmt.Errorf("invalid proposal type")
-	}
-
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
-
-	if err = c.chain.ValidateBlock(ctx, b); err != nil {
+	if err := c.chain.ValidateBlock(ctx, proposal.Block); err != nil {
 		return fmt.Errorf("validate block failed: %w", err)
 	}
 
@@ -95,26 +86,21 @@ func (c *DynamicShardOp) ValidateProposal(ctx context.Context, proposal *message
 }
 
 func (c *DynamicShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
+	b := proposal.Block
 
-	switch proposal.ProposalType {
-	case message.BlockProposalType:
-		if err = c.tbo.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
-			return fmt.Errorf("block commit failed: %w", err)
-		}
-	case message.PartitionProposalType:
-		if err = c.mbo.MigrationBlockCommit(ctx, isLeader, b); err != nil {
+	switch b.BlockType() {
+	case block.MigrationBlockType:
+		if err := c.mbo.MigrationBlockCommit(ctx, isLeader, b); err != nil {
 			return fmt.Errorf("migration block commit failed: %w", err)
 		}
 	default:
-		return fmt.Errorf("invalid proposal type=%s", proposal.ProposalType)
+		if err := c.tbo.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
+			return fmt.Errorf("block commit failed: %w", err)
+		}
 	}
 
 	if isLeader {
-		if err = recordBlock(c.csw, b); err != nil {
+		if err := recordBlock(c.csw, b); err != nil {
 			return fmt.Errorf("record block failed: %w", err)
 		}
 	}

@@ -5,6 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
+
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
@@ -20,14 +22,8 @@ const (
 	StopConsensusMessageType = "StopConsensus"
 )
 
-const (
-	BlockProposalType     = "BlockProposal"
-	PartitionProposalType = "PartitionProposalType"
-)
-
 type Proposal struct {
-	ProposalType string
-	Payload      []byte
+	Block *block.Block
 }
 
 func (p *Proposal) Hash() ([]byte, error) {

@@ -11,6 +11,11 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
 )
 
+const (
+	TxBlockType        = 1
+	MigrationBlockType = 2
+)
+
 var RecordTitle = []string{
 	"ParentHash",
 	"BlockHash",
@@ -51,6 +56,18 @@ func (b *Block) Encode() ([]byte, error) {
 	}
 
 	return buff.Bytes(), nil
+}
+
+func (b *Block) BlockType() int {
+	if len(b.TxRoot) != 0 {
+		return TxBlockType
+	}
+
+	if len(b.MigratedAccountsRoot) != 0 {
+		return MigrationBlockType
+	}
+
+	return TxBlockType
 }
 
 func DecodeBlock(data []byte) (*Block, error) {

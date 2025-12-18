@@ -40,10 +40,7 @@ func (r *RelayTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []transac
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
 
-	p, err := message.WrapProposal(b, message.BlockProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
+	p := message.WrapProposal(b)
 
 	slog.InfoContext(ctx, "block is generated", "shard ID", r.c.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
 
