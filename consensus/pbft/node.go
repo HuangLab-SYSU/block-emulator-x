@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/basicstructs"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/outsideop"
@@ -23,7 +24,8 @@ import (
 type messageHandleFunc func(context.Context, []byte) error
 
 const (
-	executeInterval = 100 * time.Millisecond
+	// executeInterval is the time interval between two running loops.
+	executeInterval = 500 * time.Millisecond
 )
 
 // Node is the node running the PBFT consensus.
@@ -154,14 +156,14 @@ func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) err
 	handleFunc, exist := n.defaultMsgHandler[msg.GetMsgType()]
 	if !exist {
 		if err := n.omh.HandleMsgOutsideShard(ctx, msg); err != nil {
-			return fmt.Errorf("handleMsgOutsideShard: %w", err)
+			return fmt.Errorf("handleMsgOutsideShard failed: %w", err)
 		}
 
 		return nil
 	}
 
 	if err := handleFunc(ctx, msg.GetPayload()); err != nil {
-		return fmt.Errorf("handle %s message err: %w", msg.GetMsgType(), err)
+		return fmt.Errorf("handle %s message failed: %w", msg.GetMsgType(), err)
 	}
 
 	return nil
@@ -181,10 +183,10 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode preprepare msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle preprepare message", "shardID", ppMsg.ShardID, "nodeID", ppMsg.NodeID)
+	slog.InfoContext(ctx, "handle preprepare message: try to add it to the message pool", "shardID", ppMsg.ShardID, "nodeID", ppMsg.NodeID)
 
 	// ignore the out-of-date message
-	if ppMsg.View < n.pbftMeta.view || ppMsg.Seq < n.pbftMeta.seq {
+	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: ppMsg.View, Seq: ppMsg.Seq}) > 0 {
 		slog.InfoContext(ctx, "handle out-of-date Preprepare, ignore it", "view", ppMsg.View, "seq", ppMsg.Seq)
 		return nil
 	}
@@ -204,10 +206,10 @@ func (n *Node) handlePrepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode prepare msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle prepare message", "shardID", pMsg.ShardID, "nodeID", pMsg.NodeID)
+	slog.InfoContext(ctx, "handle prepare message: try to add it to the message pool", "shardID", pMsg.ShardID, "nodeID", pMsg.NodeID)
 
 	// ignore the out-of-date message
-	if pMsg.View < n.pbftMeta.view || pMsg.Seq < n.pbftMeta.seq {
+	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) > 0 {
 		slog.InfoContext(ctx, "handle out-of-date Prepare, ignore it", "view", pMsg.View, "seq", pMsg.Seq)
 		return nil
 	}
@@ -223,10 +225,10 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode commit msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle commit message", "shardID", cMsg.ShardID, "nodeID", cMsg.NodeID)
+	slog.InfoContext(ctx, "handle commit message: try to add it to the message pool", "shardID", cMsg.ShardID, "nodeID", cMsg.NodeID)
 
 	// ignore the out-of-date message
-	if cMsg.View < n.pbftMeta.view || cMsg.Seq < n.pbftMeta.seq {
+	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) > 0 {
 		slog.InfoContext(ctx, "handle out-of-date Commit, ignore it", "view", cMsg.View, "seq", cMsg.Seq)
 		return nil
 	}
@@ -278,8 +280,11 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 func (n *Node) propose(ctx context.Context) error {
 	if time.Since(n.pbftMeta.lastProposeTime) < time.Duration(n.pbftMeta.cfg.BlockInterval)*time.Millisecond {
 		// not reach the block interval
+		slog.Debug("not the time to propose, ignore it", "time duration", time.Since(n.pbftMeta.lastProposeTime).Seconds())
 		return nil
 	}
+
+	slog.Debug("try to propose")
 
 	p, err := n.iop.BuildProposal(ctx)
 	if err != nil {
@@ -298,7 +303,7 @@ func (n *Node) propose(ctx context.Context) error {
 	}
 
 	wrappedMsg, err := message.WrapMsg(&message.PreprepareMsg{
-		P: *p, Digest: digest, Seq: n.pbftMeta.seq, View: n.pbftMeta.view,
+		P: *p, Digest: digest, Seq: n.pbftMeta.curViewSeq.Seq, View: n.pbftMeta.curViewSeq.View,
 	})
 	if err != nil {
 		return fmt.Errorf("message.WrapMsg failed: %w", err)
@@ -319,8 +324,8 @@ func (n *Node) propose(ctx context.Context) error {
 func (n *Node) prepareBroadcast(ctx context.Context) error {
 	pMsg := &message.PrepareMsg{
 		Digest:  n.pbftMeta.curProposal.Digest,
-		View:    n.pbftMeta.view,
-		Seq:     n.pbftMeta.seq,
+		View:    n.pbftMeta.curProposal.View,
+		Seq:     n.pbftMeta.curProposal.Seq,
 		ShardID: n.pbftMeta.lp.ShardID,
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}
@@ -343,8 +348,8 @@ func (n *Node) prepareBroadcast(ctx context.Context) error {
 func (n *Node) commitBroadcast(ctx context.Context) error {
 	cMsg := &message.CommitMsg{
 		Digest:  n.pbftMeta.curProposal.Digest,
-		View:    n.pbftMeta.view,
-		Seq:     n.pbftMeta.seq,
+		View:    n.pbftMeta.curProposal.View,
+		Seq:     n.pbftMeta.curProposal.Seq,
 		ShardID: n.pbftMeta.lp.ShardID,
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}

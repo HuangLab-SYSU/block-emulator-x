@@ -83,7 +83,7 @@ func (r *RPCConn) DrainMsgBuffer() []*rpcserver.WrappedMsg {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 
-	ret := make([]*rpcserver.WrappedMsg, 0)
+	ret := make([]*rpcserver.WrappedMsg, 0, len(r.msgBuffer))
 
 	for {
 		select {

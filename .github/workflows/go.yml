@@ -49,6 +49,9 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Tidy Diff
+        run: go mod tidy -diff
+
       - name: Run golangci-lint
         run: golangci-lint run --timeout 5m ./...
 
