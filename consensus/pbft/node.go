@@ -101,7 +101,7 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 func (n *Node) Start() {
 	n.registerHandleFunc()
 
-	// start and run
+	// Start and run.
 	n.run()
 }
 
@@ -111,32 +111,39 @@ func (n *Node) run() {
 
 	for range runTicker.C {
 		ctx := context.Background()
-		// if the node is closed, break it
+		// If the node is closed, break it.
 		if n.pbftMeta.closed {
 			break
 		}
 
-		// fetch messages from buffer to pool
+		// Fetch messages from buffer to pool.
 		msgList := n.conn.DrainMsgBuffer()
 		for _, msg := range msgList {
 			err := n.handleMessage(ctx, msg)
 			if err != nil {
-				slog.ErrorContext(ctx, "handleMessage", "err", err)
+				slog.ErrorContext(ctx, "handleMessage failed", "err", err)
 			}
 		}
 
-		// update PBFT process
+		// Update PBFT process.
 		n.pbftMeta.curateMsg()
 
-		// try to step into the next process
+		// Try to step into the next process.
 		if err := n.step2NextStage(ctx); err != nil {
-			slog.ErrorContext(ctx, "step2NextStage", "err", err)
+			slog.ErrorContext(ctx, "step2NextStage failed", "err", err)
 		}
 
-		// if this node is the leader and not proposed yet, try to propose one block
-		if n.pbftMeta.stage == stagePreprepare && n.pbftMeta.lp.NodeID == n.pbftMeta.leader && !n.pbftMeta.proposed {
-			if err := n.propose(ctx); err != nil {
-				slog.ErrorContext(ctx, "propose", "err", err)
+		if n.pbftMeta.lp.NodeID == n.pbftMeta.leader {
+			// If this node is the leader and not proposed yet, try to propose one block.
+			if n.pbftMeta.stage == stagePreprepare && !n.pbftMeta.proposed {
+				if err := n.propose(ctx); err != nil {
+					slog.ErrorContext(ctx, "propose failed", "err", err)
+				}
+			}
+		} else if n.pbftMeta.catchupReady() {
+			// If this node is not the leader, check whether to use catch-up.
+			if err := n.catchUpStart(ctx); err != nil {
+				slog.ErrorContext(ctx, "catchupStart failed", "err", err)
 			}
 		}
 	}
@@ -196,6 +203,7 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 	}
 
 	n.pbftMeta.msgPool.PushPreprepareMsg(&ppMsg)
+	n.pbftMeta.updateLatestViewSeq(ppMsg.View, ppMsg.Seq)
 
 	return nil
 }
@@ -367,6 +375,12 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, w)
 
 	return nil
+}
+
+func (n *Node) catchUpStart(ctx context.Context) error {
+	n.pbftMeta.catchupStarted = true
+	// Send the catchup message to the leader.
+
 }
 
 func (n *Node) closeAll() {

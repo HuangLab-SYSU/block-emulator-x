@@ -52,7 +52,8 @@ type consensusMeta struct {
 	commitSet       map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
 
 	// variables to catch-up proposals
-	latestViewSeqPool basicstructs.ViewSeq
+	latestViewSeq  basicstructs.ViewSeq // latestViewSeq is the latest view and seq of proposals in the message pool.
+	catchupStarted bool                 // catchupStarted shows whether the catchup mechanism is started.
 }
 
 func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *consensusMeta {
@@ -75,7 +76,8 @@ func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *conse
 		prepareSet:      map[nodetopo.NodeInfo]struct{}{},
 		commitSet:       map[nodetopo.NodeInfo]struct{}{},
 
-		latestViewSeqPool: basicstructs.ViewSeq{},
+		latestViewSeq:  basicstructs.ViewSeq{},
+		catchupStarted: false,
 	}
 }
 
@@ -166,4 +168,22 @@ func (c *consensusMeta) step2Next() (int, int, error) {
 	}
 
 	return 0, -1, fmt.Errorf("invalid stage %d", c.stage)
+}
+
+// updateLatestViewSeq updates the latest view and seq in the message pool.
+func (c *consensusMeta) updateLatestViewSeq(view, seq int64) {
+	in := basicstructs.ViewSeq{View: view, Seq: seq}
+	if c.latestViewSeq.Compare(in) == -1 {
+		c.latestViewSeq = in
+	}
+}
+
+// catchupReady returns whether the catch-up mechanism is ready to start.
+func (c *consensusMeta) catchupReady() bool {
+	if c.catchupStarted {
+		// If the catch-up starts already, should not start a new one.
+		return false
+	}
+	// If the view is unchanged and the seq is catchUpThreshold behind, return true.
+	return c.latestViewSeq.View == c.curViewSeq.View && c.latestViewSeq.Seq >= c.curViewSeq.Seq+catchUpThreshold
 }
