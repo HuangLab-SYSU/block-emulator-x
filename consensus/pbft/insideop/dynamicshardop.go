@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop/migrationblockop"
@@ -43,19 +42,17 @@ type DynamicShardOp struct {
 	lp  config.LocalParams
 }
 
-func NewDynamicShardOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, amm *migration.AccMigrateMetadata, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*DynamicShardOp, error) {
-	tbo, err := txblockop.NewTxBlockOp(conn, resolver, chain, cfg, lp)
-	if err != nil {
-		return nil, fmt.Errorf("NewTxBlockOp: %w", err)
-	}
-
-	fp := filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID))
-
-	csw, err := csvwrite.NewCSVSeqWriter(fp, block.RecordTitle)
-	if err != nil {
-		return nil, fmt.Errorf("NewCSVSeqWriter: %w", err)
-	}
-
+func NewDynamicShardOp(
+	conn *network.ConnHandler,
+	resolver nodetopo.NodeMapper,
+	chain *chain.Chain,
+	txPool txpool.TxPool,
+	amm *migration.AccMigrateMetadata,
+	tbo txblockop.TxBlockOp,
+	csw *csvwrite.CSVSeqWriter,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) *DynamicShardOp {
 	return &DynamicShardOp{
 		amm:      amm,
 		conn:     conn,
@@ -67,7 +64,7 @@ func NewDynamicShardOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, 
 		csw:      csw,
 		cfg:      cfg,
 		lp:       lp,
-	}, nil
+	}
 }
 
 func (c *DynamicShardOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
@@ -123,11 +120,6 @@ func (c *DynamicShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader 
 	}
 
 	return nil
-}
-
-func (c *DynamicShardOp) Close() {
-	_ = c.csw.Close()
-	_ = c.chain.Close()
 }
 
 func (c *DynamicShardOp) buildBlockProposal(ctx context.Context) (*message.Proposal, error) {

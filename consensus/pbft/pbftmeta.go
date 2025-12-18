@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
-	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/pool"
+	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/basicstructs"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
@@ -22,6 +22,12 @@ const (
 	stageViewChange = 4
 )
 
+const (
+	// catchUpThreshold is the view-interval threshold to trigger the Catch-Up mechanism in PBFT.
+	// If the view of this node is catchUpThreshold behind the latest proposal, this node will use Catch-Up.
+	catchUpThreshold = 5
+)
+
 // consensusMeta is the metadata of PBFT consensus.
 // Note that, consensusMeta is not thread-safe.
 type consensusMeta struct {
@@ -32,19 +38,22 @@ type consensusMeta struct {
 	leader int64 // the leader id
 	closed bool  // consensus is closed or not
 
-	msgPool *pool.MsgPool
+	msgPool *basicstructs.MsgPool
 
 	// metadata for a single round;
 	// variables below will update per round.
-	proposed        bool                           // this node has proposed in this round or not
-	seq             int64                          // sequence id of PBFT consensus.
-	view            int64                          // view of PBFT consensus.
+	proposed        bool                           // this node has proposed in this round or not.
+	curViewSeq      basicstructs.ViewSeq           // curViewSeq is current pbft view and sequence.
 	stage           int                            // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
 	curProposal     *message.PreprepareMsg         // preprepare message in this round.
 	lastProposal    *message.PreprepareMsg         // preprepare message in the last round.
-	lastProposeTime time.Time                      // the time for the last proposal
+	lastProposeTime time.Time                      // the time for the last proposal.
 	prepareSet      map[nodetopo.NodeInfo]struct{} // prepareSet collects the nodes sending prepare message.
 	commitSet       map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
+
+	// variables to catch-up proposals
+	latestViewSeq  basicstructs.ViewSeq // latestViewSeq is the latest view and seq of proposals in the message pool.
+	catchupStarted bool                 // catchupStarted shows whether the catchup mechanism is started.
 }
 
 func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *consensusMeta {
@@ -56,32 +65,34 @@ func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *conse
 		leader: initialLeader,
 		closed: false,
 
-		msgPool: pool.NewMsgPool(),
+		msgPool: basicstructs.NewMsgPool(),
 
 		proposed:        false,
-		seq:             0,
-		view:            0,
+		curViewSeq:      basicstructs.ViewSeq{},
 		stage:           stagePreprepare,
 		curProposal:     nil,
 		lastProposal:    nil,
 		lastProposeTime: time.Now(),
 		prepareSet:      map[nodetopo.NodeInfo]struct{}{},
 		commitSet:       map[nodetopo.NodeInfo]struct{}{},
+
+		latestViewSeq:  basicstructs.ViewSeq{},
+		catchupStarted: false,
 	}
 }
 
 // curateMsg counts the number of valid messages in the msgPool.
 func (c *consensusMeta) curateMsg() {
 	if c.curProposal == nil {
-		ppMsgList := c.msgPool.ReadPreprepareMsg(c.view, c.seq)
+		ppMsgList := c.msgPool.ReadPreprepareMsg(c.curViewSeq)
 		for _, ppMsg := range ppMsgList {
-			if ppMsg.View != c.view || ppMsg.Seq != c.seq || ppMsg.NodeID != c.leader {
+			if c.curViewSeq.Compare(basicstructs.ViewSeq{View: ppMsg.View, Seq: ppMsg.Seq}) != 0 || ppMsg.NodeID != c.leader {
 				// if the message is invalid (wrong seq/view or wrong leader), drop it
-				slog.Info("get invalid ppMsg", "view", ppMsg.View, "seq", ppMsg.Seq)
+				slog.Info("get an invalid preprepare message, ignore it", "view", ppMsg.View, "seq", ppMsg.Seq)
 				continue
 			}
 
-			slog.Info("proposal of this round is received", "view", c.view, "seq", c.seq)
+			slog.Info("proposal of this round is received", "current view and seq", c.curViewSeq)
 			c.curProposal = ppMsg
 
 			break
@@ -92,22 +103,22 @@ func (c *consensusMeta) curateMsg() {
 		return
 	}
 
-	pMsgList := c.msgPool.ReadPrepareMsg(c.view, c.seq)
+	pMsgList := c.msgPool.ReadPrepareMsg(c.curViewSeq)
 	for _, pMsg := range pMsgList {
-		if pMsg.View != c.view || pMsg.Seq != c.seq || !bytes.Equal(pMsg.Digest, c.curProposal.Digest) {
+		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) != 0 || !bytes.Equal(pMsg.Digest, c.curProposal.Digest) {
 			// if the prepare message is invalid (wrong seq/view or wrong digest), drop it
-			slog.Info("get invalid pMsg", "view", pMsg.View, "seq", pMsg.Seq)
+			slog.Info("get an invalid prepare message, ignore it", "view", pMsg.View, "seq", pMsg.Seq)
 			continue
 		}
 
 		c.prepareSet[nodetopo.NodeInfo{NodeID: pMsg.NodeID, ShardID: pMsg.ShardID}] = struct{}{}
 	}
 
-	cMsgList := c.msgPool.ReadCommitMsg(c.view, c.seq)
+	cMsgList := c.msgPool.ReadCommitMsg(c.curViewSeq)
 	for _, cMsg := range cMsgList {
-		if cMsg.View != c.view || cMsg.Seq != c.seq || !bytes.Equal(cMsg.Digest, c.curProposal.Digest) {
+		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) != 0 || !bytes.Equal(cMsg.Digest, c.curProposal.Digest) {
 			// if the commit message is invalid (wrong seq/view or wrong digest), drop it
-			slog.Info("get invalid cMsg", "view", cMsg.View, "seq", cMsg.Seq)
+			slog.Info("get an invalid commit message, ignore it", "view", cMsg.View, "seq", cMsg.Seq)
 			continue
 		}
 
@@ -151,10 +162,28 @@ func (c *consensusMeta) step2Next() (int, int, error) {
 		c.prepareSet = map[nodetopo.NodeInfo]struct{}{}
 		c.commitSet = map[nodetopo.NodeInfo]struct{}{}
 		c.proposed = false
-		c.seq++
+		c.curViewSeq.Seq++
 
 		return stageCommit, stagePreprepare, nil
 	}
 
 	return 0, -1, fmt.Errorf("invalid stage %d", c.stage)
+}
+
+// updateLatestViewSeq updates the latest view and seq in the message pool.
+func (c *consensusMeta) updateLatestViewSeq(view, seq int64) {
+	in := basicstructs.ViewSeq{View: view, Seq: seq}
+	if c.latestViewSeq.Compare(in) == -1 {
+		c.latestViewSeq = in
+	}
+}
+
+// catchupReady returns whether the catch-up mechanism is ready to start.
+func (c *consensusMeta) catchupReady() bool {
+	if c.catchupStarted {
+		// If the catch-up starts already, should not start a new one.
+		return false
+	}
+	// If the view is unchanged and the seq is catchUpThreshold behind, return true.
+	return c.latestViewSeq.View == c.curViewSeq.View && c.latestViewSeq.Seq >= c.curViewSeq.Seq+catchUpThreshold
 }

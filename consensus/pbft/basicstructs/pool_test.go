@@ -1,4 +1,4 @@
-package pool
+package basicstructs
 
 import (
 	"testing"
@@ -75,7 +75,7 @@ func msgPush(mp *MsgPool) {
 }
 
 func testMsgReadThisRound(t *testing.T, mp *MsgPool) {
-	ppMsg := mp.ReadPreprepareMsg(testView, testSequence)
+	ppMsg := mp.ReadPreprepareMsg(ViewSeq{View: testView, Seq: testSequence})
 	require.Len(t, ppMsg, 1)
 	for _, p := range ppMsg {
 		require.Equal(t, []byte(testThisRoundDigest), p.Digest)
@@ -83,7 +83,7 @@ func testMsgReadThisRound(t *testing.T, mp *MsgPool) {
 		require.Equal(t, testView, p.View)
 	}
 
-	pMsg := mp.ReadPrepareMsg(testView, testSequence)
+	pMsg := mp.ReadPrepareMsg(ViewSeq{View: testView, Seq: testSequence})
 	require.Len(t, pMsg, msgNumber)
 	for _, p := range pMsg {
 		require.Equal(t, []byte(testThisRoundDigest), p.Digest)
@@ -91,7 +91,7 @@ func testMsgReadThisRound(t *testing.T, mp *MsgPool) {
 		require.Equal(t, testView, p.View)
 	}
 
-	cMsg := mp.ReadCommitMsg(testView, testSequence)
+	cMsg := mp.ReadCommitMsg(ViewSeq{View: testView, Seq: testSequence})
 	require.Len(t, cMsg, msgNumber)
 	for _, c := range cMsg {
 		require.Equal(t, []byte(testThisRoundDigest), c.Digest)
@@ -101,8 +101,8 @@ func testMsgReadThisRound(t *testing.T, mp *MsgPool) {
 }
 
 func testMsgReadNextView(t *testing.T, mp *MsgPool) {
-	// given a larger view, all testSequence with less view will be popped.
-	ppMsg := mp.ReadPreprepareMsg(testView+1, testSequence)
+	// given a larger View, all testSequence with less View will be popped.
+	ppMsg := mp.ReadPreprepareMsg(ViewSeq{View: testView + 1, Seq: testSequence})
 	require.Len(t, ppMsg, 1)
 	for _, p := range ppMsg {
 		require.Equal(t, []byte(testNextRoundDigest), p.Digest)
@@ -110,7 +110,7 @@ func testMsgReadNextView(t *testing.T, mp *MsgPool) {
 		require.Equal(t, testView, p.View)
 	}
 
-	pMsg := mp.ReadPrepareMsg(testView+1, testSequence)
+	pMsg := mp.ReadPrepareMsg(ViewSeq{View: testView + 1, Seq: testSequence})
 	require.Len(t, pMsg, msgNumber)
 	for _, p := range pMsg {
 		require.Equal(t, []byte(testNextRoundDigest), p.Digest)
@@ -118,7 +118,7 @@ func testMsgReadNextView(t *testing.T, mp *MsgPool) {
 		require.Equal(t, testView, p.View)
 	}
 
-	cMsg := mp.ReadCommitMsg(testView+1, testSequence)
+	cMsg := mp.ReadCommitMsg(ViewSeq{View: testView + 1, Seq: testSequence})
 	require.Len(t, cMsg, msgNumber)
 	for _, c := range cMsg {
 		require.Equal(t, []byte(testNextRoundDigest), c.Digest)
@@ -128,10 +128,10 @@ func testMsgReadNextView(t *testing.T, mp *MsgPool) {
 }
 
 func testMsgReadEmpty(t *testing.T, mp *MsgPool) {
-	ppMsg := mp.ReadPreprepareMsg(testView+1, testSequence+1)
+	ppMsg := mp.ReadPreprepareMsg(ViewSeq{View: testView + 1, Seq: testSequence + 1})
 	require.Len(t, ppMsg, 0)
-	pMsg := mp.ReadPrepareMsg(testView+1, testSequence+1)
+	pMsg := mp.ReadPrepareMsg(ViewSeq{View: testView + 1, Seq: testSequence + 1})
 	require.Len(t, pMsg, 0)
-	cMsg := mp.ReadCommitMsg(testView+1, testSequence+1)
+	cMsg := mp.ReadCommitMsg(ViewSeq{View: testView + 1, Seq: testSequence + 1})
 	require.Len(t, cMsg, 0)
 }

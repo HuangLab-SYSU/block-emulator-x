@@ -13,7 +13,9 @@ const (
 	PrepareMessageType    = "Prepare"
 	CommitMessageType     = "Commit"
 
-	ReceiveTxsMessageType = "ReceiveTxs"
+	ReceiveTxsMessageType  = "ReceiveTxs"
+	CatchupReqMessageType  = "CatchupReq"
+	CatchupRespMessageType = "CatchupResp"
 
 	StopConsensusMessageType = "StopConsensus"
 )
@@ -61,10 +63,23 @@ type CommitMsg struct {
 	ShardID, NodeID int64
 }
 
+type CatchupReqMsg struct {
+	StartBlockHeight int64
+	ShardID, NodeID  int64
+}
+
+type CatchupRespMsg struct {
+	Proposals         []Proposal
+	NextSeq, NextView int64
+	ShardID, NodeID   int64
+}
+
+// ReceiveTxsMsg contains transactions.
 type ReceiveTxsMsg struct {
 	Txs []transaction.Transaction
 }
 
+// StopConsensusMsg is the stop-signal to nodes.
 type StopConsensusMsg struct {
 	StopSignal struct{}
 }

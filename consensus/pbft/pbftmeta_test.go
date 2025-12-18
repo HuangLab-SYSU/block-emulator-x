@@ -60,7 +60,7 @@ func TestConsensusMeta(t *testing.T) {
 	require.Equal(t, stageCommit, oldStage)
 	require.Equal(t, stagePreprepare, stage)
 	require.Equal(t, stagePreprepare, cm.stage)
-	require.Equal(t, testSequence+1, cm.seq)
+	require.Equal(t, testSequence+1, cm.curViewSeq.Seq)
 	require.Nil(t, cm.curProposal)
 
 	cm.curateMsg()
@@ -72,7 +72,7 @@ func TestConsensusMeta(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, stagePreprepare, stage)
 	require.Equal(t, stagePreprepare, cm.stage)
-	require.Equal(t, testSequence+2, cm.seq)
+	require.Equal(t, testSequence+2, cm.curViewSeq.Seq)
 	require.Nil(t, cm.curProposal)
 }
 

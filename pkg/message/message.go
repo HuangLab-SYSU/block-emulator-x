@@ -59,6 +59,11 @@ func getMsgType(msg any) (string, error) {
 		msgType = CommitMessageType
 	case *ReceiveTxsMsg, ReceiveTxsMsg:
 		msgType = ReceiveTxsMessageType
+	case *CatchupReqMsg, CatchupReqMsg:
+		msgType = CatchupReqMessageType
+	case *CatchupRespMsg, CatchupRespMsg:
+		msgType = CatchupRespMessageType
+
 	case *RelayBlockInfoMsg, RelayBlockInfoMsg:
 		msgType = RelayBlockInfoMessageType
 
