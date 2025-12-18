@@ -2,7 +2,7 @@ name: PR Merge and Delete Branch
 
 on:
   pull_request:
-    types: [ review_requested, reviewed, closed ]
+    types: [ closed ]
     branches:
       - main
 
@@ -14,12 +14,16 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Set up GitHub CLI
-        uses: cli/cli-action@v2
+        uses: actions/setup-gh-cli@v1
+        with:
+          version: '2.7.0'
 
       - name: Merge PR with squash and delete branch
-        if: github.event.pull_request.merged == true && github.event.pull_request.state == 'closed'
+        if: github.event.pull_request.merged == true
         run: |
           PR_BRANCH=${{ github.head_ref }}
-          echo "Merging PR with squash and deleting branch $PR_BRANCH"
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "Merging PR #${PR_NUMBER} with squash and deleting branch $PR_BRANCH"
           
-          gh pr merge ${{ github.event.pull_request.number }} --squash --admin --delete-branch --confirm
+          # 使用 GitHub CLI 合并 PR 并删除分支
+          gh pr merge $PR_NUMBER --squash --delete-branch --confirm
