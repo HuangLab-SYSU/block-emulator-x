@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 )
 
 func Hex2Addr(s string) (account.Address, error) {

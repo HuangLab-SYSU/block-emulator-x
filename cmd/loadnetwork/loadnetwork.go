@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/network/clientconnrpc"
-	"github.com/HuangLab-SYSU/block-emulator/pkg/nodetopo"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/clientconnrpc"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
 var ipTablePath = flag.String("ip_table", "ip_table.json", "path to ip_table.json")

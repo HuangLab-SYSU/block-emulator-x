@@ -6,7 +6,7 @@ import (
 
 	"github.com/bits-and-blooms/bitset"
 
-	"github.com/HuangLab-SYSU/block-emulator/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
 )
 
 const (

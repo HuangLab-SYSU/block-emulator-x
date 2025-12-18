@@ -3,7 +3,7 @@ package partition
 import (
 	"encoding/binary"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 )
 
 // DefaultAccountLoc generates an account state with some balances.

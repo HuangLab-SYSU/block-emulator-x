@@ -3,7 +3,7 @@ package message
 import (
 	"time"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/core/transaction"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
 const RelayBlockInfoMessageType = "RelayBlockInfo" // Consensus nodes (using transaction-relay to handle cross-shard tx) send this type of message to supervisor

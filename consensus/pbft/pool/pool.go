@@ -3,7 +3,7 @@ package pool
 import (
 	"log/slog"
 
-	"github.com/HuangLab-SYSU/block-emulator/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
 type MsgPool struct {

@@ -9,7 +9,7 @@ formatters:
     - goimports
   settings:
     goimports:
-      local-prefixes: github.com/HuangLab-SYSU/block-emulator
+      local-prefixes: github.com/HuangLab-SYSU/block-emulator-x
     gofumpt:
       extra-rules: true
 
