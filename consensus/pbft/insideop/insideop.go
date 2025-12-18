@@ -18,10 +18,7 @@ type ShardInsideOp interface {
 	ValidateProposal(ctx context.Context, proposal *message.Proposal) error
 	// ProposalCommitAndDeliver commits the given proposal and deliver the related messages to the supervisor or other shards.
 	ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error
-	Close()
 }
-
-const blockRecordPathFmt = "shard=%d_node=%d/block_record.csv"
 
 func recordBlock(caller *csvwrite.CSVSeqWriter, b *block.Block) error {
 	line, err := block.ConvertBlock2Line(b)

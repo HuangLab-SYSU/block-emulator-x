@@ -66,5 +66,3 @@ func (c *CLPALocOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpcse
 
 	return nil
 }
-
-func (c *CLPALocOutsideOp) Close() {}

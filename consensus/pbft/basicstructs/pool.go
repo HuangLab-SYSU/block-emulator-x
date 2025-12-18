@@ -1,4 +1,4 @@
-package pool
+package basicstructs
 
 import (
 	"log/slog"
@@ -20,12 +20,12 @@ func NewMsgPool() *MsgPool {
 	}
 }
 
-func (m *MsgPool) ReadPreprepareMsg(endView, endSeq int64) []*message.PreprepareMsg {
+func (m *MsgPool) ReadPreprepareMsg(end ViewSeq) []*message.PreprepareMsg {
 	ret := make([]*message.PreprepareMsg, 0)
 
 	for m.preprepares.Len() > 0 {
 		top := m.preprepares.PopItem()
-		if top.View > endView || (top.View == endView && top.Seq > endSeq) {
+		if end.Compare(ViewSeq{View: top.View, Seq: top.Seq}) == -1 {
 			m.preprepares.PushItem(top)
 			break
 		}
@@ -34,18 +34,18 @@ func (m *MsgPool) ReadPreprepareMsg(endView, endSeq int64) []*message.Preprepare
 	}
 
 	if len(ret) > 0 {
-		slog.Debug("read PreprepareMsg successfully", "endView", endView, "endSeq", endSeq, "fetched size", len(ret), "rest size", m.preprepares.Len())
+		slog.Debug("read PreprepareMsg successfully", "end view and seq", end, "fetched size", len(ret), "rest size", m.preprepares.Len())
 	}
 
 	return ret
 }
 
-func (m *MsgPool) ReadPrepareMsg(endView, endSeq int64) []*message.PrepareMsg {
+func (m *MsgPool) ReadPrepareMsg(end ViewSeq) []*message.PrepareMsg {
 	ret := make([]*message.PrepareMsg, 0)
 
 	for m.prepares.Len() > 0 {
 		top := m.prepares.PopItem()
-		if top.View > endView || (top.View == endView && top.Seq > endSeq) {
+		if end.Compare(ViewSeq{View: top.View, Seq: top.Seq}) == -1 {
 			m.prepares.PushItem(top)
 			break
 		}
@@ -54,18 +54,18 @@ func (m *MsgPool) ReadPrepareMsg(endView, endSeq int64) []*message.PrepareMsg {
 	}
 
 	if len(ret) > 0 {
-		slog.Debug("read PrepareMsg successfully", "endView", endView, "endSeq", endSeq, "fetched size", len(ret), "rest size", m.preprepares.Len())
+		slog.Debug("read PrepareMsg successfully", "end view and seq", end, "fetched size", len(ret), "rest size", m.preprepares.Len())
 	}
 
 	return ret
 }
 
-func (m *MsgPool) ReadCommitMsg(endView, endSeq int64) []*message.CommitMsg {
+func (m *MsgPool) ReadCommitMsg(end ViewSeq) []*message.CommitMsg {
 	ret := make([]*message.CommitMsg, 0)
 
 	for m.commits.Len() > 0 {
 		top := m.commits.PopItem()
-		if top.View > endView || (top.View == endView && top.Seq > endSeq) {
+		if end.Compare(ViewSeq{View: top.View, Seq: top.Seq}) == -1 {
 			m.commits.PushItem(top)
 			break
 		}
@@ -74,7 +74,7 @@ func (m *MsgPool) ReadCommitMsg(endView, endSeq int64) []*message.CommitMsg {
 	}
 
 	if len(ret) > 0 {
-		slog.Debug("read CommitMsg successfully", "endView", endView, "endSeq", endSeq, "fetched size", len(ret), "rest size", m.preprepares.Len())
+		slog.Debug("read CommitMsg successfully", "end view and seq", end, "fetched size", len(ret), "rest size", m.preprepares.Len())
 	}
 
 	return ret

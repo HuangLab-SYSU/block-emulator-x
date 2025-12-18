@@ -6,14 +6,19 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
+	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/basicstructs"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop"
+	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop/txblockop"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/outsideop"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/chain"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
@@ -23,7 +28,9 @@ import (
 type messageHandleFunc func(context.Context, []byte) error
 
 const (
-	executeInterval = 100 * time.Millisecond
+	// executeInterval is the time interval between two running loops.
+	executeInterval    = 500 * time.Millisecond
+	blockRecordPathFmt = "shard=%d_node=%d/block_record.csv"
 )
 
 // Node is the node running the PBFT consensus.
@@ -32,14 +39,17 @@ type Node struct {
 	resolver nodetopo.NodeMapper  // resolver gives the information of all consensus nodes and shards.
 	pbftMeta *consensusMeta       // pbftMeta is the current consensus procedure
 
+	bc  *chain.Chain
+	csw *csvwrite.CSVSeqWriter
+
 	iop insideop.ShardInsideOp
 	omh outsideop.ShardOutsideMsgHandler
 
-	defaultMsgHandler map[string]messageHandleFunc
+	pbftMsgHandler map[string]messageHandleFunc
 }
 
 // NewPBFTNode creates a new node running PBFT consensus with given configurations.
-func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*Node, error) {
+func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (n *Node, rErr error) {
 	if cfg.ShardNum <= 0 || cfg.ShardNum <= lp.ShardID {
 		return nil, fmt.Errorf("invalid shardID=%d", lp.ShardID)
 	}
@@ -48,16 +58,43 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 		return nil, fmt.Errorf("invalid nodeID=%d", lp.NodeID)
 	}
 
-	// new a blockchain
+	var cleanups []func()
+
+	defer func() {
+		if rErr != nil {
+			for i := len(cleanups) - 1; i >= 0; i-- {
+				cleanups[i]()
+			}
+		}
+	}()
+
+	// New a blockchain.
 	bc, err := chain.NewChain(cfg.BlockchainCfg, lp)
 	if err != nil {
 		return nil, fmt.Errorf("NewChain err=%w", err)
 	}
 
+	cleanups = append(cleanups, func() { _ = bc.Close() })
+
+	// New a transaction pool.
 	txp, err := txpool.NewTxPool(cfg.TxPoolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxPool err=%w", err)
 	}
+
+	// New a transaction block operation.
+	tbo, err := txblockop.NewTxBlockOp(conn, r, bc, cfg, lp)
+	if err != nil {
+		return nil, fmt.Errorf("NewTxBlockOp failed: %w", err)
+	}
+
+	// New a csv writer to record blocks.
+	csw, err := csvwrite.NewCSVSeqWriter(filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID)), block.RecordTitle)
+	if err != nil {
+		return nil, fmt.Errorf("NewCSVSeqWriter failed: %w", err)
+	}
+
+	cleanups = append(cleanups, func() { _ = csw.Close() })
 
 	var (
 		iop insideop.ShardInsideOp
@@ -67,17 +104,11 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 	switch cfg.ConsensusType {
 	case config.StaticRelayConsensus, config.StaticBrokerConsensus:
 		omh = outsideop.NewStaticLocOutsideOp(txp)
-		if iop, err = insideop.NewStaticShardOp(conn, r, bc, txp, cfg, lp); err != nil {
-			return nil, fmt.Errorf("NewStaticShardOp err=%w", err)
-		}
-
+		iop = insideop.NewStaticShardOp(bc, txp, tbo, csw, cfg)
 	case config.CLPARelayConsensus, config.CLPABrokerConsensus:
 		amm := migration.NewAccMigrateMetadata(cfg.SystemCfg, lp)
-
 		omh = outsideop.NewCLPALocOutsideOp(txp, amm)
-		if iop, err = insideop.NewDynamicShardOp(conn, r, bc, txp, amm, cfg, lp); err != nil {
-			return nil, fmt.Errorf("NewDynamicShardOp err=%w", err)
-		}
+		iop = insideop.NewDynamicShardOp(conn, r, bc, txp, amm, tbo, csw, cfg, lp)
 	default:
 		return nil, fmt.Errorf("invalid consensus type=%s", cfg.ConsensusType)
 	}
@@ -87,10 +118,12 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 		resolver: r,
 		pbftMeta: newConsensusMeta(cfg, lp),
 
+		bc: bc,
+
 		iop: iop,
 		omh: omh,
 
-		defaultMsgHandler: make(map[string]messageHandleFunc),
+		pbftMsgHandler: make(map[string]messageHandleFunc),
 	}, nil
 }
 
@@ -99,7 +132,7 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 func (n *Node) Start() {
 	n.registerHandleFunc()
 
-	// start and run
+	// Start and run.
 	n.run()
 }
 
@@ -109,32 +142,39 @@ func (n *Node) run() {
 
 	for range runTicker.C {
 		ctx := context.Background()
-		// if the node is closed, break it
+		// If the node is closed, break it.
 		if n.pbftMeta.closed {
 			break
 		}
 
-		// fetch messages from buffer to pool
+		// Fetch messages from buffer to pool.
 		msgList := n.conn.DrainMsgBuffer()
 		for _, msg := range msgList {
 			err := n.handleMessage(ctx, msg)
 			if err != nil {
-				slog.ErrorContext(ctx, "handleMessage", "err", err)
+				slog.ErrorContext(ctx, "handleMessage failed", "err", err)
 			}
 		}
 
-		// update PBFT process
+		// Update PBFT process.
 		n.pbftMeta.curateMsg()
 
-		// try to step into the next process
+		// Try to step into the next process.
 		if err := n.step2NextStage(ctx); err != nil {
-			slog.ErrorContext(ctx, "step2NextStage", "err", err)
+			slog.ErrorContext(ctx, "step2NextStage failed", "err", err)
 		}
 
-		// if this node is the leader and not proposed yet, try to propose one block
-		if n.pbftMeta.stage == stagePreprepare && n.pbftMeta.lp.NodeID == n.pbftMeta.leader && !n.pbftMeta.proposed {
-			if err := n.propose(ctx); err != nil {
-				slog.ErrorContext(ctx, "propose", "err", err)
+		if n.pbftMeta.lp.NodeID == n.pbftMeta.leader {
+			// If this node is the leader and not proposed yet, try to propose one block.
+			if n.pbftMeta.stage == stagePreprepare && !n.pbftMeta.proposed {
+				if err := n.propose(ctx); err != nil {
+					slog.ErrorContext(ctx, "propose failed", "err", err)
+				}
+			}
+		} else if n.pbftMeta.catchupReady() {
+			// If this node is not the leader, check whether to use catch-up.
+			if err := n.catchUpStart(ctx); err != nil {
+				slog.ErrorContext(ctx, "catchupStart failed", "err", err)
 			}
 		}
 	}
@@ -144,24 +184,26 @@ func (n *Node) run() {
 
 // registerHandleFunc registers all message handle functions.
 func (n *Node) registerHandleFunc() {
-	n.defaultMsgHandler[message.StopConsensusMessageType] = n.handleStopConsensus
-	n.defaultMsgHandler[message.PreprepareMessageType] = n.handlePreprepare
-	n.defaultMsgHandler[message.PrepareMessageType] = n.handlePrepare
-	n.defaultMsgHandler[message.CommitMessageType] = n.handleCommit
+	n.pbftMsgHandler[message.StopConsensusMessageType] = n.handleStopConsensus
+	n.pbftMsgHandler[message.PreprepareMessageType] = n.handlePreprepare
+	n.pbftMsgHandler[message.PrepareMessageType] = n.handlePrepare
+	n.pbftMsgHandler[message.CommitMessageType] = n.handleCommit
+	n.pbftMsgHandler[message.CatchupReqMessageType] = n.handleCatchupReq
+	n.pbftMsgHandler[message.CatchupRespMessageType] = n.handleCatchupResp
 }
 
 func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) error {
-	handleFunc, exist := n.defaultMsgHandler[msg.GetMsgType()]
+	handleFunc, exist := n.pbftMsgHandler[msg.GetMsgType()]
 	if !exist {
 		if err := n.omh.HandleMsgOutsideShard(ctx, msg); err != nil {
-			return fmt.Errorf("handleMsgOutsideShard: %w", err)
+			return fmt.Errorf("handleMsgOutsideShard failed: %w", err)
 		}
 
 		return nil
 	}
 
 	if err := handleFunc(ctx, msg.GetPayload()); err != nil {
-		return fmt.Errorf("handle %s message err: %w", msg.GetMsgType(), err)
+		return fmt.Errorf("handle %s message failed: %w", msg.GetMsgType(), err)
 	}
 
 	return nil
@@ -181,10 +223,10 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode preprepare msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle preprepare message", "shardID", ppMsg.ShardID, "nodeID", ppMsg.NodeID)
+	slog.InfoContext(ctx, "handle preprepare message: try to add it to the message pool", "shardID", ppMsg.ShardID, "nodeID", ppMsg.NodeID)
 
 	// ignore the out-of-date message
-	if ppMsg.View < n.pbftMeta.view || ppMsg.Seq < n.pbftMeta.seq {
+	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: ppMsg.View, Seq: ppMsg.Seq}) > 0 {
 		slog.InfoContext(ctx, "handle out-of-date Preprepare, ignore it", "view", ppMsg.View, "seq", ppMsg.Seq)
 		return nil
 	}
@@ -194,6 +236,7 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 	}
 
 	n.pbftMeta.msgPool.PushPreprepareMsg(&ppMsg)
+	n.pbftMeta.updateLatestViewSeq(ppMsg.View, ppMsg.Seq)
 
 	return nil
 }
@@ -204,10 +247,10 @@ func (n *Node) handlePrepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode prepare msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle prepare message", "shardID", pMsg.ShardID, "nodeID", pMsg.NodeID)
+	slog.InfoContext(ctx, "handle prepare message: try to add it to the message pool", "shardID", pMsg.ShardID, "nodeID", pMsg.NodeID)
 
 	// ignore the out-of-date message
-	if pMsg.View < n.pbftMeta.view || pMsg.Seq < n.pbftMeta.seq {
+	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) > 0 {
 		slog.InfoContext(ctx, "handle out-of-date Prepare, ignore it", "view", pMsg.View, "seq", pMsg.Seq)
 		return nil
 	}
@@ -223,10 +266,10 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode commit msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle commit message", "shardID", cMsg.ShardID, "nodeID", cMsg.NodeID)
+	slog.InfoContext(ctx, "handle commit message: try to add it to the message pool", "shardID", cMsg.ShardID, "nodeID", cMsg.NodeID)
 
 	// ignore the out-of-date message
-	if cMsg.View < n.pbftMeta.view || cMsg.Seq < n.pbftMeta.seq {
+	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) > 0 {
 		slog.InfoContext(ctx, "handle out-of-date Commit, ignore it", "view", cMsg.View, "seq", cMsg.Seq)
 		return nil
 	}
@@ -234,6 +277,14 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 	n.pbftMeta.msgPool.PushCommitMsg(&cMsg)
 
 	return nil
+}
+
+func (n *Node) handleCatchupReq(ctx context.Context, payload []byte) error {
+	panic("implement me")
+}
+
+func (n *Node) handleCatchupResp(ctx context.Context, payload []byte) error {
+	panic("implement me")
 }
 
 // step2NextStage steps to next pbft stage until it steps to the end
@@ -278,8 +329,11 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 func (n *Node) propose(ctx context.Context) error {
 	if time.Since(n.pbftMeta.lastProposeTime) < time.Duration(n.pbftMeta.cfg.BlockInterval)*time.Millisecond {
 		// not reach the block interval
+		slog.Debug("not the time to propose, ignore it", "time duration", time.Since(n.pbftMeta.lastProposeTime).Seconds())
 		return nil
 	}
+
+	slog.Debug("try to propose")
 
 	p, err := n.iop.BuildProposal(ctx)
 	if err != nil {
@@ -297,19 +351,14 @@ func (n *Node) propose(ctx context.Context) error {
 		return fmt.Errorf("CalcHash failed: %w", err)
 	}
 
-	wrappedMsg, err := message.WrapMsg(&message.PreprepareMsg{
-		P: *p, Digest: digest, Seq: n.pbftMeta.seq, View: n.pbftMeta.view,
-	})
-	if err != nil {
-		return fmt.Errorf("message.WrapMsg failed: %w", err)
+	ppMsg := &message.PreprepareMsg{
+		P: *p, Digest: digest, Seq: n.pbftMeta.curViewSeq.Seq, View: n.pbftMeta.curViewSeq.View,
 	}
 
-	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.lp.ShardID)
-	if err != nil {
-		return fmt.Errorf("GetNodesInShard failed: %w", err)
+	if err = n.broadcastMsgInnerShard(ctx, ppMsg); err != nil {
+		return fmt.Errorf("broadcastMsgInnerShard failed: %w", err)
 	}
 
-	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, wrappedMsg)
 	n.pbftMeta.proposed = true
 	n.pbftMeta.lastProposeTime = time.Now()
 
@@ -319,37 +368,51 @@ func (n *Node) propose(ctx context.Context) error {
 func (n *Node) prepareBroadcast(ctx context.Context) error {
 	pMsg := &message.PrepareMsg{
 		Digest:  n.pbftMeta.curProposal.Digest,
-		View:    n.pbftMeta.view,
-		Seq:     n.pbftMeta.seq,
+		View:    n.pbftMeta.curProposal.View,
+		Seq:     n.pbftMeta.curProposal.Seq,
 		ShardID: n.pbftMeta.lp.ShardID,
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}
 
-	w, err := message.WrapMsg(pMsg)
-	if err != nil {
-		return fmt.Errorf("message.WrapMsg failed: %w", err)
-	}
-
-	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.lp.ShardID)
-	if err != nil {
-		return fmt.Errorf("GetNodesInShard failed: %w", err)
-	}
-
-	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, w)
-
-	return nil
+	return n.broadcastMsgInnerShard(ctx, pMsg)
 }
 
 func (n *Node) commitBroadcast(ctx context.Context) error {
 	cMsg := &message.CommitMsg{
 		Digest:  n.pbftMeta.curProposal.Digest,
-		View:    n.pbftMeta.view,
-		Seq:     n.pbftMeta.seq,
+		View:    n.pbftMeta.curProposal.View,
+		Seq:     n.pbftMeta.curProposal.Seq,
 		ShardID: n.pbftMeta.lp.ShardID,
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}
 
-	w, err := message.WrapMsg(cMsg)
+	return n.broadcastMsgInnerShard(ctx, cMsg)
+}
+
+func (n *Node) catchUpStart(ctx context.Context) error {
+	// Send the catchup message to the leader.
+	leader, err := n.resolver.GetLeader(n.pbftMeta.lp.ShardID)
+	if err != nil {
+		return fmt.Errorf("get leader failed: %w", err)
+	}
+
+	w, err := message.WrapMsg(&message.CatchupReqMsg{
+		StartBlockHeight: int64(n.bc.GetCurHeader().Number) + 1, // StartBlockHeight should be the current height + 1
+		ShardID:          n.pbftMeta.lp.ShardID,
+		NodeID:           n.pbftMeta.lp.NodeID,
+	})
+	if err != nil {
+		return fmt.Errorf("wrap message failed: %w", err)
+	}
+
+	n.conn.SendMsg2Dest(ctx, leader, w)
+	n.pbftMeta.catchupStarted = true
+
+	return nil
+}
+
+func (n *Node) broadcastMsgInnerShard(ctx context.Context, msg any) error {
+	w, err := message.WrapMsg(msg)
 	if err != nil {
 		return fmt.Errorf("message.WrapMsg failed: %w", err)
 	}
@@ -368,6 +431,6 @@ func (n *Node) closeAll() {
 	slog.Info("consensus node is closing")
 
 	n.conn.Close()
-	n.iop.Close()
-	n.omh.Close()
+	_ = n.bc.Close()
+	_ = n.csw.Close()
 }

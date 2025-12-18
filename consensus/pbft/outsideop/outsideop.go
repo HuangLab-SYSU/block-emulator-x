@@ -8,5 +8,4 @@ import (
 
 type ShardOutsideMsgHandler interface {
 	HandleMsgOutsideShard(ctx context.Context, msg *rpcserver.WrappedMsg) error
-	Close()
 }
