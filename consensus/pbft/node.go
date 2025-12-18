@@ -23,7 +23,7 @@ import (
 type messageHandleFunc func(context.Context, []byte) error
 
 const (
-	executeInterval = 500 * time.Millisecond
+	executeInterval = 100 * time.Millisecond
 )
 
 // Node is the node running the PBFT consensus.
@@ -366,9 +366,6 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 
 func (n *Node) closeAll() {
 	slog.Info("consensus node is closing")
-
-	// wait a block-interval
-	time.Sleep(time.Duration(n.pbftMeta.cfg.BlockInterval) * time.Millisecond)
 
 	n.conn.Close()
 	n.iop.Close()
