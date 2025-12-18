@@ -280,11 +280,66 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 }
 
 func (n *Node) handleCatchupReq(ctx context.Context, payload []byte) error {
-	panic("implement me")
+	var crMsg message.CatchupReqMsg
+	if err := gob.NewDecoder(bytes.NewReader(payload)).Decode(&crMsg); err != nil {
+		return fmt.Errorf("decode catchup req msg: %w", err)
+	}
+
+	slog.InfoContext(ctx, "handle catch up req message", "from shardID", crMsg.ShardID, "from nodeID", crMsg.NodeID)
+
+	blocks, err := n.bc.GetBlocksAfterHeight(crMsg.ShardID)
+	if err != nil {
+		return fmt.Errorf("get blocks failed: %w", err)
+	}
+
+	proposals := make([]message.Proposal, len(blocks))
+	for i, b := range blocks {
+		proposals[i] = *message.WrapProposal(&b)
+	}
+
+	w, err := message.WrapMsg(&message.CatchupRespMsg{
+		Proposals: proposals,
+		NextView:  n.pbftMeta.curViewSeq.View,
+		NextSeq:   n.pbftMeta.curViewSeq.Seq,
+		ShardID:   n.pbftMeta.lp.ShardID,
+		NodeID:    n.pbftMeta.lp.NodeID,
+	})
+	if err != nil {
+		return fmt.Errorf("wrap message failed: %w", err)
+	}
+
+	n.conn.SendMsg2Dest(ctx, nodetopo.NodeInfo{NodeID: crMsg.NodeID, ShardID: crMsg.ShardID}, w)
+
+	return nil
 }
 
 func (n *Node) handleCatchupResp(ctx context.Context, payload []byte) error {
-	panic("implement me")
+	var crMsg message.CatchupRespMsg
+	if err := gob.NewDecoder(bytes.NewReader(payload)).Decode(&crMsg); err != nil {
+		return fmt.Errorf("decode catchup resp msg: %w", err)
+	}
+
+	slog.InfoContext(ctx, "handle catch up req message")
+
+	if n.pbftMeta.leader != n.pbftMeta.lp.NodeID {
+		return fmt.Errorf("the leader will not catch up")
+	}
+
+	if !n.pbftMeta.catchupStarted {
+		return fmt.Errorf("catchup req message not started")
+	}
+
+	// Add blocks.
+	for _, p := range crMsg.Proposals {
+		if err := n.bc.AddBlock(ctx, p.Block); err != nil {
+			return fmt.Errorf("add block failed, height=%d, err: %w", p.Block.Number, err)
+		}
+	}
+
+	// Set catchup states.
+	n.pbftMeta.catchupOverAndReset(basicstructs.ViewSeq{View: crMsg.NextView, Seq: crMsg.NextSeq})
+
+	return nil
 }
 
 // step2NextStage steps to next pbft stage until it steps to the end

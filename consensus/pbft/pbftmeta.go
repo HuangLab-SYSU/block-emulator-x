@@ -187,3 +187,17 @@ func (c *consensusMeta) catchupReady() bool {
 	// If the view is unchanged and the seq is catchUpThreshold behind, return true.
 	return c.latestViewSeq.View == c.curViewSeq.View && c.latestViewSeq.Seq >= c.curViewSeq.Seq+catchUpThreshold
 }
+
+func (c *consensusMeta) catchupOverAndReset(vs basicstructs.ViewSeq) {
+	// Catchup over
+	c.catchupStarted = false
+	c.curViewSeq = vs
+
+	// Reset
+	c.stage = stagePreprepare
+	c.lastProposal = nil
+	c.curProposal = nil
+	c.prepareSet = map[nodetopo.NodeInfo]struct{}{}
+	c.commitSet = map[nodetopo.NodeInfo]struct{}{}
+	c.proposed = false
+}
