@@ -3,7 +3,6 @@ package insideop
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop/txblockop"
@@ -12,8 +11,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
 type StaticShardOp struct {
@@ -26,26 +23,14 @@ type StaticShardOp struct {
 	cfg config.ConsensusNodeCfg
 }
 
-func NewStaticShardOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*StaticShardOp, error) {
-	tbo, err := txblockop.NewTxBlockOp(conn, resolver, chain, cfg, lp)
-	if err != nil {
-		return nil, fmt.Errorf("NewTxBlockOp: %w", err)
-	}
-
-	fp := filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID))
-
-	csw, err := csvwrite.NewCSVSeqWriter(fp, block.RecordTitle)
-	if err != nil {
-		return nil, fmt.Errorf("NewCSVSeqWriter: %w", err)
-	}
-
+func NewStaticShardOp(chain *chain.Chain, txPool txpool.TxPool, tbo txblockop.TxBlockOp, csw *csvwrite.CSVSeqWriter, cfg config.ConsensusNodeCfg) *StaticShardOp {
 	return &StaticShardOp{
 		chain:  chain,
 		txPool: txPool,
 		tbo:    tbo,
 		csw:    csw,
 		cfg:    cfg,
-	}, nil
+	}
 }
 
 func (s *StaticShardOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
@@ -101,9 +86,4 @@ func (s *StaticShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader b
 	}
 
 	return nil
-}
-
-func (s *StaticShardOp) Close() {
-	_ = s.csw.Close()
-	_ = s.chain.Close()
 }

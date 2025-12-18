@@ -6,15 +6,19 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/basicstructs"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop"
+	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop/txblockop"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/outsideop"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/chain"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
@@ -25,7 +29,8 @@ type messageHandleFunc func(context.Context, []byte) error
 
 const (
 	// executeInterval is the time interval between two running loops.
-	executeInterval = 500 * time.Millisecond
+	executeInterval    = 500 * time.Millisecond
+	blockRecordPathFmt = "shard=%d_node=%d/block_record.csv"
 )
 
 // Node is the node running the PBFT consensus.
@@ -34,6 +39,9 @@ type Node struct {
 	resolver nodetopo.NodeMapper  // resolver gives the information of all consensus nodes and shards.
 	pbftMeta *consensusMeta       // pbftMeta is the current consensus procedure
 
+	bc  *chain.Chain
+	csw *csvwrite.CSVSeqWriter
+
 	iop insideop.ShardInsideOp
 	omh outsideop.ShardOutsideMsgHandler
 
@@ -41,7 +49,7 @@ type Node struct {
 }
 
 // NewPBFTNode creates a new node running PBFT consensus with given configurations.
-func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*Node, error) {
+func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (n *Node, rErr error) {
 	if cfg.ShardNum <= 0 || cfg.ShardNum <= lp.ShardID {
 		return nil, fmt.Errorf("invalid shardID=%d", lp.ShardID)
 	}
@@ -50,16 +58,43 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 		return nil, fmt.Errorf("invalid nodeID=%d", lp.NodeID)
 	}
 
-	// new a blockchain
+	var cleanups []func()
+
+	defer func() {
+		if rErr != nil {
+			for i := len(cleanups) - 1; i >= 0; i-- {
+				cleanups[i]()
+			}
+		}
+	}()
+
+	// New a blockchain.
 	bc, err := chain.NewChain(cfg.BlockchainCfg, lp)
 	if err != nil {
 		return nil, fmt.Errorf("NewChain err=%w", err)
 	}
 
+	cleanups = append(cleanups, func() { _ = bc.Close() })
+
+	// New a transaction pool.
 	txp, err := txpool.NewTxPool(cfg.TxPoolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxPool err=%w", err)
 	}
+
+	// New a transaction block operation.
+	tbo, err := txblockop.NewTxBlockOp(conn, r, bc, cfg, lp)
+	if err != nil {
+		return nil, fmt.Errorf("NewTxBlockOp failed: %w", err)
+	}
+
+	// New a csv writer to record blocks.
+	csw, err := csvwrite.NewCSVSeqWriter(filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID)), block.RecordTitle)
+	if err != nil {
+		return nil, fmt.Errorf("NewCSVSeqWriter failed: %w", err)
+	}
+
+	cleanups = append(cleanups, func() { _ = csw.Close() })
 
 	var (
 		iop insideop.ShardInsideOp
@@ -69,17 +104,11 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 	switch cfg.ConsensusType {
 	case config.StaticRelayConsensus, config.StaticBrokerConsensus:
 		omh = outsideop.NewStaticLocOutsideOp(txp)
-		if iop, err = insideop.NewStaticShardOp(conn, r, bc, txp, cfg, lp); err != nil {
-			return nil, fmt.Errorf("NewStaticShardOp err=%w", err)
-		}
-
+		iop = insideop.NewStaticShardOp(bc, txp, tbo, csw, cfg)
 	case config.CLPARelayConsensus, config.CLPABrokerConsensus:
 		amm := migration.NewAccMigrateMetadata(cfg.SystemCfg, lp)
-
 		omh = outsideop.NewCLPALocOutsideOp(txp, amm)
-		if iop, err = insideop.NewDynamicShardOp(conn, r, bc, txp, amm, cfg, lp); err != nil {
-			return nil, fmt.Errorf("NewDynamicShardOp err=%w", err)
-		}
+		iop = insideop.NewDynamicShardOp(conn, r, bc, txp, amm, tbo, csw, cfg, lp)
 	default:
 		return nil, fmt.Errorf("invalid consensus type=%s", cfg.ConsensusType)
 	}
@@ -88,6 +117,8 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 		conn:     conn,
 		resolver: r,
 		pbftMeta: newConsensusMeta(cfg, lp),
+
+		bc: bc,
 
 		iop: iop,
 		omh: omh,
@@ -310,19 +341,14 @@ func (n *Node) propose(ctx context.Context) error {
 		return fmt.Errorf("CalcHash failed: %w", err)
 	}
 
-	wrappedMsg, err := message.WrapMsg(&message.PreprepareMsg{
+	ppMsg := &message.PreprepareMsg{
 		P: *p, Digest: digest, Seq: n.pbftMeta.curViewSeq.Seq, View: n.pbftMeta.curViewSeq.View,
-	})
-	if err != nil {
-		return fmt.Errorf("message.WrapMsg failed: %w", err)
 	}
 
-	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.lp.ShardID)
-	if err != nil {
-		return fmt.Errorf("GetNodesInShard failed: %w", err)
+	if err = n.broadcastMsgInnerShard(ctx, ppMsg); err != nil {
+		return fmt.Errorf("broadcastMsgInnerShard failed: %w", err)
 	}
 
-	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, wrappedMsg)
 	n.pbftMeta.proposed = true
 	n.pbftMeta.lastProposeTime = time.Now()
 
@@ -338,19 +364,7 @@ func (n *Node) prepareBroadcast(ctx context.Context) error {
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}
 
-	w, err := message.WrapMsg(pMsg)
-	if err != nil {
-		return fmt.Errorf("message.WrapMsg failed: %w", err)
-	}
-
-	shardNeighbors, err := n.resolver.GetNodesInShard(n.pbftMeta.lp.ShardID)
-	if err != nil {
-		return fmt.Errorf("GetNodesInShard failed: %w", err)
-	}
-
-	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, w)
-
-	return nil
+	return n.broadcastMsgInnerShard(ctx, pMsg)
 }
 
 func (n *Node) commitBroadcast(ctx context.Context) error {
@@ -362,7 +376,17 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}
 
-	w, err := message.WrapMsg(cMsg)
+	return n.broadcastMsgInnerShard(ctx, cMsg)
+}
+
+func (n *Node) catchUpStart(ctx context.Context) error {
+	n.pbftMeta.catchupStarted = true
+	// Send the catchup message to the leader.
+	return nil
+}
+
+func (n *Node) broadcastMsgInnerShard(ctx context.Context, msg any) error {
+	w, err := message.WrapMsg(msg)
 	if err != nil {
 		return fmt.Errorf("message.WrapMsg failed: %w", err)
 	}
@@ -377,16 +401,10 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) catchUpStart(ctx context.Context) error {
-	n.pbftMeta.catchupStarted = true
-	// Send the catchup message to the leader.
-
-}
-
 func (n *Node) closeAll() {
 	slog.Info("consensus node is closing")
 
 	n.conn.Close()
-	n.iop.Close()
-	n.omh.Close()
+	_ = n.bc.Close()
+	_ = n.csw.Close()
 }

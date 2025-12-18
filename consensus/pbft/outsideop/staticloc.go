@@ -40,5 +40,3 @@ func (s *StaticLocOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpc
 
 	return nil
 }
-
-func (s *StaticLocOutsideOp) Close() {}
