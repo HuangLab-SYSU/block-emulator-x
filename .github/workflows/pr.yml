@@ -1,0 +1,25 @@
+name: PR Merge and Delete Branch
+
+on:
+  pull_request:
+    types: [ review_requested, reviewed, closed ]
+    branches:
+      - main
+
+jobs:
+  merge-and-delete-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v2
+
+      - name: Merge PR with squash and delete branch
+        if: github.event.pull_request.merged == true && github.event.pull_request.state == 'closed'
+        run: |
+          PR_BRANCH=${{ github.head_ref }}
+          echo "Merging PR with squash and deleting branch $PR_BRANCH"
+          
+          gh pr merge ${{ github.event.pull_request.number }} --squash --admin --delete-branch --confirm
