@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -17,6 +18,7 @@ import (
 const (
 	msgBufferSize = 1 << 20
 	msgSizeLimit  = 100 * 1 << 20
+	connCloseTime = 10 * time.Second
 )
 
 type clientConnection struct {
@@ -120,6 +122,8 @@ func (r *RPCConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo.No
 
 // Close closes all the connections in the client pool.
 func (r *RPCConn) Close() {
+	time.Sleep(connCloseTime)
+
 	// close all clients in the pool
 	for _, c := range r.clientPool {
 		_ = c.conn.Close()
