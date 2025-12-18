@@ -13,7 +13,9 @@ const (
 	PrepareMessageType    = "Prepare"
 	CommitMessageType     = "Commit"
 
-	ReceiveTxsMessageType = "ReceiveTxs"
+	ReceiveTxsMessageType  = "ReceiveTxs"
+	CatchupReqMessageType  = "CatchupReq"
+	CatchupRespMessageType = "CatchupResp"
 
 	StopConsensusMessageType = "StopConsensus"
 )
@@ -67,9 +69,9 @@ type CatchupReqMsg struct {
 }
 
 type CatchupRespMsg struct {
-	Proposals       []Proposal
-	EndSeq, EndView int64
-	ShardID, NodeID int64
+	Proposals         []Proposal
+	NextSeq, NextView int64
+	ShardID, NodeID   int64
 }
 
 // ReceiveTxsMsg contains transactions.

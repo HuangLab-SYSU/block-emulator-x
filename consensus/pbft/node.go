@@ -45,7 +45,7 @@ type Node struct {
 	iop insideop.ShardInsideOp
 	omh outsideop.ShardOutsideMsgHandler
 
-	defaultMsgHandler map[string]messageHandleFunc
+	pbftMsgHandler map[string]messageHandleFunc
 }
 
 // NewPBFTNode creates a new node running PBFT consensus with given configurations.
@@ -123,7 +123,7 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 		iop: iop,
 		omh: omh,
 
-		defaultMsgHandler: make(map[string]messageHandleFunc),
+		pbftMsgHandler: make(map[string]messageHandleFunc),
 	}, nil
 }
 
@@ -184,14 +184,16 @@ func (n *Node) run() {
 
 // registerHandleFunc registers all message handle functions.
 func (n *Node) registerHandleFunc() {
-	n.defaultMsgHandler[message.StopConsensusMessageType] = n.handleStopConsensus
-	n.defaultMsgHandler[message.PreprepareMessageType] = n.handlePreprepare
-	n.defaultMsgHandler[message.PrepareMessageType] = n.handlePrepare
-	n.defaultMsgHandler[message.CommitMessageType] = n.handleCommit
+	n.pbftMsgHandler[message.StopConsensusMessageType] = n.handleStopConsensus
+	n.pbftMsgHandler[message.PreprepareMessageType] = n.handlePreprepare
+	n.pbftMsgHandler[message.PrepareMessageType] = n.handlePrepare
+	n.pbftMsgHandler[message.CommitMessageType] = n.handleCommit
+	n.pbftMsgHandler[message.CatchupReqMessageType] = n.handleCatchupReq
+	n.pbftMsgHandler[message.CatchupRespMessageType] = n.handleCatchupResp
 }
 
 func (n *Node) handleMessage(ctx context.Context, msg *rpcserver.WrappedMsg) error {
-	handleFunc, exist := n.defaultMsgHandler[msg.GetMsgType()]
+	handleFunc, exist := n.pbftMsgHandler[msg.GetMsgType()]
 	if !exist {
 		if err := n.omh.HandleMsgOutsideShard(ctx, msg); err != nil {
 			return fmt.Errorf("handleMsgOutsideShard failed: %w", err)
@@ -275,6 +277,14 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 	n.pbftMeta.msgPool.PushCommitMsg(&cMsg)
 
 	return nil
+}
+
+func (n *Node) handleCatchupReq(ctx context.Context, payload []byte) error {
+	panic("implement me")
+}
+
+func (n *Node) handleCatchupResp(ctx context.Context, payload []byte) error {
+	panic("implement me")
 }
 
 // step2NextStage steps to next pbft stage until it steps to the end
@@ -380,8 +390,24 @@ func (n *Node) commitBroadcast(ctx context.Context) error {
 }
 
 func (n *Node) catchUpStart(ctx context.Context) error {
-	n.pbftMeta.catchupStarted = true
 	// Send the catchup message to the leader.
+	leader, err := n.resolver.GetLeader(n.pbftMeta.lp.ShardID)
+	if err != nil {
+		return fmt.Errorf("get leader failed: %w", err)
+	}
+
+	w, err := message.WrapMsg(&message.CatchupReqMsg{
+		StartBlockHeight: int64(n.bc.GetCurHeader().Number) + 1, // StartBlockHeight should be the current height + 1
+		ShardID:          n.pbftMeta.lp.ShardID,
+		NodeID:           n.pbftMeta.lp.NodeID,
+	})
+	if err != nil {
+		return fmt.Errorf("wrap message failed: %w", err)
+	}
+
+	n.conn.SendMsg2Dest(ctx, leader, w)
+	n.pbftMeta.catchupStarted = true
+
 	return nil
 }
 
