@@ -45,8 +45,8 @@ type consensusMeta struct {
 	proposed        bool                           // this node has proposed in this round or not.
 	curViewSeq      basicstructs.ViewSeq           // curViewSeq is current pbft view and sequence.
 	stage           int                            // stage of PBFT consensus, containing preprepare, prepare, commit, view-change and new-view.
-	curProposal     *message.PreprepareMsg         // preprepare message in this round.
-	lastProposal    *message.PreprepareMsg         // preprepare message in the last round.
+	curPreprepare   *message.PreprepareMsg         // preprepare message in this round.
+	lastProposal    *message.Proposal              // proposal in the last round.
 	lastProposeTime time.Time                      // the time for the last proposal.
 	prepareSet      map[nodetopo.NodeInfo]struct{} // prepareSet collects the nodes sending prepare message.
 	commitSet       map[nodetopo.NodeInfo]struct{} // commitSet collects the nodes sending commit message.
@@ -70,7 +70,7 @@ func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *conse
 		proposed:        false,
 		curViewSeq:      basicstructs.ViewSeq{},
 		stage:           stagePreprepare,
-		curProposal:     nil,
+		curPreprepare:   nil,
 		lastProposal:    nil,
 		lastProposeTime: time.Now(),
 		prepareSet:      map[nodetopo.NodeInfo]struct{}{},
@@ -83,7 +83,7 @@ func newConsensusMeta(cfg config.ConsensusNodeCfg, lp config.LocalParams) *conse
 
 // curateMsg counts the number of valid messages in the msgPool.
 func (c *consensusMeta) curateMsg() {
-	if c.curProposal == nil {
+	if c.curPreprepare == nil {
 		ppMsgList := c.msgPool.ReadPreprepareMsg(c.curViewSeq)
 		for _, ppMsg := range ppMsgList {
 			if c.curViewSeq.Compare(basicstructs.ViewSeq{View: ppMsg.View, Seq: ppMsg.Seq}) != 0 || ppMsg.NodeID != c.leader {
@@ -93,19 +93,19 @@ func (c *consensusMeta) curateMsg() {
 			}
 
 			slog.Info("proposal of this round is received", "current view and seq", c.curViewSeq)
-			c.curProposal = ppMsg
+			c.curPreprepare = ppMsg
 
 			break
 		}
 	}
 
-	if c.curProposal == nil {
+	if c.curPreprepare == nil {
 		return
 	}
 
 	pMsgList := c.msgPool.ReadPrepareMsg(c.curViewSeq)
 	for _, pMsg := range pMsgList {
-		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) != 0 || !bytes.Equal(pMsg.Digest, c.curProposal.Digest) {
+		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) != 0 || !bytes.Equal(pMsg.Digest, c.curPreprepare.Digest) {
 			// if the prepare message is invalid (wrong seq/view or wrong digest), drop it
 			slog.Info("get an invalid prepare message, ignore it", "view", pMsg.View, "seq", pMsg.Seq)
 			continue
@@ -116,7 +116,7 @@ func (c *consensusMeta) curateMsg() {
 
 	cMsgList := c.msgPool.ReadCommitMsg(c.curViewSeq)
 	for _, cMsg := range cMsgList {
-		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) != 0 || !bytes.Equal(cMsg.Digest, c.curProposal.Digest) {
+		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) != 0 || !bytes.Equal(cMsg.Digest, c.curPreprepare.Digest) {
 			// if the commit message is invalid (wrong seq/view or wrong digest), drop it
 			slog.Info("get an invalid commit message, ignore it", "view", cMsg.View, "seq", cMsg.Seq)
 			continue
@@ -130,7 +130,7 @@ func (c *consensusMeta) curateMsg() {
 func (c *consensusMeta) step2Next() (int, int, error) {
 	switch c.stage {
 	case stagePreprepare:
-		if c.curProposal == nil {
+		if c.curPreprepare == nil {
 			slog.Debug("waiting for preprepare message")
 			return stagePreprepare, stagePreprepare, nil
 		}
@@ -157,8 +157,8 @@ func (c *consensusMeta) step2Next() (int, int, error) {
 
 		// step into next round
 		c.stage = stagePreprepare
-		c.lastProposal = c.curProposal
-		c.curProposal = nil
+		c.lastProposal = &c.curPreprepare.P
+		c.curPreprepare = nil
 		c.prepareSet = map[nodetopo.NodeInfo]struct{}{}
 		c.commitSet = map[nodetopo.NodeInfo]struct{}{}
 		c.proposed = false
@@ -196,7 +196,7 @@ func (c *consensusMeta) catchupOverAndReset(vs basicstructs.ViewSeq) {
 	// Reset
 	c.stage = stagePreprepare
 	c.lastProposal = nil
-	c.curProposal = nil
+	c.curPreprepare = nil
 	c.prepareSet = map[nodetopo.NodeInfo]struct{}{}
 	c.commitSet = map[nodetopo.NodeInfo]struct{}{}
 	c.proposed = false
