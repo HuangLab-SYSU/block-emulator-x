@@ -288,7 +288,7 @@ func (n *Node) handleCatchupReq(ctx context.Context, payload []byte) error {
 
 	slog.InfoContext(ctx, "handle catch up req message", "from shardID", crMsg.ShardID, "from nodeID", crMsg.NodeID)
 
-	blocks, err := n.bc.GetBlocksAfterHeight(crMsg.ShardID)
+	blocks, err := n.bc.GetBlocksAfterHeight(ctx, crMsg.ShardID)
 	if err != nil {
 		return fmt.Errorf("get blocks failed: %w", err)
 	}
@@ -309,7 +309,7 @@ func (n *Node) handleCatchupReq(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("wrap message failed: %w", err)
 	}
 
-	n.conn.SendMsg2Dest(ctx, nodetopo.NodeInfo{NodeID: crMsg.NodeID, ShardID: crMsg.ShardID}, w)
+	go n.conn.SendMsg2Dest(ctx, nodetopo.NodeInfo{NodeID: crMsg.NodeID, ShardID: crMsg.ShardID}, w)
 
 	return nil
 }

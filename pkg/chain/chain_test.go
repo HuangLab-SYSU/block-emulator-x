@@ -81,6 +81,15 @@ func TestChain(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, as, 1)
 	require.Equal(t, *account.NewState(testSender, 100), *as[0])
+
+	// Test to get blocks by the given beginHeight
+	require.Equal(t, uint64(3), bc.GetCurHeader().Number)
+	blocks, err := bc.GetBlocksAfterHeight(ctx, -1)
+	require.Error(t, err)
+
+	blocks, err = bc.GetBlocksAfterHeight(ctx, 2)
+	require.NoError(t, err)
+	require.Len(t, blocks, 2)
 }
 
 func clearChainStorage() {
