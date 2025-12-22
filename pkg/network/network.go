@@ -45,7 +45,7 @@ func (p *ConnHandler) MSendDifferentMessages(ctx context.Context, node2Msg map[n
 func (p *ConnHandler) GroupBroadcastMessage(ctx context.Context, group []nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(group))
-	// broadcast to all nodes in this group
+	// Broadcast to all nodes in this group.
 	for _, node := range group {
 		go func(nif nodetopo.NodeInfo) {
 			defer wg.Done()

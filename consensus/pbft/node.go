@@ -288,7 +288,7 @@ func (n *Node) handleCatchupReq(ctx context.Context, payload []byte) error {
 
 	slog.InfoContext(ctx, "handle catch up req message", "from shardID", crMsg.ShardID, "from nodeID", crMsg.NodeID)
 
-	blocks, err := n.bc.GetBlocksAfterHeight(ctx, crMsg.ShardID)
+	blocks, err := n.bc.GetBlocksAfterHeight(ctx, crMsg.StartBlockHeight)
 	if err != nil {
 		return fmt.Errorf("get blocks failed: %w", err)
 	}
@@ -322,8 +322,8 @@ func (n *Node) handleCatchupResp(ctx context.Context, payload []byte) error {
 
 	slog.InfoContext(ctx, "handle catch up req message")
 
-	if n.pbftMeta.leader != n.pbftMeta.lp.NodeID {
-		return fmt.Errorf("the leader will not catch up")
+	if n.pbftMeta.leader != crMsg.NodeID {
+		return fmt.Errorf("the catchup response message is not from the leader, from nodeID=%d", crMsg.NodeID)
 	}
 
 	if !n.pbftMeta.catchupStarted {

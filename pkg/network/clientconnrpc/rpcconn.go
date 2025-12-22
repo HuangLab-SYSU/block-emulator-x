@@ -102,24 +102,6 @@ func (r *RPCConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg 
 	}
 }
 
-func (r *RPCConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
-	wg := &sync.WaitGroup{}
-	wg.Add(len(group))
-	// broadcast to all nodes in this group
-	for _, node := range group {
-		go func(nif nodetopo.NodeInfo) {
-			defer wg.Done()
-
-			err := r.sendMessage(ctx, nif, msg)
-			if err != nil {
-				slog.ErrorContext(ctx, "sub-goroutine: broadcast", "err", err)
-			}
-		}(node)
-	}
-
-	wg.Wait()
-}
-
 // Close closes all the connections in the client pool.
 func (r *RPCConn) Close() {
 	time.Sleep(connCloseTime)
