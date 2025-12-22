@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
-
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
