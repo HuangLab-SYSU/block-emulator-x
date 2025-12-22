@@ -81,7 +81,7 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 
 	for i, acc := range accountsMigratedOut {
 		// If this shard is in not this shard, skip it
-		if states[i].ShardLocation != m.lp.ShardID {
+		if states[i].ShardLocation != uint64(m.lp.ShardID) {
 			continue
 		}
 
