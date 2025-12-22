@@ -20,6 +20,8 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/storage"
 )
 
+const blocksFetchLimit = 100
+
 // Chain describes a blockchain.
 type Chain struct {
 	s         *storage.Storage // the storage for both block-storage and trie-storage.
@@ -119,18 +121,18 @@ func (c *Chain) GenerateMigrationBlock(ctx context.Context, miner account.Addres
 		return nil, fmt.Errorf("preview updated trie by migration err: %w", err)
 	}
 
-	parentHeader, err := c.curHeader.Encode()
+	parentHeaderHash, err := c.curHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("create parent header err: %w", err)
 	}
-	// calculate the merkle root of accounts & states.
+	// calculate the Merkle root of accounts & states.
 	msRoot, err := c.getMigratedStateMerkleRoot(ctx, accounts, states)
 	if err != nil {
 		return nil, fmt.Errorf("get account state root err: %w", err)
 	}
 
 	header := block.Header{
-		ParentBlockHash: parentHeader,
+		ParentBlockHash: parentHeaderHash,
 		StateRoot:       stateRoot,
 		Number:          c.curHeader.Number + 1,
 		Miner:           miner,
@@ -154,7 +156,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 		blockHash, blockByte, headerByte []byte
 	)
 	if blockHash, err = b.Hash(); err != nil {
-		return fmt.Errorf("calc hash err: %w", err)
+		return fmt.Errorf("calc header hash err: %w", err)
 	}
 
 	if blockByte, err = b.Encode(); err != nil {
@@ -216,7 +218,7 @@ func (c *Chain) GetAccountLocationsInTxs(ctx context.Context, txs []transaction.
 	}
 
 	for i, requestAccount := range requestAccounts {
-		accountLocations[requestAccount] = states[i].ShardLocation
+		accountLocations[requestAccount] = int64(states[i].ShardLocation)
 	}
 
 	return accountLocations, nil
@@ -252,11 +254,56 @@ func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
 	return nil
 }
 
-func (c *Chain) GetBlocksAfterHeight(begin int64) ([]block.Block, error) {
+// GetBlocksAfterHeight gets blocks those heights are larger than the given beginHeight.
+// The heights of the returning blocks is in [beginHeight, curHeight].
+func (c *Chain) GetBlocksAfterHeight(ctx context.Context, beginHeight int64) ([]block.Block, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	panic("not yet implemented")
+	if beginHeight <= 0 {
+		return nil, fmt.Errorf("beginHeight must be > 0")
+	}
+
+	fetchedBlocksCnt := int64(c.curHeader.Number) - beginHeight + 1
+	if fetchedBlocksCnt > blocksFetchLimit {
+		return nil, fmt.Errorf("too many blocks (%d) to return", fetchedBlocksCnt)
+	}
+
+	if fetchedBlocksCnt < 0 {
+		fetchedBlocksCnt = 0
+	}
+
+	bHash, err := c.curHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("get header hash err: %w", err)
+	}
+
+	var (
+		bByte []byte
+		b     *block.Block
+	)
+
+	blocks := make([]block.Block, fetchedBlocksCnt)
+
+	for i := fetchedBlocksCnt - 1; i >= 0; i-- {
+		bByte, err = c.s.BlockStorage.GetBlockByHash(ctx, bHash)
+		if err != nil {
+			return nil, fmt.Errorf("get block err: %w", err)
+		}
+
+		b, err = block.DecodeBlock(bByte)
+		if err != nil {
+			return nil, fmt.Errorf("decode block err: %w", err)
+		}
+
+		slog.InfoContext(ctx, "block is fetched from storage", "height", b.Number)
+
+		blocks[i] = *b
+		// Set the hash to the parent hash
+		bHash = b.ParentBlockHash
+	}
+
+	return blocks, nil
 }
 
 func (c *Chain) GetShardID() int64 {
@@ -446,7 +493,7 @@ func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Address]*accou
 	case transaction.Relay1Tx:
 		// For a relay1 transaction, debit the sender's balance.
 		senderState := accountStates[tx.Sender]
-		if senderState == nil || senderState.ShardLocation != c.shardID {
+		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
 			// Sender is not in this shard, skip.
 			return
 		}
@@ -460,7 +507,7 @@ func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Address]*accou
 	case transaction.Relay2Tx:
 		// For a relay2 transaction credit the recipient's balance.
 		recipientState := accountStates[tx.Recipient]
-		if recipientState == nil || recipientState.ShardLocation != c.shardID {
+		if recipientState == nil || recipientState.ShardLocation != uint64(c.shardID) {
 			return
 		}
 
@@ -478,7 +525,7 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*acco
 		senderState := accountStates[tx.Sender]
 
 		brokerState := accountStates[tx.Broker]
-		if senderState == nil || senderState.ShardLocation != c.shardID {
+		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
 			slog.Error("handle broker1 tx error", "err", "the sender is not in this shard", "sender", tx.Sender, "shard", c.shardID)
 			return
 		}
@@ -495,7 +542,7 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*acco
 		recipientState := accountStates[tx.Recipient]
 
 		brokerState := accountStates[tx.Broker]
-		if recipientState == nil || recipientState.ShardLocation != c.shardID {
+		if recipientState == nil || recipientState.ShardLocation != uint64(c.shardID) {
 			slog.Error("handle broker2 tx error", "err", "the recipient is not in this shard", "recipient", tx.Recipient, "shard", c.shardID)
 			return
 		}
@@ -517,7 +564,7 @@ func (c *Chain) modifyStateMapByNormalTx(accountStates map[account.Address]*acco
 	recipientState := accountStates[tx.Recipient]
 
 	// Modify senderState
-	if senderState != nil && senderState.ShardLocation != c.shardID {
+	if senderState != nil && senderState.ShardLocation != uint64(c.shardID) {
 		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
 			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
 		} else if err != nil {
@@ -526,7 +573,7 @@ func (c *Chain) modifyStateMapByNormalTx(accountStates map[account.Address]*acco
 	}
 
 	// Modify recipientState
-	if recipientState != nil && recipientState.ShardLocation != c.shardID {
+	if recipientState != nil && recipientState.ShardLocation != uint64(c.shardID) {
 		recipientState.Credit(tx.Value)
 	}
 }

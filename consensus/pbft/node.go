@@ -104,11 +104,11 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 	switch cfg.ConsensusType {
 	case config.StaticRelayConsensus, config.StaticBrokerConsensus:
 		omh = outsideop.NewStaticLocOutsideOp(txp)
-		iop = insideop.NewStaticShardOp(bc, txp, tbo, csw, cfg)
+		iop = insideop.NewStaticShardOp(bc, txp, tbo, cfg)
 	case config.CLPARelayConsensus, config.CLPABrokerConsensus:
 		amm := migration.NewAccMigrateMetadata(cfg.SystemCfg, lp)
 		omh = outsideop.NewCLPALocOutsideOp(txp, amm)
-		iop = insideop.NewDynamicShardOp(conn, r, bc, txp, amm, tbo, csw, cfg, lp)
+		iop = insideop.NewDynamicShardOp(conn, r, bc, txp, amm, tbo, cfg, lp)
 	default:
 		return nil, fmt.Errorf("invalid consensus type=%s", cfg.ConsensusType)
 	}
@@ -118,7 +118,8 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 		resolver: r,
 		pbftMeta: newConsensusMeta(cfg, lp),
 
-		bc: bc,
+		bc:  bc,
+		csw: csw,
 
 		iop: iop,
 		omh: omh,
@@ -280,11 +281,66 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 }
 
 func (n *Node) handleCatchupReq(ctx context.Context, payload []byte) error {
-	panic("implement me")
+	var crMsg message.CatchupReqMsg
+	if err := gob.NewDecoder(bytes.NewReader(payload)).Decode(&crMsg); err != nil {
+		return fmt.Errorf("decode catchup req msg: %w", err)
+	}
+
+	slog.InfoContext(ctx, "handle catch up req message", "from shardID", crMsg.ShardID, "from nodeID", crMsg.NodeID)
+
+	blocks, err := n.bc.GetBlocksAfterHeight(ctx, crMsg.StartBlockHeight)
+	if err != nil {
+		return fmt.Errorf("get blocks failed: %w", err)
+	}
+
+	proposals := make([]message.Proposal, len(blocks))
+	for i, b := range blocks {
+		proposals[i] = *message.WrapProposal(&b)
+	}
+
+	w, err := message.WrapMsg(&message.CatchupRespMsg{
+		Proposals: proposals,
+		NextView:  n.pbftMeta.curViewSeq.View,
+		NextSeq:   n.pbftMeta.curViewSeq.Seq,
+		ShardID:   n.pbftMeta.lp.ShardID,
+		NodeID:    n.pbftMeta.lp.NodeID,
+	})
+	if err != nil {
+		return fmt.Errorf("wrap message failed: %w", err)
+	}
+
+	go n.conn.SendMsg2Dest(ctx, nodetopo.NodeInfo{NodeID: crMsg.NodeID, ShardID: crMsg.ShardID}, w)
+
+	return nil
 }
 
 func (n *Node) handleCatchupResp(ctx context.Context, payload []byte) error {
-	panic("implement me")
+	var crMsg message.CatchupRespMsg
+	if err := gob.NewDecoder(bytes.NewReader(payload)).Decode(&crMsg); err != nil {
+		return fmt.Errorf("decode catchup resp msg: %w", err)
+	}
+
+	slog.InfoContext(ctx, "handle catch up req message")
+
+	if n.pbftMeta.leader != crMsg.NodeID {
+		return fmt.Errorf("the catchup response message is not from the leader, from nodeID=%d", crMsg.NodeID)
+	}
+
+	if !n.pbftMeta.catchupStarted {
+		return fmt.Errorf("catchup req message not started")
+	}
+
+	// Add blocks.
+	for _, p := range crMsg.Proposals {
+		if err := n.bc.AddBlock(ctx, p.Block); err != nil {
+			return fmt.Errorf("add block failed, height=%d, err: %w", p.Block.Number, err)
+		}
+	}
+
+	// Set catchup states.
+	n.pbftMeta.catchupOverAndReset(basicstructs.ViewSeq{View: crMsg.NextView, Seq: crMsg.NextSeq})
+
+	return nil
 }
 
 // step2NextStage steps to next pbft stage until it steps to the end
@@ -302,8 +358,16 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 		switch newStage {
 		case stagePreprepare:
 			// deliver according to the last proposal
-			if err = n.iop.ProposalCommitAndDeliver(ctx, n.pbftMeta.leader == n.pbftMeta.lp.NodeID, &n.pbftMeta.lastProposal.P); err != nil {
-				slog.ErrorContext(ctx, "deliver the last confirmed proposal failed", "err", err)
+			if err = n.iop.ProposalCommitAndDeliver(ctx, n.pbftMeta.leader == n.pbftMeta.lp.NodeID, n.pbftMeta.lastProposal); err != nil {
+				return fmt.Errorf("commit and deliver a proposal failed: %w", err)
+			}
+
+			if n.pbftMeta.leader != n.pbftMeta.lp.NodeID {
+				return nil
+			}
+			// record this block
+			if err = n.recordBlock(n.pbftMeta.lastProposal.Block); err != nil {
+				return fmt.Errorf("record block failed: %w", err)
 			}
 
 			return nil
@@ -367,9 +431,9 @@ func (n *Node) propose(ctx context.Context) error {
 
 func (n *Node) prepareBroadcast(ctx context.Context) error {
 	pMsg := &message.PrepareMsg{
-		Digest:  n.pbftMeta.curProposal.Digest,
-		View:    n.pbftMeta.curProposal.View,
-		Seq:     n.pbftMeta.curProposal.Seq,
+		Digest:  n.pbftMeta.curPreprepare.Digest,
+		View:    n.pbftMeta.curPreprepare.View,
+		Seq:     n.pbftMeta.curPreprepare.Seq,
 		ShardID: n.pbftMeta.lp.ShardID,
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}
@@ -379,9 +443,9 @@ func (n *Node) prepareBroadcast(ctx context.Context) error {
 
 func (n *Node) commitBroadcast(ctx context.Context) error {
 	cMsg := &message.CommitMsg{
-		Digest:  n.pbftMeta.curProposal.Digest,
-		View:    n.pbftMeta.curProposal.View,
-		Seq:     n.pbftMeta.curProposal.Seq,
+		Digest:  n.pbftMeta.curPreprepare.Digest,
+		View:    n.pbftMeta.curPreprepare.View,
+		Seq:     n.pbftMeta.curPreprepare.Seq,
 		ShardID: n.pbftMeta.lp.ShardID,
 		NodeID:  n.pbftMeta.lp.NodeID,
 	}
@@ -423,6 +487,19 @@ func (n *Node) broadcastMsgInnerShard(ctx context.Context, msg any) error {
 	}
 
 	n.conn.GroupBroadcastMessage(ctx, shardNeighbors, w)
+
+	return nil
+}
+
+func (n *Node) recordBlock(b *block.Block) error {
+	line, err := block.ConvertBlock2Line(b)
+	if err != nil {
+		return fmt.Errorf("ConvertBlock2Line failed: %w", err)
+	}
+
+	if err = n.csw.WriteLine2CSV(line); err != nil {
+		return fmt.Errorf("WriteLine2CSV failed: %w", err)
+	}
 
 	return nil
 }

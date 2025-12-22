@@ -7,14 +7,13 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
-
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
@@ -82,7 +81,7 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 
 	for i, acc := range accountsMigratedOut {
 		// If this shard is in not this shard, skip it
-		if states[i].ShardLocation != m.lp.ShardID {
+		if states[i].ShardLocation != uint64(m.lp.ShardID) {
 			continue
 		}
 

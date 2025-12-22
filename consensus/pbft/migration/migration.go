@@ -123,7 +123,7 @@ func (am *AccMigrateMetadata) GetMigratedAddrStates() ([]account.Address, []acco
 			state = account.NewState(acc, int64(destShardID))
 		} else {
 			// Set the location of this state to be this one.
-			state.ShardLocation = int64(destShardID)
+			state.ShardLocation = uint64(destShardID)
 		}
 
 		migratedAccounts = append(migratedAccounts, acc)

@@ -8,7 +8,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop/txblockop"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
@@ -17,17 +16,14 @@ type StaticShardOp struct {
 	txPool txpool.TxPool // txPool is the transactions pool.
 
 	tbo txblockop.TxBlockOp
-
-	csw *csvwrite.CSVSeqWriter
 	cfg config.ConsensusNodeCfg
 }
 
-func NewStaticShardOp(chain *chain.Chain, txPool txpool.TxPool, tbo txblockop.TxBlockOp, csw *csvwrite.CSVSeqWriter, cfg config.ConsensusNodeCfg) *StaticShardOp {
+func NewStaticShardOp(chain *chain.Chain, txPool txpool.TxPool, tbo txblockop.TxBlockOp, cfg config.ConsensusNodeCfg) *StaticShardOp {
 	return &StaticShardOp{
 		chain:  chain,
 		txPool: txPool,
 		tbo:    tbo,
-		csw:    csw,
 		cfg:    cfg,
 	}
 }
@@ -57,12 +53,6 @@ func (s *StaticShardOp) ValidateProposal(ctx context.Context, proposal *message.
 func (s *StaticShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
 	if err := s.tbo.BlockCommitAndDeliver(ctx, isLeader, proposal.Block); err != nil {
 		return fmt.Errorf("block commit failed: %w", err)
-	}
-
-	if isLeader {
-		if err := recordBlock(s.csw, proposal.Block); err != nil {
-			return fmt.Errorf("record block failed: %w", err)
-		}
 	}
 
 	return nil

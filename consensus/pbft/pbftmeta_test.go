@@ -3,9 +3,10 @@ package pbft
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -37,10 +38,10 @@ func TestConsensusMeta(t *testing.T) {
 	// inject messages
 	injectMsg(cm)
 
-	require.Nil(t, cm.curProposal)
+	require.Nil(t, cm.curPreprepare)
 	cm.curateMsg()
-	require.NotNil(t, cm.curProposal)
-	require.Equal(t, []byte(testDigest), cm.curProposal.Digest)
+	require.NotNil(t, cm.curPreprepare)
+	require.Equal(t, []byte(testDigest), cm.curPreprepare.Digest)
 
 	require.Equal(t, stagePreprepare, cm.stage)
 	oldStage, stage, err := cm.step2Next()
@@ -61,7 +62,7 @@ func TestConsensusMeta(t *testing.T) {
 	require.Equal(t, stagePreprepare, stage)
 	require.Equal(t, stagePreprepare, cm.stage)
 	require.Equal(t, testSequence+1, cm.curViewSeq.Seq)
-	require.Nil(t, cm.curProposal)
+	require.Nil(t, cm.curPreprepare)
 
 	cm.curateMsg()
 	_, stage, err = cm.step2Next()
@@ -73,7 +74,7 @@ func TestConsensusMeta(t *testing.T) {
 	require.Equal(t, stagePreprepare, stage)
 	require.Equal(t, stagePreprepare, cm.stage)
 	require.Equal(t, testSequence+2, cm.curViewSeq.Seq)
-	require.Nil(t, cm.curProposal)
+	require.Nil(t, cm.curPreprepare)
 }
 
 func injectMsg(cm *consensusMeta) {

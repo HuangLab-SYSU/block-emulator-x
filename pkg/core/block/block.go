@@ -59,10 +59,6 @@ func (b *Block) Encode() ([]byte, error) {
 }
 
 func (b *Block) BlockType() int {
-	if len(b.TxRoot) != 0 {
-		return TxBlockType
-	}
-
 	if len(b.MigratedAccountsRoot) != 0 {
 		return MigrationBlockType
 	}

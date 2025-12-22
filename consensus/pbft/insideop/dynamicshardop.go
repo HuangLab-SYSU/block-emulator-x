@@ -14,7 +14,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
@@ -36,7 +35,6 @@ type DynamicShardOp struct {
 
 	tbo txblockop.TxBlockOp
 	mbo *migrationblockop.MigrationBlockOp
-	csw *csvwrite.CSVSeqWriter
 
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
@@ -49,7 +47,6 @@ func NewDynamicShardOp(
 	txPool txpool.TxPool,
 	amm *migration.AccMigrateMetadata,
 	tbo txblockop.TxBlockOp,
-	csw *csvwrite.CSVSeqWriter,
 	cfg config.ConsensusNodeCfg,
 	lp config.LocalParams,
 ) *DynamicShardOp {
@@ -61,7 +58,6 @@ func NewDynamicShardOp(
 		txPool:   txPool,
 		tbo:      tbo,
 		mbo:      migrationblockop.NewMigrationBlockOp(conn, resolver, chain, amm, cfg, lp),
-		csw:      csw,
 		cfg:      cfg,
 		lp:       lp,
 	}
@@ -96,12 +92,6 @@ func (c *DynamicShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader 
 	default:
 		if err := c.tbo.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
 			return fmt.Errorf("block commit failed: %w", err)
-		}
-	}
-
-	if isLeader {
-		if err := recordBlock(c.csw, b); err != nil {
-			return fmt.Errorf("record block failed: %w", err)
 		}
 	}
 
