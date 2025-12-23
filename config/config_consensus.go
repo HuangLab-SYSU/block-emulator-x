@@ -8,27 +8,27 @@ const (
 )
 
 type SystemCfg struct {
-	ShardNum       int64  `json:"shard_num" yaml:"shard_num"`
-	NodeNum        int64  `json:"node_num" yaml:"node_num"`
+	ShardNum       int64  `json:"shard_num"      yaml:"shard_num"`
+	NodeNum        int64  `json:"node_num"       yaml:"node_num"`
 	ConsensusType  string `json:"consensus_type" yaml:"consensus_type"`
-	BlockSizeLimit int64  `json:"limit" yaml:"limit"`
-	LogCfg         `json:"log" yaml:"log"`
+	BlockSizeLimit int64  `json:"limit"          yaml:"limit"`
+	LogCfg         `       json:"log"            yaml:"log"`
 }
 
 type SupervisorCfg struct {
 	SystemCfg
-	TxNumber         int64  `json:"tx_number" yaml:"tx_number"`
+	TxNumber         int64  `json:"tx_number"          yaml:"tx_number"`
 	TxInjectionSpeed int64  `json:"tx_injection_speed" yaml:"tx_injection_speed"` // transactions per second
-	ResultOutputDir  string `json:"result_output_dir" yaml:"result_output_dir"`
-	EpochDuration    int64  `json:"epoch_duration" yaml:"epoch_duration"`
-	TxSourceCfg      `json:"tx_source" yaml:"tx_source"`
-	BrokerModuleCfg  `json:"broker_module" yaml:"broker_module"`
+	ResultOutputDir  string `json:"result_output_dir"  yaml:"result_output_dir"`
+	EpochDuration    int64  `json:"epoch_duration"     yaml:"epoch_duration"`
+	TxSourceCfg      `       json:"tx_source"          yaml:"tx_source"`
+	BrokerModuleCfg  `       json:"broker_module"      yaml:"broker_module"`
 }
 
 type ConsensusNodeCfg struct {
-	BlockchainCfg  `json:"blockchain" yaml:"blockchain"`
-	TxPoolCfg      `json:"tx_pool"     yaml:"tx_pool"`
-	BlockInterval  int64  `json:"block_interval" yaml:"block_interval"` // ms
+	BlockchainCfg  `       json:"blockchain"       yaml:"blockchain"`
+	TxPoolCfg      `       json:"tx_pool"          yaml:"tx_pool"`
+	BlockInterval  int64  `json:"block_interval"   yaml:"block_interval"` // ms
 	BlockRecordDir string `json:"block_record_dir" yaml:"block_record_dir"`
 }
 
@@ -39,5 +39,5 @@ type TxSourceCfg struct {
 
 type BrokerModuleCfg struct {
 	BrokerFilePath string `json:"broker_file_path" yaml:"broker_file_path"`
-	BrokerNum      int64  `json:"broker_num" yaml:"broker_num"`
+	BrokerNum      int64  `json:"broker_num"       yaml:"broker_num"`
 }

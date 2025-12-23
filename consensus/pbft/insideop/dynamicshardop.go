@@ -81,12 +81,16 @@ func (c *DynamicShardOp) ValidateProposal(ctx context.Context, proposal *message
 	return nil
 }
 
-func (c *DynamicShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
+func (c *DynamicShardOp) ProposalCommitAndDeliver(
+	ctx context.Context,
+	isLeader bool,
+	proposal *message.Proposal,
+) error {
 	b := proposal.Block
 
 	switch b.BlockType() {
 	case block.MigrationBlockType:
-		if err := c.mbo.MigrationBlockCommit(ctx, isLeader, b); err != nil {
+		if err := c.mbo.MigrationBlockCommit(ctx, b); err != nil {
 			return fmt.Errorf("migration block commit failed: %w", err)
 		}
 	default:
@@ -123,7 +127,14 @@ func (c *DynamicShardOp) buildPartitionProposal(ctx context.Context) (*message.P
 			return nil, fmt.Errorf("migrateTxs failed: %w", err)
 		}
 
-		slog.InfoContext(ctx, "accounts and txs has been migrated in this epoch", "shard", c.lp.ShardID, "epoch", c.amm.Epoch)
+		slog.InfoContext(
+			ctx,
+			"accounts and txs has been migrated in this epoch",
+			"shard",
+			c.lp.ShardID,
+			"epoch",
+			c.amm.Epoch,
+		)
 	}
 
 	p, err := c.mbo.BuildMigrationProposal(ctx)
@@ -137,7 +148,10 @@ func (c *DynamicShardOp) buildPartitionProposal(ctx context.Context) (*message.P
 // packValidTxs packs transactions from the tx pool.
 // Because of the account migration, if a transaction should not be processed in this shard,
 // it wil also be migrated to the correct shard.
-func (c *DynamicShardOp) packValidTxs(ctx context.Context, size int) ([]transaction.Transaction, error) {
+func (c *DynamicShardOp) packValidTxs(
+	ctx context.Context,
+	size int,
+) ([]transaction.Transaction, error) {
 	if c.cfg.ConsensusType == config.CLPARelayConsensus {
 		return c.packValidTxsInRelay(ctx, size)
 	}
@@ -145,7 +159,10 @@ func (c *DynamicShardOp) packValidTxs(ctx context.Context, size int) ([]transact
 	return c.packValidTxsInBroker(ctx, size)
 }
 
-func (c *DynamicShardOp) packValidTxsInRelay(ctx context.Context, size int) ([]transaction.Transaction, error) {
+func (c *DynamicShardOp) packValidTxsInRelay(
+	ctx context.Context,
+	size int,
+) ([]transaction.Transaction, error) {
 	txsPacked := make([]transaction.Transaction, 0)
 	txs2Shard := make([][]transaction.Transaction, c.cfg.ShardNum)
 
@@ -202,7 +219,10 @@ func (c *DynamicShardOp) packValidTxsInRelay(ctx context.Context, size int) ([]t
 	return txsPacked, nil
 }
 
-func (c *DynamicShardOp) packValidTxsInBroker(ctx context.Context, size int) ([]transaction.Transaction, error) {
+func (c *DynamicShardOp) packValidTxsInBroker(
+	ctx context.Context,
+	size int,
+) ([]transaction.Transaction, error) {
 	txsPacked := make([]transaction.Transaction, 0)
 	txs2Supervisor := make([]transaction.Transaction, 0)
 	txs2Shard := make([][]transaction.Transaction, c.cfg.ShardNum)
@@ -245,10 +265,20 @@ func (c *DynamicShardOp) packValidTxsInBroker(ctx context.Context, size int) ([]
 	}
 
 	for i, txs := range txs2Shard {
-		slog.Debug("dynamic-broker: migrate txs to the other shard when packing from pool", "tx size", len(txs), "shard", i)
+		slog.Debug(
+			"dynamic-broker: migrate txs to the other shard when packing from pool",
+			"tx size",
+			len(txs),
+			"shard",
+			i,
+		)
 	}
 
-	slog.Debug("dynamic-broker: migrate txs to the supervisor when packing from pool", "tx size", len(txs2Supervisor))
+	slog.Debug(
+		"dynamic-broker: migrate txs to the supervisor when packing from pool",
+		"tx size",
+		len(txs2Supervisor),
+	)
 
 	if err := message.SendWrappedTxs2Shards(ctx, txs2Shard, c.conn, c.resolver); err != nil {
 		return nil, fmt.Errorf("SendWrappedTxs2Shard failed: %w", err)
@@ -326,10 +356,20 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	}
 
 	for i, txs := range tx2Shards {
-		slog.Debug("dynamic-broker: migrate txs to the other shard when operating account-migration", "tx size", len(txs), "shard", i)
+		slog.Debug(
+			"dynamic-broker: migrate txs to the other shard when operating account-migration",
+			"tx size",
+			len(txs),
+			"shard",
+			i,
+		)
 	}
 
-	slog.Debug("dynamic-broker: migrate txs to the supervisor when operating account-migration", "tx size", len(tx2Supervisor))
+	slog.Debug(
+		"dynamic-broker: migrate txs to the supervisor when operating account-migration",
+		"tx size",
+		len(tx2Supervisor),
+	)
 
 	// Add the unmigrated txs back to the tx pool.
 	if err = c.txPool.AddTxs(addBackTxs); err != nil {
@@ -390,12 +430,22 @@ func (c *DynamicShardOp) getBrokerTxDestLocByModifiedMap(tx transaction.Transact
 	return supervisorShardID
 }
 
-func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, accountLoc map[account.Address]int64) int64 {
+func (c *DynamicShardOp) getTxDestLocByAccountState(
+	tx transaction.Transaction,
+	accountLoc map[account.Address]int64,
+) int64 {
 	sDestShard, sExist := accountLoc[tx.Sender]
 	rDestShard, rExist := accountLoc[tx.Recipient]
 
 	if !sExist || !rExist {
-		slog.Error("sender or recipient is not found in accountLoc", "sender", tx.Sender, "recipient", tx.Recipient)
+		slog.Error(
+			"sender or recipient is not found in accountLoc",
+			"sender",
+			tx.Sender,
+			"recipient",
+			tx.Recipient,
+		)
+
 		return supervisorShardID
 	}
 
@@ -423,7 +473,10 @@ func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, 
 	return supervisorShardID
 }
 
-func (c *DynamicShardOp) brokerCLPATxSendAgain(ctx context.Context, txSentAgain []transaction.Transaction) error {
+func (c *DynamicShardOp) brokerCLPATxSendAgain(
+	ctx context.Context,
+	txSentAgain []transaction.Transaction,
+) error {
 	if len(txSentAgain) == 0 {
 		return nil
 	}

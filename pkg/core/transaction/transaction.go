@@ -50,7 +50,12 @@ type BrokerTxOpt struct {
 	HeightLock, HeightCurrent uint64
 }
 
-func NewTransaction(sender, recipient account.Address, value *big.Int, nonce uint64, proposeTime time.Time) *Transaction {
+func NewTransaction(
+	sender, recipient account.Address,
+	value *big.Int,
+	nonce uint64,
+	proposeTime time.Time,
+) *Transaction {
 	tx := &Transaction{
 		Sender:     sender,
 		Recipient:  recipient,

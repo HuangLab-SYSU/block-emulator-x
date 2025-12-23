@@ -213,7 +213,11 @@ func (cs *CLPAState) getShardScore(v Vertex, uShard int) float64 {
 		}
 	}
 
-	score := float64(edge2uShard) / float64(vOutdegree) * (1 - cs.weightPenalty*cs.shardWeight[uShard]/cs.minShardWeight)
+	score := float64(
+		edge2uShard,
+	) / float64(
+		vOutdegree,
+	) * (1 - cs.weightPenalty*cs.shardWeight[uShard]/cs.minShardWeight)
 
 	return score
 }

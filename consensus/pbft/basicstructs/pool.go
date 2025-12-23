@@ -34,7 +34,15 @@ func (m *MsgPool) ReadPreprepareMsg(end ViewSeq) []*message.PreprepareMsg {
 	}
 
 	if len(ret) > 0 {
-		slog.Debug("read PreprepareMsg successfully", "end view and seq", end, "fetched size", len(ret), "rest size", m.preprepares.Len())
+		slog.Debug(
+			"read PreprepareMsg successfully",
+			"end view and seq",
+			end,
+			"fetched size",
+			len(ret),
+			"rest size",
+			m.preprepares.Len(),
+		)
 	}
 
 	return ret
@@ -54,7 +62,15 @@ func (m *MsgPool) ReadPrepareMsg(end ViewSeq) []*message.PrepareMsg {
 	}
 
 	if len(ret) > 0 {
-		slog.Debug("read PrepareMsg successfully", "end view and seq", end, "fetched size", len(ret), "rest size", m.preprepares.Len())
+		slog.Debug(
+			"read PrepareMsg successfully",
+			"end view and seq",
+			end,
+			"fetched size",
+			len(ret),
+			"rest size",
+			m.preprepares.Len(),
+		)
 	}
 
 	return ret
@@ -74,7 +90,15 @@ func (m *MsgPool) ReadCommitMsg(end ViewSeq) []*message.CommitMsg {
 	}
 
 	if len(ret) > 0 {
-		slog.Debug("read CommitMsg successfully", "end view and seq", end, "fetched size", len(ret), "rest size", m.preprepares.Len())
+		slog.Debug(
+			"read CommitMsg successfully",
+			"end view and seq",
+			end,
+			"fetched size",
+			len(ret),
+			"rest size",
+			m.preprepares.Len(),
+		)
 	}
 
 	return ret

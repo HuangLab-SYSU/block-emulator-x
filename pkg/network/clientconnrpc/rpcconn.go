@@ -69,7 +69,10 @@ func (r *RPCConn) ListenStart() error {
 	return s.Serve(lis)
 }
 
-func (r *RPCConn) HandleMessage(_ context.Context, req *rpcserver.HandleMessageRequest) (*rpcserver.HandleMessageResponse, error) {
+func (r *RPCConn) HandleMessage(
+	_ context.Context,
+	req *rpcserver.HandleMessageRequest,
+) (*rpcserver.HandleMessageResponse, error) {
 	if err := r.add2LocalBuffer(req.GetMsg()); err != nil {
 		return nil, fmt.Errorf("add message to buffer failed: %w", err)
 	}

@@ -49,7 +49,12 @@ type Node struct {
 }
 
 // NewPBFTNode creates a new node running PBFT consensus with given configurations.
-func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) (n *Node, rErr error) {
+func NewPBFTNode(
+	conn *network.ConnHandler,
+	r nodetopo.NodeMapper,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) (n *Node, rErr error) {
 	if cfg.ShardNum <= 0 || cfg.ShardNum <= lp.ShardID {
 		return nil, fmt.Errorf("invalid shardID=%d", lp.ShardID)
 	}
@@ -89,7 +94,10 @@ func NewPBFTNode(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.Co
 	}
 
 	// New a csv writer to record blocks.
-	csw, err := csvwrite.NewCSVSeqWriter(filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID)), block.RecordTitle)
+	csw, err := csvwrite.NewCSVSeqWriter(
+		filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID)),
+		block.RecordTitle,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("NewCSVSeqWriter failed: %w", err)
 	}
@@ -224,7 +232,14 @@ func (n *Node) handlePreprepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode preprepare msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle preprepare message: try to add it to the message pool", "shardID", ppMsg.ShardID, "nodeID", ppMsg.NodeID)
+	slog.InfoContext(
+		ctx,
+		"handle preprepare message: try to add it to the message pool",
+		"shardID",
+		ppMsg.ShardID,
+		"nodeID",
+		ppMsg.NodeID,
+	)
 
 	// ignore the out-of-date message
 	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: ppMsg.View, Seq: ppMsg.Seq}) > 0 {
@@ -248,7 +263,14 @@ func (n *Node) handlePrepare(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode prepare msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle prepare message: try to add it to the message pool", "shardID", pMsg.ShardID, "nodeID", pMsg.NodeID)
+	slog.InfoContext(
+		ctx,
+		"handle prepare message: try to add it to the message pool",
+		"shardID",
+		pMsg.ShardID,
+		"nodeID",
+		pMsg.NodeID,
+	)
 
 	// ignore the out-of-date message
 	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) > 0 {
@@ -267,7 +289,14 @@ func (n *Node) handleCommit(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode commit msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle commit message: try to add it to the message pool", "shardID", cMsg.ShardID, "nodeID", cMsg.NodeID)
+	slog.InfoContext(
+		ctx,
+		"handle commit message: try to add it to the message pool",
+		"shardID",
+		cMsg.ShardID,
+		"nodeID",
+		cMsg.NodeID,
+	)
 
 	// ignore the out-of-date message
 	if n.pbftMeta.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) > 0 {
@@ -393,7 +422,12 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 func (n *Node) propose(ctx context.Context) error {
 	if time.Since(n.pbftMeta.lastProposeTime) < time.Duration(n.pbftMeta.cfg.BlockInterval)*time.Millisecond {
 		// not reach the block interval
-		slog.Debug("not the time to propose, ignore it", "time duration", time.Since(n.pbftMeta.lastProposeTime).Seconds())
+		slog.Debug(
+			"not the time to propose, ignore it",
+			"time duration",
+			time.Since(n.pbftMeta.lastProposeTime).Seconds(),
+		)
+
 		return nil
 	}
 

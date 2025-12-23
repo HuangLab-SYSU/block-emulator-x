@@ -27,7 +27,10 @@ func NewConnHandler(p2p P2PConn) *ConnHandler {
 	return &ConnHandler{P2PConn: p2p}
 }
 
-func (p *ConnHandler) MSendDifferentMessages(ctx context.Context, node2Msg map[nodetopo.NodeInfo]*rpcserver.WrappedMsg) {
+func (p *ConnHandler) MSendDifferentMessages(
+	ctx context.Context,
+	node2Msg map[nodetopo.NodeInfo]*rpcserver.WrappedMsg,
+) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(node2Msg))
 

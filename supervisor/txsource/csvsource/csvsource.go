@@ -2,6 +2,7 @@ package csvsource
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -53,7 +54,7 @@ func (ds *CSVSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 	ret := make([]transaction.Transaction, 0, size)
 	for int64(len(ret)) < size {
 		txLine, err := ds.cr.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			ds.close()
 			break
 		}

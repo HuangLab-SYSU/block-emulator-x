@@ -24,11 +24,20 @@ type BrokerTxBlockOp struct {
 	lp  config.LocalParams
 }
 
-func NewBrokerTxBlockOp(c *chain.Chain, conn *network.ConnHandler, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *BrokerTxBlockOp {
+func NewBrokerTxBlockOp(
+	c *chain.Chain,
+	conn *network.ConnHandler,
+	rs nodetopo.NodeMapper,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) *BrokerTxBlockOp {
 	return &BrokerTxBlockOp{c: c, conn: conn, resolver: rs, cfg: cfg, lp: lp}
 }
 
-func (bto *BrokerTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []transaction.Transaction) (*message.Proposal, error) {
+func (bto *BrokerTxBlockOp) BuildTxBlockProposal(
+	ctx context.Context,
+	txs []transaction.Transaction,
+) (*message.Proposal, error) {
 	b, err := bto.c.GenerateBlock(ctx, bto.lp.WalletAddr, txs)
 	if err != nil {
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
@@ -36,7 +45,18 @@ func (bto *BrokerTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []tran
 
 	p := message.WrapProposal(b)
 
-	slog.InfoContext(ctx, "block is generated", "shard ID", bto.c.GetShardID(), "block height", b.Number, "epoch", bto.c.GetEpochID(), "block create time", b.CreateTime)
+	slog.InfoContext(
+		ctx,
+		"block is generated",
+		"shard ID",
+		bto.c.GetShardID(),
+		"block height",
+		b.Number,
+		"epoch",
+		bto.c.GetEpochID(),
+		"block create time",
+		b.CreateTime,
+	)
 
 	return p, nil
 }
@@ -65,8 +85,20 @@ func (bto *BrokerTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader 
 	return nil
 }
 
-func (*BrokerTxBlockOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
-	innerTxs, b1Txs, b2Txs := make([]transaction.Transaction, 0), make([]transaction.Transaction, 0), make([]transaction.Transaction, 0)
+func (*BrokerTxBlockOp) splitTxs(
+	ctx context.Context,
+	txs []transaction.Transaction,
+) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
+	innerTxs, b1Txs, b2Txs := make(
+		[]transaction.Transaction,
+		0,
+	), make(
+		[]transaction.Transaction,
+		0,
+	), make(
+		[]transaction.Transaction,
+		0,
+	)
 
 	for _, tx := range txs {
 		switch tx.BrokerStage {
@@ -77,7 +109,12 @@ func (*BrokerTxBlockOp) splitTxs(ctx context.Context, txs []transaction.Transact
 		case transaction.Sigma2BrokerStage:
 			b2Txs = append(b2Txs, tx)
 		default:
-			slog.ErrorContext(ctx, "broker-handler split tx error, broker stage invalid", "broker stage", tx.BrokerStage)
+			slog.ErrorContext(
+				ctx,
+				"broker-handler split tx error, broker stage invalid",
+				"broker stage",
+				tx.BrokerStage,
+			)
 		}
 	}
 

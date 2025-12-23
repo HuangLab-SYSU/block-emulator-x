@@ -81,7 +81,10 @@ func (s *Manager) CreateRawTxsRandomBroker(txs []transaction.Transaction) ([]tra
 }
 
 // CreateRawTx creates a raw tx with the given tx.
-func (s *Manager) CreateRawTx(tx transaction.Transaction, brokerAddr account.Address) (*transaction.Transaction, error) {
+func (s *Manager) CreateRawTx(
+	tx transaction.Transaction,
+	brokerAddr account.Address,
+) (*transaction.Transaction, error) {
 	th, err := tx.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("calc hash: %w", err)

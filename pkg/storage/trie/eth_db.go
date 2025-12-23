@@ -70,7 +70,11 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg, lp config.LocalParams) (
 func (*EthereumDefaultTrieDB) GenerateRootByGivenBytes(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
-		return nil, fmt.Errorf("bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d", len(keys), len(values))
+		return nil, fmt.Errorf(
+			"bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d",
+			len(keys),
+			len(values),
+		)
 	}
 	// Create a new trie.
 	memTrieDb := triedb.NewDatabase(rawdb.NewMemoryDatabase(), &triedb.Config{IsVerkle: false})
@@ -93,7 +97,11 @@ func (e *EthereumDefaultTrieDB) GetCurrentRoot(_ context.Context) ([]byte, error
 func (e *EthereumDefaultTrieDB) MAddAccountStatesPreview(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
-		return nil, fmt.Errorf("bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d", len(keys), len(values))
+		return nil, fmt.Errorf(
+			"bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d",
+			len(keys),
+			len(values),
+		)
 	}
 
 	curTrie, err := trie.New(trie.TrieID(e.curStateRoot), e.trieDB)
@@ -114,7 +122,11 @@ func (e *EthereumDefaultTrieDB) MAddAccountStatesPreview(_ context.Context, keys
 func (e *EthereumDefaultTrieDB) MAddAccountStatesAndCommit(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
-		return nil, fmt.Errorf("bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d", len(keys), len(values))
+		return nil, fmt.Errorf(
+			"bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d",
+			len(keys),
+			len(values),
+		)
 	}
 
 	curTrie, err := trie.New(trie.TrieID(e.curStateRoot), e.trieDB)

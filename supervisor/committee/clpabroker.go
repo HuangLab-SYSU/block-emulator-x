@@ -33,7 +33,11 @@ type CLPABrokerCommittee struct {
 	cfg config.SupervisorCfg
 }
 
-func NewCLPABrokerCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*CLPABrokerCommittee, error) {
+func NewCLPABrokerCommittee(
+	conn *network.ConnHandler,
+	r nodetopo.NodeMapper,
+	cfg config.SupervisorCfg,
+) (*CLPABrokerCommittee, error) {
 	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)
@@ -173,8 +177,18 @@ func (c *CLPABrokerCommittee) readTxsAndSend(ctx context.Context) error {
 	return nil
 }
 
-func (c *CLPABrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction) {
-	innerShardTxs, crossShardTxs := make([]transaction.Transaction, 0, len(txs)), make([]transaction.Transaction, 0, len(txs))
+func (c *CLPABrokerCommittee) classifyTxs(
+	txs []transaction.Transaction,
+) ([]transaction.Transaction, []transaction.Transaction) {
+	innerShardTxs, crossShardTxs := make(
+		[]transaction.Transaction,
+		0,
+		len(txs),
+	), make(
+		[]transaction.Transaction,
+		0,
+		len(txs),
+	)
 	for _, tx := range txs {
 		senderAddr, receiverAddr := tx.Sender, tx.Recipient
 		senderShard := c.state.GetVertexLocation(partition.Vertex{Addr: senderAddr})

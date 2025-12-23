@@ -65,7 +65,11 @@ func (c *Chain) GetCurHeader() block.Header {
 
 // GenerateBlock reads the current storage and tries to generate a normal block to handle the transactions.
 // It will not affect the Chain.
-func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []transaction.Transaction) (*block.Block, error) {
+func (c *Chain) GenerateBlock(
+	ctx context.Context,
+	miner account.Address,
+	txs []transaction.Transaction,
+) (*block.Block, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -112,7 +116,12 @@ func (c *Chain) GenerateBlock(ctx context.Context, miner account.Address, txs []
 }
 
 // GenerateMigrationBlock generates a block for account migration, by the given accounts and their states.
-func (c *Chain) GenerateMigrationBlock(ctx context.Context, miner account.Address, accounts []account.Address, states []account.State) (*block.Block, error) {
+func (c *Chain) GenerateMigrationBlock(
+	ctx context.Context,
+	miner account.Address,
+	accounts []account.Address,
+	states []account.State,
+) (*block.Block, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -199,7 +208,10 @@ func (c *Chain) GetAccountStates(ctx context.Context, accounts []account.Address
 }
 
 // GetAccountLocationsInTxs gets the locations of the accounts in the given transaction list.
-func (c *Chain) GetAccountLocationsInTxs(ctx context.Context, txs []transaction.Transaction) (map[account.Address]int64, error) {
+func (c *Chain) GetAccountLocationsInTxs(
+	ctx context.Context,
+	txs []transaction.Transaction,
+) (map[account.Address]int64, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -364,7 +376,11 @@ func (c *Chain) previewTrieUpdatedByTxs(ctx context.Context, txs []transaction.T
 	return root, nil
 }
 
-func (c *Chain) previewTrieUpdatedByMigration(ctx context.Context, accounts []account.Address, states []account.State) ([]byte, error) {
+func (c *Chain) previewTrieUpdatedByMigration(
+	ctx context.Context,
+	accounts []account.Address,
+	states []account.State,
+) ([]byte, error) {
 	keyBytes, valBytes, err := c.getMigrationAccountBytes(accounts, states)
 	if err != nil {
 		return nil, fmt.Errorf("get migration account bytes err: %w", err)
@@ -405,7 +421,10 @@ func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, 
 	return root, nil
 }
 
-func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []transaction.Transaction) ([][]byte, [][]byte, error) {
+func (c *Chain) calculateAccountsAndStatesBytes(
+	ctx context.Context,
+	txs []transaction.Transaction,
+) ([][]byte, [][]byte, error) {
 	accountStates := make(map[account.Address]*account.State, len(txs)*2)
 	for _, tx := range txs {
 		accountStates[tx.Sender] = nil
@@ -456,7 +475,10 @@ func (c *Chain) calculateAccountsAndStatesBytes(ctx context.Context, txs []trans
 	return retAccountByteList, stateByteList, nil
 }
 
-func (c *Chain) getMigrationAccountBytes(accounts []account.Address, states []account.State) ([][]byte, [][]byte, error) {
+func (c *Chain) getMigrationAccountBytes(
+	accounts []account.Address,
+	states []account.State,
+) ([][]byte, [][]byte, error) {
 	var err error
 
 	keyBytes := make([][]byte, len(accounts))
@@ -526,7 +548,16 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*acco
 
 		brokerState := accountStates[tx.Broker]
 		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
-			slog.Error("handle broker1 tx error", "err", "the sender is not in this shard", "sender", tx.Sender, "shard", c.shardID)
+			slog.Error(
+				"handle broker1 tx error",
+				"err",
+				"the sender is not in this shard",
+				"sender",
+				tx.Sender,
+				"shard",
+				c.shardID,
+			)
+
 			return
 		}
 
@@ -543,7 +574,16 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*acco
 
 		brokerState := accountStates[tx.Broker]
 		if recipientState == nil || recipientState.ShardLocation != uint64(c.shardID) {
-			slog.Error("handle broker2 tx error", "err", "the recipient is not in this shard", "recipient", tx.Recipient, "shard", c.shardID)
+			slog.Error(
+				"handle broker2 tx error",
+				"err",
+				"the recipient is not in this shard",
+				"recipient",
+				tx.Recipient,
+				"shard",
+				c.shardID,
+			)
+
 			return
 		}
 
@@ -605,7 +645,11 @@ func (c *Chain) getTxMerkleRoot(ctx context.Context, txs []transaction.Transacti
 	return root, nil
 }
 
-func (c *Chain) getMigratedStateMerkleRoot(ctx context.Context, accounts []account.Address, states []account.State) ([]byte, error) {
+func (c *Chain) getMigratedStateMerkleRoot(
+	ctx context.Context,
+	accounts []account.Address,
+	states []account.State,
+) ([]byte, error) {
 	keyBytes, valBytes, err := c.getMigrationAccountBytes(accounts, states)
 	if err != nil {
 		return nil, fmt.Errorf("get migrated state merkle root err: %w", err)

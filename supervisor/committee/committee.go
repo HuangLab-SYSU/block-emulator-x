@@ -34,7 +34,11 @@ type stopLogic struct {
 
 type txLocationFunc func(tx transaction.Transaction) int64
 
-func packShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLocationFunc) [][]transaction.Transaction {
+func packShardTxs(
+	txs []transaction.Transaction,
+	shardNumber int64,
+	locFunc txLocationFunc,
+) [][]transaction.Transaction {
 	shardTxs := make([][]transaction.Transaction, shardNumber)
 
 	// classify the transactions by the locations of sender
