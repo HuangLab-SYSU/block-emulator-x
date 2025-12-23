@@ -98,7 +98,11 @@ func (am *AccMigrateMetadata) CollectStatesByMsg(atMsg *message.AccountMigration
 // GetMigratedAddrStates returns the migrated accounts and states if all MigratedAccountStates are collected.
 func (am *AccMigrateMetadata) GetMigratedAddrStates() ([]account.Address, []account.State, error) {
 	if len(am.MigratedAccountStates) != int(am.cfg.ShardNum) {
-		return nil, nil, fmt.Errorf("not all MigratedAccountStates is collected, expect=%d, got=%d", am.cfg.ShardNum, len(am.MigratedAccountStates))
+		return nil, nil, fmt.Errorf(
+			"not all MigratedAccountStates is collected, expect=%d, got=%d",
+			am.cfg.ShardNum,
+			len(am.MigratedAccountStates),
+		)
 	}
 
 	accountMigratedIn := make(map[account.Address]*account.State, len(am.MigratedAccountStates))

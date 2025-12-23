@@ -78,7 +78,10 @@ func (t *TxPool) GetTxListSize(txs []transaction.Transaction) (int, error) {
 	return 0, fmt.Errorf("unknown tx pool type: %s", t.cfg.Type)
 }
 
-func packTxsByGivenNum(q []transaction.Transaction, n int) ([]transaction.Transaction, []transaction.Transaction, error) {
+func packTxsByGivenNum(
+	q []transaction.Transaction,
+	n int,
+) ([]transaction.Transaction, []transaction.Transaction, error) {
 	length := len(q)
 	if length > n {
 		length = n
@@ -91,7 +94,10 @@ func packTxsByGivenNum(q []transaction.Transaction, n int) ([]transaction.Transa
 	return ret, q, nil
 }
 
-func packTxsByGivenBytes(q []transaction.Transaction, n int) ([]transaction.Transaction, []transaction.Transaction, error) {
+func packTxsByGivenBytes(
+	q []transaction.Transaction,
+	n int,
+) ([]transaction.Transaction, []transaction.Transaction, error) {
 	endIdx := 0
 
 	for i, tx := range q {

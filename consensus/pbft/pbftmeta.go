@@ -86,7 +86,8 @@ func (c *consensusMeta) curateMsg() {
 	if c.curPreprepare == nil {
 		ppMsgList := c.msgPool.ReadPreprepareMsg(c.curViewSeq)
 		for _, ppMsg := range ppMsgList {
-			if c.curViewSeq.Compare(basicstructs.ViewSeq{View: ppMsg.View, Seq: ppMsg.Seq}) != 0 || ppMsg.NodeID != c.leader {
+			if c.curViewSeq.Compare(basicstructs.ViewSeq{View: ppMsg.View, Seq: ppMsg.Seq}) != 0 ||
+				ppMsg.NodeID != c.leader {
 				// if the message is invalid (wrong seq/view or wrong leader), drop it
 				slog.Info("get an invalid preprepare message, ignore it", "view", ppMsg.View, "seq", ppMsg.Seq)
 				continue
@@ -105,7 +106,8 @@ func (c *consensusMeta) curateMsg() {
 
 	pMsgList := c.msgPool.ReadPrepareMsg(c.curViewSeq)
 	for _, pMsg := range pMsgList {
-		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) != 0 || !bytes.Equal(pMsg.Digest, c.curPreprepare.Digest) {
+		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: pMsg.View, Seq: pMsg.Seq}) != 0 ||
+			!bytes.Equal(pMsg.Digest, c.curPreprepare.Digest) {
 			// if the prepare message is invalid (wrong seq/view or wrong digest), drop it
 			slog.Info("get an invalid prepare message, ignore it", "view", pMsg.View, "seq", pMsg.Seq)
 			continue
@@ -116,7 +118,8 @@ func (c *consensusMeta) curateMsg() {
 
 	cMsgList := c.msgPool.ReadCommitMsg(c.curViewSeq)
 	for _, cMsg := range cMsgList {
-		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) != 0 || !bytes.Equal(cMsg.Digest, c.curPreprepare.Digest) {
+		if c.curViewSeq.Compare(basicstructs.ViewSeq{View: cMsg.View, Seq: cMsg.Seq}) != 0 ||
+			!bytes.Equal(cMsg.Digest, c.curPreprepare.Digest) {
 			// if the commit message is invalid (wrong seq/view or wrong digest), drop it
 			slog.Info("get an invalid commit message, ignore it", "view", cMsg.View, "seq", cMsg.Seq)
 			continue

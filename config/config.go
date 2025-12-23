@@ -14,10 +14,10 @@ import (
 )
 
 type Config struct {
-	GlobalSys        SystemCfg `json:"system" yaml:"system"`
-	ConsensusNodeCfg `json:"consensus_node" yaml:"consensus_node"`
-	SupervisorCfg    `json:"supervisor"  yaml:"supervisor"`
-	NetworkCfg       `json:"network"    yaml:"network"`
+	GlobalSys        SystemCfg `json:"system"         yaml:"system"`
+	ConsensusNodeCfg `          json:"consensus_node" yaml:"consensus_node"`
+	SupervisorCfg    `          json:"supervisor"     yaml:"supervisor"`
+	NetworkCfg       `          json:"network"        yaml:"network"`
 }
 
 type LocalParams struct {

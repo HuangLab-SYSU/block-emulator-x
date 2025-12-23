@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	_ "net/http/pprof"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/cmd/loadnetwork"
@@ -13,6 +12,8 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/logger"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
+
+	_ "net/http/pprof"
 )
 
 const (
@@ -23,7 +24,11 @@ const (
 var (
 	configPath = flag.String("config", "config.yaml", "path to config file")
 	// pprof is a tool to sample the program and collect the runtime data.
-	pprofPort = flag.Int("pprof-port", 0, fmt.Sprintf("port to serve pprof; the port should be larger than %d", pprofPortLowerBound))
+	pprofPort = flag.Int(
+		"pprof-port",
+		0,
+		fmt.Sprintf("port to serve pprof; the port should be larger than %d", pprofPortLowerBound),
+	)
 )
 
 func main() {

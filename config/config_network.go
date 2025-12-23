@@ -2,5 +2,5 @@ package config
 
 type NetworkCfg struct {
 	Bandwidth int64 `json:"bandwidth" yaml:"bandwidth"`
-	Latency   int64 `json:"latency" yaml:"latency"`
+	Latency   int64 `json:"latency"   yaml:"latency"`
 }

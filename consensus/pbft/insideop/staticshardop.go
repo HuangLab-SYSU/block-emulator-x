@@ -19,7 +19,12 @@ type StaticShardOp struct {
 	cfg config.ConsensusNodeCfg
 }
 
-func NewStaticShardOp(chain *chain.Chain, txPool txpool.TxPool, tbo txblockop.TxBlockOp, cfg config.ConsensusNodeCfg) *StaticShardOp {
+func NewStaticShardOp(
+	chain *chain.Chain,
+	txPool txpool.TxPool,
+	tbo txblockop.TxBlockOp,
+	cfg config.ConsensusNodeCfg,
+) *StaticShardOp {
 	return &StaticShardOp{
 		chain:  chain,
 		txPool: txPool,

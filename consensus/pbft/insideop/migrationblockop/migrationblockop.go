@@ -29,7 +29,14 @@ type MigrationBlockOp struct {
 	lp  config.LocalParams
 }
 
-func NewMigrationBlockOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, amm *migration.AccMigrateMetadata, cfg config.ConsensusNodeCfg, lp config.LocalParams) *MigrationBlockOp {
+func NewMigrationBlockOp(
+	conn *network.ConnHandler,
+	resolver nodetopo.NodeMapper,
+	chain *chain.Chain,
+	amm *migration.AccMigrateMetadata,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) *MigrationBlockOp {
 	return &MigrationBlockOp{amm: amm, conn: conn, resolver: resolver, chain: chain, lp: lp, cfg: cfg}
 }
 
@@ -37,7 +44,15 @@ func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message
 	// If the number of received account-migration messages is enough (equal to ShardNum),
 	// the leader will pack the partition proposal in a block.
 	if len(m.amm.MigratedAccountStates) != int(m.cfg.ShardNum) {
-		slog.InfoContext(ctx, "not all MigratedAccountStates is collected, do not propose", "expect", int(m.cfg.ShardNum), "actual", len(m.amm.MigratedAccountStates))
+		slog.InfoContext(
+			ctx,
+			"not all MigratedAccountStates is collected, do not propose",
+			"expect",
+			int(m.cfg.ShardNum),
+			"actual",
+			len(m.amm.MigratedAccountStates),
+		)
+
 		return nil, nil
 	}
 
@@ -113,7 +128,7 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 	return nil
 }
 
-func (m *MigrationBlockOp) MigrationBlockCommit(ctx context.Context, _ bool, b *block.Block) error {
+func (m *MigrationBlockOp) MigrationBlockCommit(ctx context.Context, b *block.Block) error {
 	// commit block - add block to the blockchain
 	if err := m.chain.AddBlock(ctx, b); err != nil {
 		return fmt.Errorf("chain.AddBlock failed: %w", err)

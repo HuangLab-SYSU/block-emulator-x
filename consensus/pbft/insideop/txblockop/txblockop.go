@@ -18,7 +18,13 @@ type TxBlockOp interface {
 	BlockCommitAndDeliver(ctx context.Context, isLeader bool, b *block.Block) error
 }
 
-func NewTxBlockOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, cfg config.ConsensusNodeCfg, lp config.LocalParams) (TxBlockOp, error) {
+func NewTxBlockOp(
+	conn *network.ConnHandler,
+	resolver nodetopo.NodeMapper,
+	chain *chain.Chain,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) (TxBlockOp, error) {
 	var tbo TxBlockOp
 
 	switch cfg.ConsensusType {
