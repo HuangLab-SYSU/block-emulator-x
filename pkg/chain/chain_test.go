@@ -12,6 +12,7 @@ import (
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
@@ -31,65 +32,31 @@ var (
 
 func TestChain(t *testing.T) {
 	cfg := getTestConfig()
-	// create test dir
+	// Create the test dir.
 	err := os.MkdirAll(cfg.BoltCfg.FilePathDir, os.ModePerm)
 	require.NoError(t, err)
 
 	t.Cleanup(func() { clearChainStorage() })
 
-	// create block
+	// Create a blockchain.
 	bc, err := NewChain(getTestConfig(), config.LocalParams{ShardID: 0})
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, bc.Close())
 	}()
 
-	// create block but not add it to the chain
+	b1 := generateBlockButNotAdd(t, bc)
+
+	// Add this block to the chain.
 	ctx := context.Background()
-	beforeHeader := bc.GetCurHeader()
-
-	b, err := bc.GenerateBlock(ctx, testMiner, testTxs)
-	require.NoError(t, err)
-	generateHeader := b.Header
-
-	headerAfterGenerate := bc.GetCurHeader()
-	// the blockchain's 'curHeader' will not be modified after generating a block
-	require.Equal(t, beforeHeader, headerAfterGenerate)
-
-	encodedBeforeHeader, _ := beforeHeader.Encode()
-	encodedHeaderAfterGenerate, _ := headerAfterGenerate.Encode()
-	// block header in the blockchain is equal in bytes.
-	require.Equal(t, encodedBeforeHeader, encodedHeaderAfterGenerate)
-
-	err = bc.AddBlock(ctx, b)
+	err = bc.AddBlock(ctx, b1)
 	require.NoError(t, err)
 
-	headerAfterAdd := bc.GetCurHeader()
-	require.Equal(t, generateHeader, headerAfterAdd)
-	require.NoError(t, err)
+	// The test to generate and add a migration block
+	addMigrationBlockAndCheck(t, bc)
 
-	beforeHeaderHash, _ := beforeHeader.Hash()
-	require.Equal(t, beforeHeaderHash, generateHeader.ParentBlockHash)
-
-	migratedB, err := bc.GenerateMigrationBlock(ctx, testMiner, []account.Address{testSender}, []account.State{*account.NewState(testSender, 100)})
-	require.NoError(t, err)
-
-	err = bc.AddBlock(ctx, migratedB)
-	require.NoError(t, err)
-
-	as, err := bc.GetAccountStates(ctx, []account.Address{testSender})
-	require.NoError(t, err)
-	require.Len(t, as, 1)
-	require.Equal(t, *account.NewState(testSender, 100), *as[0])
-
-	// Test to get blocks by the given beginHeight
-	require.Equal(t, uint64(3), bc.GetCurHeader().Number)
-	blocks, err := bc.GetBlocksAfterHeight(ctx, -1)
-	require.Error(t, err)
-
-	blocks, err = bc.GetBlocksAfterHeight(ctx, 2)
-	require.NoError(t, err)
-	require.Len(t, blocks, 2)
+	// The test to get blocks by the given beginHeight
+	fetchBlocksCheck(t, bc)
 }
 
 func clearChainStorage() {
@@ -121,4 +88,70 @@ func getTestConfig() config.BlockchainCfg {
 			},
 		},
 	}
+}
+
+func generateBlockButNotAdd(t *testing.T, bc *Chain) *block.Block {
+	ctx := context.Background()
+
+	headerBeforeGeneration := bc.GetCurHeader()
+	expectedParentHash, err := headerBeforeGeneration.Hash()
+	require.NoError(t, err)
+
+	// Generate a block but not add it.
+	b, err := bc.GenerateBlock(ctx, testMiner, testTxs)
+	require.NoError(t, err)
+
+	headerAfterGeneration := bc.GetCurHeader()
+	// The blockchain's 'curHeader' will not be modified after generating a block.
+	require.Equal(t, headerBeforeGeneration, headerAfterGeneration)
+
+	encodedHeaderBeforeGen, _ := headerBeforeGeneration.Encode()
+	encodedHeaderAfterGen, _ := headerAfterGeneration.Encode()
+	// Block header in the blockchain is equal in bytes.
+	require.Equal(t, encodedHeaderBeforeGen, encodedHeaderAfterGen)
+
+	// The block's parent hash should be equal to expectedParentHash.
+	require.Equal(t, expectedParentHash, b.ParentBlockHash)
+	return b
+}
+
+func addMigrationBlockAndCheck(t *testing.T, bc *Chain) {
+	ctx := context.Background()
+	const testLoc = 100
+
+	oldHeaderHash, err := bc.GetCurHeader().Hash()
+	require.NoError(t, err)
+
+	// Generate a migration block.
+	migratedB, err := bc.GenerateMigrationBlock(
+		ctx,
+		testMiner,
+		[]account.Address{testSender},
+		[]account.State{*account.NewState(testSender, testLoc)},
+	)
+	require.NoError(t, err)
+
+	// Check the parent hash of this migration block.
+	require.Equal(t, oldHeaderHash, migratedB.ParentBlockHash)
+
+	// Add this block to the chain.
+	err = bc.AddBlock(ctx, migratedB)
+	require.NoError(t, err)
+
+	// Get the states of the test account: the state should be equal to the expect one.
+	as, err := bc.GetAccountStates(ctx, []account.Address{testSender})
+	require.NoError(t, err)
+	require.Len(t, as, 1)
+	require.Equal(t, *account.NewState(testSender, testLoc), *as[0])
+}
+
+func fetchBlocksCheck(t *testing.T, bc *Chain) {
+	ctx := context.Background()
+	require.Equal(t, uint64(3), bc.GetCurHeader().Number)
+	blocks, err := bc.GetBlocksAfterHeight(ctx, -1)
+	require.Error(t, err)
+
+	blocks, err = bc.GetBlocksAfterHeight(ctx, 2)
+	require.NoError(t, err)
+	require.Len(t, blocks, 2)
 }

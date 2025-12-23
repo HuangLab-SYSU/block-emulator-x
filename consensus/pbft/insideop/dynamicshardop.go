@@ -167,21 +167,16 @@ func (c *DynamicShardOp) packValidTxsInRelay(
 	txs2Shard := make([][]transaction.Transaction, c.cfg.ShardNum)
 
 	for curCnt := 0; curCnt < size; {
-		iterPackedTxs := make([]transaction.Transaction, 0)
-
-		txs, err := c.txPool.PackTxs(size - curCnt)
+		txs, accountLoc, err := c.fetchTxsAndAccountStates(ctx, size-curCnt)
 		if err != nil {
-			return nil, fmt.Errorf("PackTxs failed: %w", err)
+			return nil, fmt.Errorf("fetchTxsAndAccountStates failed: %w", err)
 		}
 
-		if len(txs) == 0 { // no transactions to pack, break
+		if len(txs) == 0 {
 			break
 		}
-		// Get all account states of this txs.
-		accountLoc, err := c.chain.GetAccountLocationsInTxs(ctx, txs)
-		if err != nil {
-			return nil, fmt.Errorf("GetAccountLocationsInTxs failed: %w", err)
-		}
+
+		iterPackedTxs := make([]transaction.Transaction, 0)
 
 		for _, tx := range txs {
 			keyAcc := tx.Sender
@@ -228,21 +223,16 @@ func (c *DynamicShardOp) packValidTxsInBroker(
 	txs2Shard := make([][]transaction.Transaction, c.cfg.ShardNum)
 
 	for curCnt := 0; curCnt < size; {
-		iterPackedTxs := make([]transaction.Transaction, 0)
-
-		txs, err := c.txPool.PackTxs(size - curCnt)
+		txs, accountLoc, err := c.fetchTxsAndAccountStates(ctx, size-curCnt)
 		if err != nil {
-			return nil, fmt.Errorf("PackTxs failed: %w", err)
+			return nil, fmt.Errorf("fetchTxsAndAccountStates failed: %w", err)
 		}
 
-		if len(txs) == 0 { // no transactions to pack, break
+		if len(txs) == 0 {
 			break
 		}
-		// Get all account states of this txs.
-		accountLoc, err := c.chain.GetAccountLocationsInTxs(ctx, txs)
-		if err != nil {
-			return nil, fmt.Errorf("GetAccountLocationsInTxs failed: %w", err)
-		}
+
+		iterPackedTxs := make([]transaction.Transaction, 0)
 
 		for _, tx := range txs {
 			if destShard := c.getTxDestLocByAccountState(tx, accountLoc); destShard == supervisorShardID {
@@ -473,14 +463,31 @@ func (c *DynamicShardOp) getTxDestLocByAccountState(
 	return supervisorShardID
 }
 
-func (c *DynamicShardOp) brokerCLPATxSendAgain(
-	ctx context.Context,
-	txSentAgain []transaction.Transaction,
-) error {
+func (c *DynamicShardOp) fetchTxsAndAccountStates(
+	ctx context.Context, size int,
+) ([]transaction.Transaction, map[account.Address]int64, error) {
+	txs, err := c.txPool.PackTxs(size)
+	if err != nil {
+		return nil, nil, fmt.Errorf("PackTxs failed: %w", err)
+	}
+
+	if len(txs) == 0 { // no transactions to pack, break
+		return nil, nil, nil
+	}
+	// Get all account states of this txs.
+	accountLoc, err := c.chain.GetAccountLocationsInTxs(ctx, txs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("GetAccountLocationsInTxs failed: %w", err)
+	}
+
+	return txs, accountLoc, nil
+}
+
+func (c *DynamicShardOp) brokerCLPATxSendAgain(ctx context.Context, txSentAgain []transaction.Transaction) error {
 	if len(txSentAgain) == 0 {
 		return nil
 	}
-	// Send to the supervisor
+	// Send to the supervisor.
 	w, err := message.WrapMsg(&message.BrokerCLPATxSendAgainMsg{Txs: txSentAgain})
 	if err != nil {
 		return fmt.Errorf("wrap BrokerCLPATxSendAgainMsg failed: %w", err)
