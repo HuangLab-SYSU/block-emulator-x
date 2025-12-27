@@ -449,7 +449,7 @@ func (c *Chain) calculateAccountsAndStatesBytes(
 
 	// update in map
 	for _, tx := range txs {
-		c.updateStateMapByTx(accountStates, tx)
+		c.executeTx(accountStates, tx)
 	}
 
 	// pack state list
@@ -496,21 +496,21 @@ func (c *Chain) getMigrationAccountBytes(
 	return keyBytes, valBytes, nil
 }
 
-func (c *Chain) updateStateMapByTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
+func (c *Chain) executeTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	if len(tx.ROriginalHash) != 0 { // relay transaction
-		c.updateStateMapByRelayTx(accountStates, tx)
+		c.executeRelayTx(accountStates, tx)
 		return
 	}
 
 	if len(tx.BOriginalHash) != 0 { // broker transaction
-		c.modifyStateMapByBrokerTx(accountStates, tx)
+		c.executeBrokerTx(accountStates, tx)
 		return
 	}
 
-	c.modifyStateMapByNormalTx(accountStates, tx)
+	c.executeNormalTx(accountStates, tx)
 }
 
-func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
+func (c *Chain) executeRelayTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	switch tx.RelayStage {
 	case transaction.Relay1Tx:
 		// For a relay1 transaction, debit the sender's balance.
@@ -520,11 +520,18 @@ func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Address]*accou
 			return
 		}
 
+		if senderState.Nonce > tx.Nonce {
+			slog.Info("the transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
+			return
+		}
+
 		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
 			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
 		} else if err != nil {
 			slog.Error("debit error", "err", err)
 		}
+
+		senderState.Nonce = tx.Nonce
 
 	case transaction.Relay2Tx:
 		// For a relay2 transaction credit the recipient's balance.
@@ -536,28 +543,25 @@ func (c *Chain) updateStateMapByRelayTx(accountStates map[account.Address]*accou
 		recipientState.Credit(tx.Value)
 
 	default:
-		slog.Error("unexpected relay stage in updateStateMapByRelayTx", "stage", tx.RelayStage)
+		slog.Error("unexpected relay stage in executeRelayTx", "stage", tx.RelayStage)
 	}
 }
 
-func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
+func (c *Chain) executeBrokerTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	switch tx.BrokerStage {
 	case transaction.Sigma1BrokerStage:
 		// For a broker1 transaction, debit the sender's balance and credit the broker's balance.
 		senderState := accountStates[tx.Sender]
 
 		brokerState := accountStates[tx.Broker]
-		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
-			slog.Error(
-				"handle broker1 tx error",
-				"err",
-				"the sender is not in this shard",
-				"sender",
-				tx.Sender,
-				"shard",
-				c.shardID,
-			)
 
+		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
+			slog.Error("handle broker1 tx error", "err", "the sender is not in this shard")
+			return
+		}
+
+		if senderState.Nonce > tx.Nonce {
+			slog.Info("the transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
 			return
 		}
 
@@ -566,6 +570,7 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*acco
 		} else if err != nil {
 			slog.Error("debit error", "err", err)
 		} else {
+			senderState.Nonce = tx.Nonce
 			brokerState.Credit(tx.Value)
 		}
 	case transaction.Sigma2BrokerStage:
@@ -573,17 +578,9 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*acco
 		recipientState := accountStates[tx.Recipient]
 
 		brokerState := accountStates[tx.Broker]
-		if recipientState == nil || recipientState.ShardLocation != uint64(c.shardID) {
-			slog.Error(
-				"handle broker2 tx error",
-				"err",
-				"the recipient is not in this shard",
-				"recipient",
-				tx.Recipient,
-				"shard",
-				c.shardID,
-			)
 
+		if recipientState == nil || recipientState.ShardLocation != uint64(c.shardID) {
+			slog.Error("handle broker2 tx error", "err", "the recipient is not in this shard")
 			return
 		}
 
@@ -595,25 +592,34 @@ func (c *Chain) modifyStateMapByBrokerTx(accountStates map[account.Address]*acco
 			recipientState.Credit(tx.Value)
 		}
 	default:
-		slog.Error("unexpected broker stage in modifyStateMapByBrokerTx", "stage", tx.BrokerStage)
+		slog.Error("unexpected broker stage in executeBrokerTx", "stage", tx.BrokerStage)
 	}
 }
 
-func (c *Chain) modifyStateMapByNormalTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
+func (c *Chain) executeNormalTx(accountStates map[account.Address]*account.State, tx transaction.Transaction) {
 	senderState := accountStates[tx.Sender]
 	recipientState := accountStates[tx.Recipient]
 
 	// Modify senderState
-	if senderState != nil && senderState.ShardLocation != uint64(c.shardID) {
+	if senderState != nil && senderState.ShardLocation == uint64(c.shardID) {
+		if senderState.Nonce > tx.Nonce {
+			slog.Info("the transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
+			return
+		}
+
 		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
 			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
+			return
 		} else if err != nil {
 			slog.Error("debit error", "err", err)
+			return
 		}
+
+		senderState.Nonce = tx.Nonce
 	}
 
 	// Modify recipientState
-	if recipientState != nil && recipientState.ShardLocation != uint64(c.shardID) {
+	if recipientState != nil && recipientState.ShardLocation == uint64(c.shardID) {
 		recipientState.Credit(tx.Value)
 	}
 }

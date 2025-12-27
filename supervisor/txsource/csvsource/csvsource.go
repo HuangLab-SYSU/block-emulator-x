@@ -103,7 +103,7 @@ func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 		return nil, fmt.Errorf("failed to parse receiver address: %w", err)
 	}
 
-	tx := transaction.NewTransaction(senderAddr, receiverAddr, val, uint64(count), time.Now())
+	tx := transaction.NewTransaction(senderAddr, receiverAddr, val, big.NewInt(0), uint64(count), time.Now())
 
 	return tx, nil
 }

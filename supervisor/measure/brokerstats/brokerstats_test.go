@@ -1,6 +1,7 @@
 package brokerstats
 
 import (
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -40,11 +41,11 @@ func initInputMsg(t *testing.T) *rpcserver.WrappedMsg {
 	for i, cTx := range cTxs {
 		txHash, err := cTx.Hash()
 		require.NoError(t, err)
-		b1 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, cTx.Nonce, cTx.CreateTime)
+		b1 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, big.NewInt(0), cTx.Nonce, cTx.CreateTime)
 		b1.BOriginalHash = txHash
 		b1.BrokerStage = 1
 
-		b2 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, cTx.Nonce, cTx.CreateTime)
+		b2 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, big.NewInt(0), cTx.Nonce, cTx.CreateTime)
 		b2.BOriginalHash = txHash
 		b2.BrokerStage = 2
 
