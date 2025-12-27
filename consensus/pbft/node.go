@@ -349,14 +349,14 @@ func (n *Node) handleCatchupResp(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("decode catchup resp msg: %w", err)
 	}
 
-	slog.InfoContext(ctx, "handle catch up req message")
+	slog.InfoContext(ctx, "handle catch up resp message")
 
 	if n.pbftMeta.leader != crMsg.NodeID {
 		return fmt.Errorf("the catchup response message is not from the leader, from nodeID=%d", crMsg.NodeID)
 	}
 
 	if !n.pbftMeta.catchupStarted {
-		return fmt.Errorf("catchup req message not started")
+		return fmt.Errorf("catchup resp message not started")
 	}
 
 	// Add blocks.
