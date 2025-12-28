@@ -447,11 +447,6 @@ func (c *Chain) executeRelayTx(accountStates map[account.Address]*account.State,
 			return
 		}
 
-		if senderState.Nonce > tx.Nonce {
-			slog.Info("the relay transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
-			return
-		}
-
 		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
 			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
 		} else if err != nil {
@@ -484,11 +479,6 @@ func (c *Chain) executeBrokerTx(accountStates map[account.Address]*account.State
 
 		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
 			slog.Error("handle broker1 tx error", "err", "the sender is not in this shard")
-			return
-		}
-
-		if senderState.Nonce > tx.Nonce {
-			slog.Info("the broker transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
 			return
 		}
 
@@ -529,11 +519,6 @@ func (c *Chain) executeNormalTx(accountStates map[account.Address]*account.State
 
 	// Modify senderState
 	if senderState != nil && senderState.ShardLocation == uint64(c.shardID) {
-		if senderState.Nonce > tx.Nonce {
-			slog.Info("the normal transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
-			return
-		}
-
 		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
 			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
 			return
