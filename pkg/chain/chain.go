@@ -537,6 +537,9 @@ func (c *Chain) executeNormalTx(accountStates map[account.Address]*account.State
 }
 
 func (c *Chain) calcTxHeaderOpt(ctx context.Context, body block.Body) (*block.TxHeaderOpt, error) {
+	if len(body.TxList) == 0 {
+		return &block.TxHeaderOpt{}, nil
+	}
 	// Calculate the bloom filter.
 	bf, err := bloom.NewFilter(c.cfg.BloomFilterCfg)
 	if err != nil {
@@ -569,6 +572,10 @@ func (c *Chain) calcTxHeaderOpt(ctx context.Context, body block.Body) (*block.Tx
 }
 
 func (c *Chain) calcMigrationHeaderOpt(ctx context.Context, opt block.MigrationOpt) (*block.MigrationHeaderOpt, error) {
+	if len(opt.MigratedAccounts) == 0 {
+		return &block.MigrationHeaderOpt{}, nil
+	}
+
 	keyBytes, valBytes, err := c.getMigrationAccountBytes(opt.MigratedAccounts, opt.MigratedStates)
 	if err != nil {
 		return nil, fmt.Errorf("get migrated state Merkle root err: %w", err)
