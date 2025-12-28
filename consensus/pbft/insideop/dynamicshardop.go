@@ -336,7 +336,7 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	tx2Supervisor := make([]transaction.Transaction, 0)
 
 	for _, tx := range allTxs {
-		if dest := c.getBrokerTxDestLocByModifiedMap(tx); dest == supervisorShardID {
+		if dest := c.getMigratedTxDestLocInBroker(tx); dest == supervisorShardID {
 			tx2Supervisor = append(tx2Supervisor, tx)
 		} else if dest == c.lp.ShardID {
 			addBackTxs = append(addBackTxs, tx)
@@ -377,7 +377,10 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	return nil
 }
 
-func (c *DynamicShardOp) getBrokerTxDestLocByModifiedMap(tx transaction.Transaction) int64 {
+// getMigratedTxDestLocInBroker gets the dest location of the given transaction.
+// In the dynamic-sharding + Broker, the transaction may be migrated to another shard.
+// If an inner-shard transaction becomes a cross-shard one, it should be sent back to the supervisor.
+func (c *DynamicShardOp) getMigratedTxDestLocInBroker(tx transaction.Transaction) int64 {
 	sDestShard, sModified := c.amm.CurModifiedMap[tx.Sender]
 	rDestShard, rModified := c.amm.CurModifiedMap[tx.Recipient]
 
@@ -428,13 +431,7 @@ func (c *DynamicShardOp) getTxDestLocByAccountState(
 	rDestShard, rExist := accountLoc[tx.Recipient]
 
 	if !sExist || !rExist {
-		slog.Error(
-			"sender or recipient is not found in accountLoc",
-			"sender",
-			tx.Sender,
-			"recipient",
-			tx.Recipient,
-		)
+		slog.Error("sender or recipient is not found in accountLoc")
 
 		return supervisorShardID
 	}

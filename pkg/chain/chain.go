@@ -256,7 +256,7 @@ func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
 	// This block is a migration block.
 	mRoot, err := c.getMigratedStateMerkleRoot(ctx, b.MigratedAccounts, b.MigratedStates)
 	if err != nil {
-		return fmt.Errorf("get migrated account state merkle root err: %w", err)
+		return fmt.Errorf("get migrated account state Merkle root err: %w", err)
 	}
 
 	if !bytes.Equal(mRoot, b.MigratedAccountsRoot) {
@@ -651,7 +651,7 @@ func (c *Chain) getMigratedStateMerkleRoot(
 ) ([]byte, error) {
 	keyBytes, valBytes, err := c.getMigrationAccountBytes(accounts, states)
 	if err != nil {
-		return nil, fmt.Errorf("get migrated state merkle root err: %w", err)
+		return nil, fmt.Errorf("get migrated state Merkle root err: %w", err)
 	}
 
 	root, err := c.s.TrieStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
