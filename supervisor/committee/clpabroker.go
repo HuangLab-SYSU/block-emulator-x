@@ -207,7 +207,7 @@ func (c *CLPABrokerCommittee) classifyTxs(
 
 func (c *CLPABrokerCommittee) getTxLocByCLPAState(tx transaction.Transaction) int64 {
 	// inner-shard tx
-	if len(tx.BOriginalHash) == 0 {
+	if tx.TxType() == transaction.NormalTxType {
 		return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender}))
 	}
 	// broker tx

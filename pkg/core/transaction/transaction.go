@@ -13,6 +13,12 @@ import (
 )
 
 const (
+	NormalTxType byte = iota
+	RelayTxType
+	BrokerTxType
+)
+
+const (
 	UndeterminedRelayTx = 0
 	Relay1Tx            = 1
 	Relay2Tx            = 2
@@ -84,4 +90,16 @@ func (tx *Transaction) Hash() ([]byte, error) {
 	sum := sha256.Sum256(b)
 
 	return sum[:], nil
+}
+
+func (tx *Transaction) TxType() byte {
+	if len(tx.BOriginalHash) != 0 {
+		return BrokerTxType
+	}
+
+	if len(tx.ROriginalHash) != 0 {
+		return RelayTxType
+	}
+
+	return NormalTxType
 }

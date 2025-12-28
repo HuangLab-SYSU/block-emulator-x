@@ -381,7 +381,7 @@ func (c *DynamicShardOp) getBrokerTxDestLocByModifiedMap(tx transaction.Transact
 	sDestShard, sModified := c.amm.CurModifiedMap[tx.Sender]
 	rDestShard, rModified := c.amm.CurModifiedMap[tx.Recipient]
 
-	if len(tx.BOriginalHash) == 0 { // inner-shard tx
+	if tx.TxType() == transaction.NormalTxType { // inner-shard tx
 		if !sModified {
 			sDestShard = int(c.lp.ShardID)
 		}
@@ -439,7 +439,7 @@ func (c *DynamicShardOp) getTxDestLocByAccountState(
 		return supervisorShardID
 	}
 
-	if len(tx.BOriginalHash) == 0 { // inner-shard tx
+	if tx.TxType() == transaction.NormalTxType { // inner-shard tx
 		// After the account-migration, this transaction is still an inner-shard tx. Thus, it should be migrated into sDestShard.
 		if sDestShard == rDestShard {
 			return sDestShard
