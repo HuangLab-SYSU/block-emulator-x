@@ -13,6 +13,12 @@ import (
 )
 
 const (
+	NormalTxType byte = iota
+	RelayTxType
+	BrokerTxType
+)
+
+const (
 	UndeterminedRelayTx = 0
 	Relay1Tx            = 1
 	Relay2Tx            = 2
@@ -25,12 +31,13 @@ const (
 type Signature []byte
 
 type Transaction struct {
-	Sender     account.Address
-	Recipient  account.Address
-	Value      *big.Int
-	Nonce      uint64
-	Signature  Signature
-	CreateTime time.Time
+	Sender      account.Address
+	Recipient   account.Address
+	Value       *big.Int
+	PriorityFee *big.Int
+	Nonce       uint64
+	Signature   Signature
+	CreateTime  time.Time
 
 	RelayTxOpt  // the optional setting only for relay transactions.
 	BrokerTxOpt // the optional setting only for broker transactions.
@@ -52,16 +59,17 @@ type BrokerTxOpt struct {
 
 func NewTransaction(
 	sender, recipient account.Address,
-	value *big.Int,
+	value, priorityFee *big.Int,
 	nonce uint64,
 	proposeTime time.Time,
 ) *Transaction {
 	tx := &Transaction{
-		Sender:     sender,
-		Recipient:  recipient,
-		Value:      value,
-		Nonce:      nonce,
-		CreateTime: proposeTime,
+		Sender:      sender,
+		Recipient:   recipient,
+		Value:       value,
+		PriorityFee: priorityFee,
+		Nonce:       nonce,
+		CreateTime:  proposeTime,
 	}
 
 	return tx
@@ -82,4 +90,16 @@ func (tx *Transaction) Hash() ([]byte, error) {
 	sum := sha256.Sum256(b)
 
 	return sum[:], nil
+}
+
+func (tx *Transaction) TxType() byte {
+	if len(tx.BOriginalHash) != 0 {
+		return BrokerTxType
+	}
+
+	if len(tx.ROriginalHash) != 0 {
+		return RelayTxType
+	}
+
+	return NormalTxType
 }

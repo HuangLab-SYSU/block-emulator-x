@@ -26,7 +26,7 @@ var (
 	testSender    = generateAccountAddr("fake sender    00000")
 	testRecipient = generateAccountAddr("fake recipient 11111")
 	testTxs       = []transaction.Transaction{
-		*transaction.NewTransaction(testSender, testRecipient, big.NewInt(100), 0, time.Now()),
+		*transaction.NewTransaction(testSender, testRecipient, big.NewInt(100), big.NewInt(0), 0, time.Now()),
 	}
 )
 

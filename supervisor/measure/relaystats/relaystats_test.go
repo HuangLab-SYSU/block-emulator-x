@@ -1,6 +1,7 @@
 package relaystats
 
 import (
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -42,11 +43,11 @@ func initInputMsg(t *testing.T) *rpcserver.WrappedMsg {
 	for i, cTx := range cTxs {
 		txHash, err := cTx.Hash()
 		require.NoError(t, err)
-		r1 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, cTx.Nonce, cTx.CreateTime)
+		r1 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, big.NewInt(0), cTx.Nonce, cTx.CreateTime)
 		r1.ROriginalHash = txHash
 		r1.RelayStage = 1
 
-		r2 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, cTx.Nonce, cTx.CreateTime)
+		r2 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, big.NewInt(0), cTx.Nonce, cTx.CreateTime)
 		r2.ROriginalHash = txHash
 		r2.RelayStage = 2
 

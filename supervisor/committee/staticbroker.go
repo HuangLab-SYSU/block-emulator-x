@@ -160,7 +160,7 @@ func (s *StaticBrokerCommittee) classifyTxs(
 func (s *StaticBrokerCommittee) getTxLoc(tx transaction.Transaction) int64 {
 	shardNumber := s.cfg.ShardNum
 	// inner-shard tx
-	if len(tx.BOriginalHash) == 0 {
+	if tx.TxType() == transaction.NormalTxType {
 		return partition.DefaultAccountLoc(tx.Sender, shardNumber)
 	}
 	// broker tx
