@@ -38,7 +38,7 @@ func (bto *BrokerTxBlockOp) BuildTxBlockProposal(
 	ctx context.Context,
 	txs []transaction.Transaction,
 ) (*message.Proposal, error) {
-	b, err := bto.c.GenerateBlock(ctx, bto.lp.WalletAddr, txs)
+	b, err := bto.c.GenerateBlock(ctx, bto.lp.WalletAddr, block.Body{TxList: txs}, block.MigrationOpt{})
 	if err != nil {
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}

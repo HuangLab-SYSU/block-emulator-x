@@ -60,6 +60,10 @@ func (f *Filter) Contains(hash []byte) bool {
 	return true
 }
 
+func (f *Filter) Equal(other Filter) bool {
+	return f.B.Equal(&other.B)
+}
+
 func (f *Filter) getFilterHashFs() []FilterHashFunc {
 	ret := make([]FilterHashFunc, len(f.FilterHashFs))
 

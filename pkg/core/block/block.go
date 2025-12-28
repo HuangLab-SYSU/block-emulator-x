@@ -34,14 +34,9 @@ type Block struct {
 	MigrationOpt
 }
 
-// NewBlock creates the normal block with header and body.
-func NewBlock(h Header, b Body) *Block {
-	return &Block{Header: h, Body: b}
-}
-
-// NewMigrationBlock creates the block for account migration, with header and MigrationOpt.
-func NewMigrationBlock(h Header, opt MigrationOpt) *Block {
-	return &Block{Header: h, MigrationOpt: opt}
+// NewBlock creates a block with header, body and migrationOpt.
+func NewBlock(h Header, b Body, mOpt MigrationOpt) *Block {
+	return &Block{Header: h, Body: b, MigrationOpt: mOpt}
 }
 
 // Encode encodes Block.
