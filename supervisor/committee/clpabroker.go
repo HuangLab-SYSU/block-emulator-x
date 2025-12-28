@@ -139,7 +139,7 @@ func (c *CLPABrokerCommittee) repartition(ctx context.Context) error {
 
 	c.conn.GroupBroadcastMessage(ctx, allLeaders, w)
 
-	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch)
+	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch, "migrated number", len(modifiedMap))
 	// set epoch-synced to false
 	c.epochSynced = false
 	c.sl.stopCnt = 0

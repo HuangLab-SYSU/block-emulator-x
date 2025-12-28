@@ -14,6 +14,7 @@ type Header struct {
 	ParentBlockHash []byte
 	StateRoot       []byte
 	Number          uint64
+	Type            uint8
 	Miner           account.Address
 	CreateTime      time.Time
 

@@ -96,7 +96,7 @@ func generateBlockButNotAdd(t *testing.T, bc *Chain) *block.Block {
 	require.NoError(t, err)
 
 	// Generate a block but not add it.
-	b, err := bc.GenerateBlock(ctx, testMiner, block.Body{TxList: testTxs}, block.MigrationOpt{})
+	b, err := bc.GenerateBlock(ctx, testMiner, block.TxBlockType, block.Body{TxList: testTxs}, block.MigrationOpt{})
 	require.NoError(t, err)
 
 	headerAfterGeneration := bc.GetCurHeader()
@@ -129,7 +129,7 @@ func addMigrationBlockAndCheck(t *testing.T, bc *Chain) {
 	require.NoError(t, err)
 
 	// Generate a migration block.
-	migratedB, err := bc.GenerateBlock(ctx, testMiner, block.Body{},
+	migratedB, err := bc.GenerateBlock(ctx, testMiner, block.TxBlockType, block.Body{},
 		block.MigrationOpt{
 			MigratedAccounts: []account.Address{testSender},
 			MigratedStates:   []account.State{*account.NewState(testSender, testLoc)},

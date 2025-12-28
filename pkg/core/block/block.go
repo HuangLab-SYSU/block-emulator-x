@@ -53,14 +53,6 @@ func (b *Block) Encode() ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
-func (b *Block) BlockType() int {
-	if len(b.MigratedAccountsRoot) != 0 {
-		return MigrationBlockType
-	}
-
-	return TxBlockType
-}
-
 func DecodeBlock(data []byte) (*Block, error) {
 	var block Block
 

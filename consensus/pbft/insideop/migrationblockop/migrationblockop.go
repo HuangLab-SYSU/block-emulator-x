@@ -64,6 +64,7 @@ func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message
 	b, err := m.chain.GenerateBlock(
 		ctx,
 		m.lp.WalletAddr,
+		block.MigrationBlockType,
 		block.Body{},
 		block.MigrationOpt{MigratedAccounts: accounts, MigratedStates: states},
 	)

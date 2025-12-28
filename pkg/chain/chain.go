@@ -68,6 +68,7 @@ func (c *Chain) GetCurHeader() block.Header {
 func (c *Chain) GenerateBlock(
 	ctx context.Context,
 	miner account.Address,
+	blockType uint8,
 	body block.Body,
 	mOpt block.MigrationOpt,
 ) (*block.Block, error) {
@@ -95,6 +96,7 @@ func (c *Chain) GenerateBlock(
 		ParentBlockHash: parentHeader,
 		Number:          c.curHeader.Number + 1,
 		Miner:           miner,
+		Type:            blockType,
 		CreateTime:      time.Now(),
 
 		TxHeaderOpt:        *tOpt,
@@ -310,7 +312,7 @@ func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 
 	ctx := context.Background()
 
-	b, err := c.GenerateBlock(ctx, genesisMiner, block.Body{}, block.MigrationOpt{})
+	b, err := c.GenerateBlock(ctx, genesisMiner, block.TxBlockType, block.Body{}, block.MigrationOpt{})
 	if err != nil {
 		return nil, fmt.Errorf("generate block err: %w", err)
 	}

@@ -88,7 +88,7 @@ func (c *DynamicShardOp) ProposalCommitAndDeliver(
 ) error {
 	b := proposal.Block
 
-	switch b.BlockType() {
+	switch b.Type {
 	case block.MigrationBlockType:
 		if err := c.mbo.MigrationBlockCommit(ctx, b); err != nil {
 			return fmt.Errorf("migration block commit failed: %w", err)
