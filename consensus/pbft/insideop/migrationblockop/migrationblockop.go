@@ -61,7 +61,13 @@ func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message
 		return nil, fmt.Errorf("GetMigratedAddrStates failed: %w", err)
 	}
 
-	b, err := m.chain.GenerateMigrationBlock(ctx, m.lp.WalletAddr, accounts, states)
+	b, err := m.chain.GenerateBlock(
+		ctx,
+		m.lp.WalletAddr,
+		block.MigrationBlockType,
+		block.Body{},
+		block.MigrationOpt{MigratedAccounts: accounts, MigratedStates: states},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("GenerateMigrationBlock failed: %w", err)
 	}
