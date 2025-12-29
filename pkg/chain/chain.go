@@ -63,94 +63,57 @@ func (c *Chain) GetCurHeader() block.Header {
 	return c.curHeader
 }
 
-// GenerateBlock reads the current storage and tries to generate a normal block to handle the transactions.
+// GenerateBlock reads the current storage and tries to generate a block to handle the body and the migrationOpt.
 // It will not affect the Chain.
 func (c *Chain) GenerateBlock(
 	ctx context.Context,
 	miner account.Address,
-	txs []transaction.Transaction,
+	blockType uint8,
+	body block.Body,
+	mOpt block.MigrationOpt,
 ) (*block.Block, error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-
-	bf, err := bloom.NewFilter(c.cfg.BloomFilterCfg)
-	if err != nil {
-		return nil, fmt.Errorf("new bloom filter err: %w", err)
-	}
-
-	for _, tx := range txs {
-		txHash, err := tx.Hash()
-		if err != nil {
-			return nil, fmt.Errorf("calc tx hash err: %w", err)
-		}
-
-		bf.Add(txHash)
-	}
-
-	stateRoot, err := c.previewTrieUpdatedByTxs(ctx, txs)
-	if err != nil {
-		return nil, fmt.Errorf("preview updated trie by txs err: %w", err)
-	}
 
 	parentHeader, err := c.curHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("create parent header err: %w", err)
 	}
 
-	txRoot, err := c.getTxMerkleRoot(ctx, txs)
+	// Calculate the TxHeaderOpt.
+	tOpt, err := c.calcTxHeaderOpt(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("get tx trie stateRoot err: %w", err)
+		return nil, fmt.Errorf("calc tx header opt err: %w", err)
 	}
 
-	header := block.Header{
-		ParentBlockHash: parentHeader,
-		StateRoot:       stateRoot,
-		Number:          c.curHeader.Number + 1,
-		Miner:           miner,
-		CreateTime:      time.Now(),
-
-		TxHeaderOpt: block.TxHeaderOpt{TxRoot: txRoot, Bloom: *bf},
-	}
-
-	return block.NewBlock(header, block.Body{TxList: txs}), nil
-}
-
-// GenerateMigrationBlock generates a block for account migration, by the given accounts and their states.
-func (c *Chain) GenerateMigrationBlock(
-	ctx context.Context,
-	miner account.Address,
-	accounts []account.Address,
-	states []account.State,
-) (*block.Block, error) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	stateRoot, err := c.previewTrieUpdatedByMigration(ctx, accounts, states)
-	if err != nil {
-		return nil, fmt.Errorf("preview updated trie by migration err: %w", err)
-	}
-
-	parentHeaderHash, err := c.curHeader.Hash()
-	if err != nil {
-		return nil, fmt.Errorf("create parent header err: %w", err)
-	}
-	// Calculate the Merkle root of accounts & states.
-	msRoot, err := c.getMigratedStateMerkleRoot(ctx, accounts, states)
+	// Calculate the MigrationTxOpt.
+	mHeaderOpt, err := c.calcMigrationHeaderOpt(ctx, mOpt)
 	if err != nil {
 		return nil, fmt.Errorf("get account state root err: %w", err)
 	}
 
 	header := block.Header{
-		ParentBlockHash: parentHeaderHash,
-		StateRoot:       stateRoot,
+		ParentBlockHash: parentHeader,
 		Number:          c.curHeader.Number + 1,
 		Miner:           miner,
+		Type:            blockType,
 		CreateTime:      time.Now(),
 
-		MigrationHeaderOpt: block.MigrationHeaderOpt{MigratedAccountsRoot: msRoot},
+		TxHeaderOpt:        *tOpt,
+		MigrationHeaderOpt: *mHeaderOpt,
 	}
 
-	return block.NewMigrationBlock(header, block.MigrationOpt{MigratedAccounts: accounts, MigratedStates: states}), nil
+	b := block.NewBlock(header, body, mOpt)
+
+	// Calculate and set the state root in the block.
+	stateRoot, err := c.previewStateRootByBlock(ctx, b)
+	if err != nil {
+		return nil, fmt.Errorf("preview updated trie by txs err: %w", err)
+	}
+
+	b.StateRoot = stateRoot
+
+	return b, nil
 }
 
 // AddBlock adds the given block into storage.
@@ -236,30 +199,29 @@ func (c *Chain) GetAccountLocationsInTxs(
 	return accountLocations, nil
 }
 
-// ValidateBlock validates blocks according to c's config.
-// Note that, this function only validate block structure, but will not assert whether a block is valid to be added in this chain.
+// ValidateBlock validates blocks according to the chain's config.
 func (c *Chain) ValidateBlock(ctx context.Context, b *block.Block) error {
-	// This block is a transaction block.
-	if b.TxRoot != nil {
-		txRoot, err := c.getTxMerkleRoot(ctx, b.TxList)
-		if err != nil {
-			return fmt.Errorf("get tx trie stateRoot err: %w", err)
-		}
-
-		if !bytes.Equal(txRoot, b.TxRoot) {
-			return fmt.Errorf("tx root mismatch")
-		}
-
-		return nil
+	// Validate the transaction part.
+	tH, err := c.calcTxHeaderOpt(ctx, b.Body)
+	if err != nil {
+		return fmt.Errorf("get tx trie stateRoot err: %w", err)
 	}
 
-	// This block is a migration block.
-	mRoot, err := c.getMigratedStateMerkleRoot(ctx, b.MigratedAccounts, b.MigratedStates)
+	if !bytes.Equal(tH.TxRoot, b.TxRoot) {
+		return fmt.Errorf("tx root mismatch")
+	}
+
+	if !tH.Bloom.Equal(b.Bloom) {
+		return fmt.Errorf("bloom mismatch")
+	}
+
+	// Validate the migration part.
+	mH, err := c.calcMigrationHeaderOpt(ctx, b.MigrationOpt)
 	if err != nil {
 		return fmt.Errorf("get migrated account state Merkle root err: %w", err)
 	}
 
-	if !bytes.Equal(mRoot, b.MigratedAccountsRoot) {
+	if !bytes.Equal(mH.MigratedAccountsRoot, b.MigratedAccountsRoot) {
 		return fmt.Errorf("migration root mismatch")
 	}
 
@@ -350,7 +312,7 @@ func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 
 	ctx := context.Background()
 
-	b, err := c.GenerateBlock(ctx, genesisMiner, []transaction.Transaction{})
+	b, err := c.GenerateBlock(ctx, genesisMiner, block.TxBlockType, block.Body{}, block.MigrationOpt{})
 	if err != nil {
 		return nil, fmt.Errorf("generate block err: %w", err)
 	}
@@ -362,8 +324,8 @@ func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 	return b, nil
 }
 
-func (c *Chain) previewTrieUpdatedByTxs(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
-	keys, values, err := c.calculateAccountsAndStatesBytes(ctx, txs)
+func (c *Chain) previewStateRootByBlock(ctx context.Context, b *block.Block) ([]byte, error) {
+	keys, values, err := c.calcModifiedAccountBytes(ctx, b)
 	if err != nil {
 		return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
 	}
@@ -376,37 +338,10 @@ func (c *Chain) previewTrieUpdatedByTxs(ctx context.Context, txs []transaction.T
 	return root, nil
 }
 
-func (c *Chain) previewTrieUpdatedByMigration(ctx context.Context, accounts []account.Address, states []account.State,
-) ([]byte, error) {
-	keyBytes, valBytes, err := c.getMigrationAccountBytes(accounts, states)
-	if err != nil {
-		return nil, fmt.Errorf("get migration account bytes err: %w", err)
-	}
-
-	root, err := c.s.TrieStorage.MAddAccountStatesPreview(ctx, keyBytes, valBytes)
-	if err != nil {
-		return nil, fmt.Errorf("preview updated accounts err: %w", err)
-	}
-
-	return root, nil
-}
-
 func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, error) {
-	var (
-		keys, values [][]byte
-		err          error
-	)
-
-	if b.TxRoot != nil { // transaction block
-		keys, values, err = c.calculateAccountsAndStatesBytes(ctx, b.TxList)
-		if err != nil {
-			return nil, fmt.Errorf("calculate account states bytes err: %w", err)
-		}
-	} else { // migration block
-		keys, values, err = c.getMigrationAccountBytes(b.MigratedAccounts, b.MigratedStates)
-		if err != nil {
-			return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
-		}
+	keys, values, err := c.calcModifiedAccountBytes(ctx, b)
+	if err != nil {
+		return nil, fmt.Errorf("calculate the modified accounts bytes by the given block err: %w", err)
 	}
 
 	root, err := c.s.TrieStorage.MAddAccountStatesAndCommit(ctx, keys, values)
@@ -417,10 +352,11 @@ func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, 
 	return root, nil
 }
 
-func (c *Chain) calculateAccountsAndStatesBytes(
-	ctx context.Context,
-	txs []transaction.Transaction,
-) ([][]byte, [][]byte, error) {
+func (c *Chain) calcModifiedAccountBytes(ctx context.Context, b *block.Block) ([][]byte, [][]byte, error) {
+	txs := b.TxList
+	migratedAccounts := b.MigratedAccounts
+	migratedStates := b.MigratedStates
+
 	accountStates := make(map[account.Address]*account.State, len(txs)*2)
 	for _, tx := range txs {
 		accountStates[tx.Sender] = nil
@@ -443,13 +379,18 @@ func (c *Chain) calculateAccountsAndStatesBytes(
 		accountStates[a] = originalStates[i]
 	}
 
-	// update in map
+	// Set the state of accounts by the given MigrationOpt.
+	for i, ma := range migratedAccounts {
+		accountStates[ma] = &migratedStates[i]
+	}
+
+	// Update in map.
 	for _, tx := range txs {
 		c.executeTx(accountStates, tx)
 	}
 
-	// pack state list
-	retAccountByteList, stateByteList := make([][]byte, 0, len(accountStates)), make([][]byte, 0, len(accountStates))
+	// Pack state list.
+	keys, vals := make([][]byte, 0, len(accountStates)), make([][]byte, 0, len(accountStates))
 
 	for k, v := range accountStates {
 		if v == nil { // this account is not in the shard
@@ -464,26 +405,21 @@ func (c *Chain) calculateAccountsAndStatesBytes(
 			return nil, nil, fmt.Errorf("encode state from map err: %w", err)
 		}
 
-		retAccountByteList = append(retAccountByteList, kByte)
-		stateByteList = append(stateByteList, vByte)
+		keys = append(keys, kByte)
+		vals = append(vals, vByte)
 	}
 
-	return retAccountByteList, stateByteList, nil
+	return keys, vals, nil
 }
 
-func (c *Chain) getMigrationAccountBytes(
-	accounts []account.Address,
-	states []account.State,
-) ([][]byte, [][]byte, error) {
+func (c *Chain) getMigrationAccountBytes(accList []account.Address, sList []account.State) ([][]byte, [][]byte, error) {
 	var err error
 
-	keyBytes := make([][]byte, len(accounts))
-
-	valBytes := make([][]byte, len(accounts))
-	for i, acc := range accounts {
+	keyBytes, valBytes := make([][]byte, len(accList)), make([][]byte, len(accList))
+	for i, acc := range accList {
 		keyBytes[i] = acc[:]
 
-		valBytes[i], err = states[i].Encode()
+		valBytes[i], err = sList[i].Encode()
 		if err != nil {
 			return nil, nil, fmt.Errorf("encode state err: %w", err)
 		}
@@ -510,11 +446,6 @@ func (c *Chain) executeRelayTx(accountStates map[account.Address]*account.State,
 		senderState := accountStates[tx.Sender]
 		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
 			// Sender is not in this shard, skip.
-			return
-		}
-
-		if senderState.Nonce > tx.Nonce {
-			slog.Info("the transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
 			return
 		}
 
@@ -550,11 +481,6 @@ func (c *Chain) executeBrokerTx(accountStates map[account.Address]*account.State
 
 		if senderState == nil || senderState.ShardLocation != uint64(c.shardID) {
 			slog.Error("handle broker1 tx error", "err", "the sender is not in this shard")
-			return
-		}
-
-		if senderState.Nonce > tx.Nonce {
-			slog.Info("the transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
 			return
 		}
 
@@ -595,11 +521,6 @@ func (c *Chain) executeNormalTx(accountStates map[account.Address]*account.State
 
 	// Modify senderState
 	if senderState != nil && senderState.ShardLocation == uint64(c.shardID) {
-		if senderState.Nonce > tx.Nonce {
-			slog.Info("the transaction is out-of-date with a smaller nonce", "tx nonce", tx.Nonce)
-			return
-		}
-
 		if err := senderState.Debit(tx.Value); errors.Is(err, account.ErrNotEnoughBalance) {
 			slog.Warn("the balance of sender is not enough", "sender", tx.Sender, "value", tx.Value)
 			return
@@ -617,14 +538,20 @@ func (c *Chain) executeNormalTx(accountStates map[account.Address]*account.State
 	}
 }
 
-func (c *Chain) getTxMerkleRoot(ctx context.Context, txs []transaction.Transaction) ([]byte, error) {
-	var err error
+func (c *Chain) calcTxHeaderOpt(ctx context.Context, body block.Body) (*block.TxHeaderOpt, error) {
+	if len(body.TxList) == 0 {
+		return &block.TxHeaderOpt{}, nil
+	}
+	// Calculate the bloom filter.
+	bf, err := bloom.NewFilter(c.cfg.BloomFilterCfg)
+	if err != nil {
+		return nil, fmt.Errorf("new bloom filter err: %w", err)
+	}
 
-	keyBytes := make([][]byte, len(txs))
+	// Calculate the transaction root.
+	keyBytes, valBytes := make([][]byte, len(body.TxList)), make([][]byte, len(body.TxList))
 
-	valBytes := make([][]byte, len(txs))
-
-	for i, tx := range txs {
+	for i, tx := range body.TxList {
 		keyBytes[i], err = tx.Hash()
 		if err != nil {
 			return nil, fmt.Errorf("hash err: %w", err)
@@ -634,6 +561,8 @@ func (c *Chain) getTxMerkleRoot(ctx context.Context, txs []transaction.Transacti
 		if err != nil {
 			return nil, fmt.Errorf("encode tx err: %w", err)
 		}
+
+		bf.Add(keyBytes[i])
 	}
 
 	root, err := c.s.TrieStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
@@ -641,15 +570,15 @@ func (c *Chain) getTxMerkleRoot(ctx context.Context, txs []transaction.Transacti
 		return nil, fmt.Errorf("generate root err: %w", err)
 	}
 
-	return root, nil
+	return &block.TxHeaderOpt{TxRoot: root, Bloom: *bf}, nil
 }
 
-func (c *Chain) getMigratedStateMerkleRoot(
-	ctx context.Context,
-	accounts []account.Address,
-	states []account.State,
-) ([]byte, error) {
-	keyBytes, valBytes, err := c.getMigrationAccountBytes(accounts, states)
+func (c *Chain) calcMigrationHeaderOpt(ctx context.Context, opt block.MigrationOpt) (*block.MigrationHeaderOpt, error) {
+	if len(opt.MigratedAccounts) == 0 {
+		return &block.MigrationHeaderOpt{}, nil
+	}
+
+	keyBytes, valBytes, err := c.getMigrationAccountBytes(opt.MigratedAccounts, opt.MigratedStates)
 	if err != nil {
 		return nil, fmt.Errorf("get migrated state Merkle root err: %w", err)
 	}
@@ -659,7 +588,7 @@ func (c *Chain) getMigratedStateMerkleRoot(
 		return nil, fmt.Errorf("generate root err: %w", err)
 	}
 
-	return root, nil
+	return &block.MigrationHeaderOpt{MigratedAccountsRoot: root}, nil
 }
 
 // getAccountStates get the states of accounts from the state trie.

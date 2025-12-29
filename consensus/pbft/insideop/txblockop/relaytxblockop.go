@@ -44,7 +44,7 @@ func (r *RelayTxBlockOp) BuildTxBlockProposal(
 		return nil, fmt.Errorf("modifyTxRelayOpt failed: %w", err)
 	}
 
-	b, err := r.c.GenerateBlock(ctx, r.lp.WalletAddr, mTxs)
+	b, err := r.c.GenerateBlock(ctx, r.lp.WalletAddr, block.TxBlockType, block.Body{TxList: mTxs}, block.MigrationOpt{})
 	if err != nil {
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
