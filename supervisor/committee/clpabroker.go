@@ -23,7 +23,7 @@ type CLPABrokerCommittee struct {
 	conn *network.ConnHandler
 	r    nodetopo.NodeMapper
 
-	clpaComponent
+	partitionRunner
 	bManager *broker.Manager
 
 	txSource    txsource.TxSource
@@ -51,7 +51,7 @@ func NewCLPABrokerCommittee(
 	return &CLPABrokerCommittee{
 		r:    r,
 		conn: conn,
-		clpaComponent: clpaComponent{
+		partitionRunner: partitionRunner{
 			state:           partition.NewCLPAState(clpaWeightPenalty, clpaMaxIterations, int(cfg.ShardNum)),
 			lastRunTime:     time.Now(),
 			epochSynced:     false,
@@ -69,12 +69,12 @@ func NewCLPABrokerCommittee(
 func (c *CLPABrokerCommittee) SendTxsAndConsensus(ctx context.Context) error {
 	// if the repartition process between consensus nodes is not over, wait for it and return
 	// This function should not be blocked.
-	if !c.checkEpochSyncAndMark() {
+	if !c.CheckEpochSyncAndMark() {
 		return nil
 	}
 
 	// reach epoch duration threshold, run clpa
-	if time.Since(c.clpaComponent.lastRunTime).Seconds() > float64(c.cfg.EpochDuration) {
+	if time.Since(c.partitionRunner.lastRunTime).Seconds() > float64(c.cfg.EpochDuration) {
 		if err := c.repartition(ctx); err != nil {
 			return fmt.Errorf("repartition failed: %w", err)
 		}

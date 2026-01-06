@@ -18,6 +18,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
+// MigrationBlockOp describes the operations for account-migration blocks.
 type MigrationBlockOp struct {
 	amm      *migration.AccMigrateMetadata
 	conn     *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
@@ -40,6 +41,7 @@ func NewMigrationBlockOp(
 	return &MigrationBlockOp{amm: amm, conn: conn, resolver: resolver, chain: chain, lp: lp, cfg: cfg}
 }
 
+// BuildMigrationProposal builds a proposal containing an account-migration block.
 func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message.Proposal, error) {
 	// If the number of received account-migration messages is enough (equal to ShardNum),
 	// the leader will pack the partition proposal in a block.
@@ -134,6 +136,7 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 	return nil
 }
 
+// MigrationBlockCommit commits the migration block and resets the status of the migration metadata.
 func (m *MigrationBlockOp) MigrationBlockCommit(ctx context.Context, b *block.Block) error {
 	// commit block - add block to the blockchain
 	if err := m.chain.AddBlock(ctx, b); err != nil {

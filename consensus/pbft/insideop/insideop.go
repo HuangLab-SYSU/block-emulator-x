@@ -6,6 +6,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
+// ShardInsideOp defines the operations inside the shard for a consensus node.
 type ShardInsideOp interface {
 	// BuildProposal build a proposal for a round of the PBFT consensus.
 	// Note that, this function is normally called by the leader.

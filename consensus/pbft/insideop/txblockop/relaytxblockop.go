@@ -15,6 +15,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
+// RelayTxBlockOp is the TxBlockOp which can handle relay transactions.
 type RelayTxBlockOp struct {
 	c        *chain.Chain
 	conn     *network.ConnHandler
@@ -50,17 +51,6 @@ func (r *RelayTxBlockOp) BuildTxBlockProposal(
 	}
 
 	p := message.WrapProposal(b)
-
-	slog.InfoContext(
-		ctx,
-		"block is generated",
-		"shard ID",
-		r.c.GetShardID(),
-		"block height",
-		b.Number,
-		"block create time",
-		b.CreateTime,
-	)
 
 	return p, nil
 }

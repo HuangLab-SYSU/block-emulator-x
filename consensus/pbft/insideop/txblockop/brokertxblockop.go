@@ -15,6 +15,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
+// BrokerTxBlockOp is the TxBlockOp which can handle broker transactions.
 type BrokerTxBlockOp struct {
 	c        *chain.Chain
 	conn     *network.ConnHandler
@@ -50,19 +51,6 @@ func (bto *BrokerTxBlockOp) BuildTxBlockProposal(
 	}
 
 	p := message.WrapProposal(b)
-
-	slog.InfoContext(
-		ctx,
-		"block is generated",
-		"shard ID",
-		bto.c.GetShardID(),
-		"block height",
-		b.Number,
-		"epoch",
-		bto.c.GetEpochID(),
-		"block create time",
-		b.CreateTime,
-	)
 
 	return p, nil
 }

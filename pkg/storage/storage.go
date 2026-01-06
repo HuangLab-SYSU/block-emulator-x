@@ -14,6 +14,7 @@ type Storage struct {
 	TrieStorage  trie.Store
 }
 
+// NewStorage creates a Storage with the given config and local parameters.
 func NewStorage(cfg config.StorageCfg, lp config.LocalParams) (*Storage, error) {
 	s := &Storage{}
 
