@@ -10,6 +10,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
+// SendWrappedTxs2Shards sends transactions to other shards with the given ConnHandler and NodeMapper.
 func SendWrappedTxs2Shards(
 	ctx context.Context,
 	txs [][]transaction.Transaction,

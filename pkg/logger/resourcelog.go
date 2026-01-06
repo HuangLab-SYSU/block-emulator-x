@@ -11,6 +11,8 @@ const (
 	byte2MB             = 20
 )
 
+// resourceLog logs the resource usage of the program.
+// Note that, it should be called in a sub-routine, or it blocks the program.
 func resourceLog() {
 	var m runtime.MemStats
 
