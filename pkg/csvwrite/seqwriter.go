@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+// CSVSeqWriter is a writer to write a csv file sequentially.
+// It writes a line by calling WriteLine2CSV and should be closed by calling Close.
 type CSVSeqWriter struct {
 	csvW *csv.Writer
 	file *os.File

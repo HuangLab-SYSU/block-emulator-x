@@ -27,6 +27,8 @@ type txInfoStage struct {
 	confirmStage int
 }
 
+// Manager manages the brokers and broker-txs.
+// It records and updates the information about them.
 type Manager struct {
 	broker2Nonce      map[account.Address]uint64
 	unconfirmedTxInfo map[rawTxHash]*txInfoStage // unconfirmed transactions information

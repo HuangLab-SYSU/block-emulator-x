@@ -21,6 +21,7 @@ const (
 
 var logFile *os.File = nil
 
+// InitLogger inits logger with the given config and local parameters.
 func InitLogger(lp *config.LocalParams, cfg config.LogCfg) error {
 	if err := setLogFile(lp, cfg); err != nil {
 		return fmt.Errorf("set the logger file failed: %w", err)

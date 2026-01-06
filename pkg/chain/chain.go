@@ -153,6 +153,9 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	// Update the current header
 	c.curHeader = b.Header
 
+	slog.InfoContext(ctx, "block is generated",
+		"shard ID", c.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
+
 	return nil
 }
 

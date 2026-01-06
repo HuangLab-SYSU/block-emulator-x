@@ -6,6 +6,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
+// MsgPool contains 3 priority queues for PBFT messages, i.e., preprepare, prepare and commit, respectively.
 type MsgPool struct {
 	preprepares *PriorityQueue[*message.PreprepareMsg]
 	prepares    *PriorityQueue[*message.PrepareMsg]

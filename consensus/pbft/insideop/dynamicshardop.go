@@ -24,6 +24,7 @@ const (
 	supervisorShardID = 0x7fffffff
 )
 
+// DynamicShardOp is the ShardInsideOp for the dynamic-sharding consensus.
 type DynamicShardOp struct {
 	amm *migration.AccMigrateMetadata
 

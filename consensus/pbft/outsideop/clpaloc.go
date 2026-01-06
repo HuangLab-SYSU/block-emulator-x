@@ -13,6 +13,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 )
 
+// CLPALocOutsideOp is a ShardOutsideMsgHandler for the dynamic-sharding consensus (e.g., CLPA).
 type CLPALocOutsideOp struct {
 	amm    *migration.AccMigrateMetadata
 	txPool txpool.TxPool

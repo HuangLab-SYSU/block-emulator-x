@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 )
 
+// WriteAllToCSV writes both headers and rows into the csv file in the given path.
+// The csv file will be closed after being written.
 func WriteAllToCSV(path string, header []string, rows [][]string) error {
 	f, err := createFileWithDirs(path)
 	if err != nil {

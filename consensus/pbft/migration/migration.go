@@ -9,6 +9,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
+// AccMigrateMetadata describes the metadata of account-migration operations.
 type AccMigrateMetadata struct {
 	Epoch                 int64
 	CurModifiedMap        map[account.Address]int
@@ -34,6 +35,7 @@ func NewAccMigrateMetadata(cfg config.SystemCfg, lp config.LocalParams) *AccMigr
 	}
 }
 
+// MigrationStatusReset resets the status of AccMigrateMetadata when a new epoch starts.
 func (am *AccMigrateMetadata) MigrationStatusReset() {
 	am.MigratedAccountStates = make(map[int64]map[account.Address]*account.State)
 	am.CurModifiedMap = make(map[account.Address]int)
@@ -44,6 +46,8 @@ func (am *AccMigrateMetadata) MigrationStatusReset() {
 // UpdateByRepartitionStartMsg updates the AccMigrateMetadata by the given CLPARepartitionStartMsg.
 // If there are unhandled messages (with the same epoch id) in the unhandledStateMsg,
 // these messages will be handled by calling CollectStatesByMsg.
+//
+// Note that,
 // **Because the network is async., the AccountMigrationMsg may be early arrived but CLPARepartitionStartMsg not.**
 func (am *AccMigrateMetadata) UpdateByRepartitionStartMsg(cr *message.CLPARepartitionStartMsg) error {
 	if cr.Epoch != am.Epoch+1 {
@@ -68,6 +72,8 @@ func (am *AccMigrateMetadata) UpdateByRepartitionStartMsg(cr *message.CLPARepart
 
 // CollectStatesByMsg collects the MigratedAccountStates according to the given message.
 // Note that, if the message is newer than this AccMigrateMetadata, it will be added to unhandledStateMsg.
+//
+// Note that,
 // **Because the network is async., the AccountMigrationMsg may be early arrived but CLPARepartitionStartMsg not.**
 // When the AccMigrateMetadata reaches the epoch id, the messages in unhandledStateMsg will be handled.
 func (am *AccMigrateMetadata) CollectStatesByMsg(atMsg *message.AccountMigrationMsg) error {
