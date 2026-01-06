@@ -11,6 +11,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
+// StaticShardOp is the ShardInsideOp for the static-sharding consensus.
 type StaticShardOp struct {
 	chain  *chain.Chain  // chain is the data-structure of blockchain.
 	txPool txpool.TxPool // txPool is the transactions pool.

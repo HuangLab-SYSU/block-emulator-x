@@ -6,7 +6,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
-// LessFunc 定义比较函数类型
+// LessFunc defines the compare function.
 type LessFunc[T any] func(a, b T) bool
 
 // PriorityQueue is the priority queue for PBFT messages.
