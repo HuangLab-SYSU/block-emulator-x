@@ -15,9 +15,8 @@ func RunComplianceTests(t *testing.T, store Store, clear func() error) {
 	ctx := context.Background()
 
 	t.Cleanup(func() {
-		if err := clear(); err != nil {
-			t.Fatalf("failed to remove test directory: %v", err)
-		}
+		err := clear()
+		require.NoError(t, err)
 	})
 
 	// Predefined test constants

@@ -564,9 +564,9 @@ func (c *Chain) calcTxHeaderOpt(ctx context.Context, body block.Body) (*block.Tx
 		if err != nil {
 			return nil, fmt.Errorf("encode tx err: %w", err)
 		}
-
-		bf.Add(keyBytes[i])
 	}
+
+	bf.Add(keyBytes...)
 
 	root, err := c.s.TrieStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
 	if err != nil {

@@ -21,9 +21,8 @@ func TestBrokerStats_UpdateMeasureRecord(t *testing.T) {
 	b, err := NewBrokerStats("test_dir/")
 
 	t.Cleanup(func() {
-		if err = os.RemoveAll("test_dir"); err != nil {
-			t.Fatalf("failed to remove test directory: %v", err)
-		}
+		err = os.RemoveAll("test_dir")
+		require.NoError(t, err)
 	})
 
 	require.NoError(t, err)
