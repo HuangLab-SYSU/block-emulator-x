@@ -21,6 +21,7 @@ func NewTopoGetter(l map[int64]NodeInfo, s map[int64][]NodeInfo) *TopoGetter {
 func (t *TopoGetter) SetTopoGetter(infoSet map[int64]map[int64]string) error {
 	t.leaders = make(map[int64]NodeInfo)
 	t.shard2nodes = make(map[int64][]NodeInfo)
+
 	for shard, shardInfo := range infoSet {
 		for node := range shardInfo {
 			t.shard2nodes[shard] = append(t.shard2nodes[shard], NodeInfo{ShardID: shard, NodeID: node})
@@ -29,8 +30,13 @@ func (t *TopoGetter) SetTopoGetter(infoSet map[int64]map[int64]string) error {
 			}
 		}
 	}
+
 	t.leaders[SupervisorShardID] = NodeInfo{ShardID: SupervisorShardID, NodeID: int64(0)}
-	t.shard2nodes[SupervisorShardID] = append(t.shard2nodes[SupervisorShardID], NodeInfo{ShardID: SupervisorShardID, NodeID: int64(0)})
+	t.shard2nodes[SupervisorShardID] = append(
+		t.shard2nodes[SupervisorShardID],
+		NodeInfo{ShardID: SupervisorShardID, NodeID: int64(0)},
+	)
+
 	return nil
 }
 
