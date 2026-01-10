@@ -3,6 +3,7 @@ package pbft
 import (
 	"testing"
 
+	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/basicstructs"
 	"github.com/stretchr/testify/require"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
@@ -37,6 +38,9 @@ func TestConsensusMeta(t *testing.T) {
 
 	// inject messages
 	injectMsg(cm)
+
+	_, _, err := cm.step2Next()
+	require.NoError(t, err)
 
 	require.Nil(t, cm.curPreprepare)
 	cm.curateMsg()
@@ -75,6 +79,12 @@ func TestConsensusMeta(t *testing.T) {
 	require.Equal(t, stagePreprepare, cm.stage)
 	require.Equal(t, testSequence+2, cm.curViewSeq.Seq)
 	require.Nil(t, cm.curPreprepare)
+
+	// Catchup.
+	catchupViewSeq := basicstructs.ViewSeq{View: testView + 3, Seq: testSequence + 3}
+	cm.updateLatestViewSeq(catchupViewSeq.View, catchupViewSeq.Seq)
+	cm.catchupReady()
+	cm.catchupOverAndReset(catchupViewSeq)
 }
 
 func injectMsg(cm *consensusMeta) {
