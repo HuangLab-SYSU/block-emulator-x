@@ -7,18 +7,18 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
-
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/migration"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/chain"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
+// MigrationBlockOp describes the operations for account-migration blocks.
 type MigrationBlockOp struct {
 	amm      *migration.AccMigrateMetadata
 	conn     *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
@@ -30,15 +30,31 @@ type MigrationBlockOp struct {
 	lp  config.LocalParams
 }
 
-func NewMigrationBlockOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, amm *migration.AccMigrateMetadata, cfg config.ConsensusNodeCfg, lp config.LocalParams) *MigrationBlockOp {
+func NewMigrationBlockOp(
+	conn *network.ConnHandler,
+	resolver nodetopo.NodeMapper,
+	chain *chain.Chain,
+	amm *migration.AccMigrateMetadata,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) *MigrationBlockOp {
 	return &MigrationBlockOp{amm: amm, conn: conn, resolver: resolver, chain: chain, lp: lp, cfg: cfg}
 }
 
+// BuildMigrationProposal builds a proposal containing an account-migration block.
 func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message.Proposal, error) {
 	// If the number of received account-migration messages is enough (equal to ShardNum),
 	// the leader will pack the partition proposal in a block.
 	if len(m.amm.MigratedAccountStates) != int(m.cfg.ShardNum) {
-		slog.InfoContext(ctx, "not all MigratedAccountStates is collected, do not propose", "expect", int(m.cfg.ShardNum), "actual", len(m.amm.MigratedAccountStates))
+		slog.InfoContext(
+			ctx,
+			"not all MigratedAccountStates is collected, do not propose",
+			"expect",
+			int(m.cfg.ShardNum),
+			"actual",
+			len(m.amm.MigratedAccountStates),
+		)
+
 		return nil, nil
 	}
 
@@ -47,15 +63,18 @@ func (m *MigrationBlockOp) BuildMigrationProposal(ctx context.Context) (*message
 		return nil, fmt.Errorf("GetMigratedAddrStates failed: %w", err)
 	}
 
-	b, err := m.chain.GenerateMigrationBlock(ctx, m.lp.WalletAddr, accounts, states)
+	b, err := m.chain.GenerateBlock(
+		ctx,
+		m.lp.WalletAddr,
+		block.MigrationBlockType,
+		block.Body{},
+		block.MigrationOpt{MigratedAccounts: accounts, MigratedStates: states},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("GenerateMigrationBlock failed: %w", err)
 	}
 
-	p, err := message.WrapProposal(b, message.PartitionProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
+	p := message.WrapProposal(b)
 
 	slog.InfoContext(ctx, "migration block proposal is generated", "height", b.Number)
 
@@ -85,7 +104,7 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 
 	for i, acc := range accountsMigratedOut {
 		// If this shard is in not this shard, skip it
-		if states[i].ShardLocation != m.lp.ShardID {
+		if states[i].ShardLocation != uint64(m.lp.ShardID) {
 			continue
 		}
 
@@ -117,7 +136,8 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 	return nil
 }
 
-func (m *MigrationBlockOp) MigrationBlockCommit(ctx context.Context, _ bool, b *block.Block) error {
+// MigrationBlockCommit commits the migration block and resets the status of the migration metadata.
+func (m *MigrationBlockOp) MigrationBlockCommit(ctx context.Context, b *block.Block) error {
 	// commit block - add block to the blockchain
 	if err := m.chain.AddBlock(ctx, b); err != nil {
 		return fmt.Errorf("chain.AddBlock failed: %w", err)

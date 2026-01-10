@@ -10,7 +10,13 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
-func SendWrappedTxs2Shards(ctx context.Context, txs [][]transaction.Transaction, conn *network.ConnHandler, r nodetopo.NodeMapper) error {
+// SendWrappedTxs2Shards sends transactions to other shards with the given ConnHandler and NodeMapper.
+func SendWrappedTxs2Shards(
+	ctx context.Context,
+	txs [][]transaction.Transaction,
+	conn *network.ConnHandler,
+	r nodetopo.NodeMapper,
+) error {
 	node2Msg := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, len(txs))
 
 	// pack messages and send them

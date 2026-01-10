@@ -12,6 +12,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 )
 
+// StaticLocOutsideOp is a ShardOutsideMsgHandler in the static-sharding consensus.
 type StaticLocOutsideOp struct {
 	txPool txpool.TxPool
 }
@@ -40,5 +41,3 @@ func (s *StaticLocOutsideOp) HandleMsgOutsideShard(ctx context.Context, msg *rpc
 
 	return nil
 }
-
-func (s *StaticLocOutsideOp) Close() {}

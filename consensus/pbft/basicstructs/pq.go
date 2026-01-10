@@ -1,4 +1,4 @@
-package pool
+package basicstructs
 
 import (
 	"container/heap"
@@ -6,7 +6,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 )
 
-// LessFunc 定义比较函数类型
+// LessFunc defines the compare function.
 type LessFunc[T any] func(a, b T) bool
 
 // PriorityQueue is the priority queue for PBFT messages.
@@ -54,25 +54,13 @@ func (pq *PriorityQueue[T]) PopItem() T {
 }
 
 func PreprepareMsgLess(a, b *message.PreprepareMsg) bool {
-	if a.View == b.View {
-		return a.Seq < b.Seq
-	}
-
-	return a.View < b.View
+	return ViewSeq{View: a.View, Seq: a.Seq}.Compare(ViewSeq{View: b.View, Seq: b.Seq}) == -1
 }
 
 func PrepareMsgLess(a, b *message.PrepareMsg) bool {
-	if a.View == b.View {
-		return a.Seq < b.Seq
-	}
-
-	return a.View < b.View
+	return ViewSeq{View: a.View, Seq: a.Seq}.Compare(ViewSeq{View: b.View, Seq: b.Seq}) == -1
 }
 
 func CommitMsgLess(a, b *message.CommitMsg) bool {
-	if a.View == b.View {
-		return a.Seq < b.Seq
-	}
-
-	return a.View < b.View
+	return ViewSeq{View: a.View, Seq: a.Seq}.Compare(ViewSeq{View: b.View, Seq: b.Seq}) == -1
 }

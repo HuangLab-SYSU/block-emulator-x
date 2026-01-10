@@ -1,6 +1,7 @@
 package brokerstats
 
 import (
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -20,9 +21,8 @@ func TestBrokerStats_UpdateMeasureRecord(t *testing.T) {
 	b, err := NewBrokerStats("test_dir/")
 
 	t.Cleanup(func() {
-		if err = os.RemoveAll("test_dir"); err != nil {
-			t.Fatalf("failed to remove test directory: %v", err)
-		}
+		err = os.RemoveAll("test_dir")
+		require.NoError(t, err)
 	})
 
 	require.NoError(t, err)
@@ -40,11 +40,11 @@ func initInputMsg(t *testing.T) *rpcserver.WrappedMsg {
 	for i, cTx := range cTxs {
 		txHash, err := cTx.Hash()
 		require.NoError(t, err)
-		b1 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, cTx.Nonce, cTx.CreateTime)
+		b1 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, big.NewInt(0), cTx.Nonce, cTx.CreateTime)
 		b1.BOriginalHash = txHash
 		b1.BrokerStage = 1
 
-		b2 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, cTx.Nonce, cTx.CreateTime)
+		b2 := transaction.NewTransaction(cTx.Sender, cTx.Recipient, cTx.Value, big.NewInt(0), cTx.Nonce, cTx.CreateTime)
 		b2.BOriginalHash = txHash
 		b2.BrokerStage = 2
 

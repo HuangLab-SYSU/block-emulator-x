@@ -14,10 +14,10 @@ import (
 )
 
 type Config struct {
-	GlobalSys        SystemCfg `json:"system" yaml:"system"`
-	ConsensusNodeCfg `json:"consensus_node" yaml:"consensus_node"`
-	SupervisorCfg    `json:"supervisor"  yaml:"supervisor"`
-	NetworkCfg       `json:"network"    yaml:"network"`
+	GlobalSys        SystemCfg `json:"system"         yaml:"system"`
+	ConsensusNodeCfg `          json:"consensus_node" yaml:"consensus_node"`
+	SupervisorCfg    `          json:"supervisor"     yaml:"supervisor"`
+	NetworkCfg       `          json:"network"        yaml:"network"`
 }
 
 type LocalParams struct {
@@ -28,9 +28,15 @@ type LocalParams struct {
 
 // local parameters are defined here, and they are read from command lines.
 var (
-	localNodeID  = flag.Int64("node_id", -1, "local node id")
+	localNodeID = flag.Int64("node_id", -1, "local node id")
+	// localNodeID is the node ID of this node.
+	localNodeID = flag.Int64("node_id", -1, "local node id")
+
+	// localShardID is the shard ID of this node.
 	localShardID = flag.Int64("shard_id", -1, "local shard id, 0x7fffffff denotes the supervisor shard")
-	accountAddr  = flag.String("account_addr", "", "miner address")
+
+	// accountAddr is the miner address of this node.
+	accountAddr = flag.String("account_addr", "", "miner address")
 )
 
 func LoadConfig(path string) (*Config, error) {
@@ -56,8 +62,8 @@ func LoadConfig(path string) (*Config, error) {
 
 	// pass the global system config to the supervisor config
 	cfg.SystemCfg = cfg.GlobalSys
-	// pass the global system config to the blockchain config
-	cfg.BlockchainCfg.SystemCfg = cfg.GlobalSys
+	// pass the global system config to the consensus config
+	cfg.ConsensusNodeCfg.SystemCfg = cfg.GlobalSys
 
 	return cfg, nil
 }

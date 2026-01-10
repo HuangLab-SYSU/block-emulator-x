@@ -2,6 +2,7 @@ package csvsource
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -53,7 +54,7 @@ func (ds *CSVSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 	ret := make([]transaction.Transaction, 0, size)
 	for int64(len(ret)) < size {
 		txLine, err := ds.cr.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			ds.close()
 			break
 		}
@@ -102,7 +103,7 @@ func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 		return nil, fmt.Errorf("failed to parse receiver address: %w", err)
 	}
 
-	tx := transaction.NewTransaction(senderAddr, receiverAddr, val, uint64(count), time.Now())
+	tx := transaction.NewTransaction(senderAddr, receiverAddr, val, big.NewInt(0), uint64(count), time.Now())
 
 	return tx, nil
 }

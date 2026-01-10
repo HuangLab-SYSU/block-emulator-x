@@ -69,7 +69,10 @@ func (r *RPCConn) ListenStart() error {
 	return s.Serve(lis)
 }
 
-func (r *RPCConn) HandleMessage(_ context.Context, req *rpcserver.HandleMessageRequest) (*rpcserver.HandleMessageResponse, error) {
+func (r *RPCConn) HandleMessage(
+	_ context.Context,
+	req *rpcserver.HandleMessageRequest,
+) (*rpcserver.HandleMessageResponse, error) {
 	if err := r.add2LocalBuffer(req.GetMsg()); err != nil {
 		return nil, fmt.Errorf("add message to buffer failed: %w", err)
 	}
@@ -83,7 +86,7 @@ func (r *RPCConn) DrainMsgBuffer() []*rpcserver.WrappedMsg {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 
-	ret := make([]*rpcserver.WrappedMsg, 0)
+	ret := make([]*rpcserver.WrappedMsg, 0, len(r.msgBuffer))
 
 	for {
 		select {
@@ -100,24 +103,6 @@ func (r *RPCConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg 
 	if err != nil {
 		slog.ErrorContext(ctx, "SendMsg2Dest failed", "dest", dest, "err", err)
 	}
-}
-
-func (r *RPCConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
-	wg := &sync.WaitGroup{}
-	wg.Add(len(group))
-	// broadcast to all nodes in this group
-	for _, node := range group {
-		go func(nif nodetopo.NodeInfo) {
-			defer wg.Done()
-
-			err := r.sendMessage(ctx, nif, msg)
-			if err != nil {
-				slog.ErrorContext(ctx, "sub-goroutine: broadcast", "err", err)
-			}
-		}(node)
-	}
-
-	wg.Wait()
 }
 
 // Close closes all the connections in the client pool.

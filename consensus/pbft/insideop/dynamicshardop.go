@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft/insideop/migrationblockop"
@@ -15,7 +14,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/txpool"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
@@ -26,6 +24,7 @@ const (
 	supervisorShardID = 0x7fffffff
 )
 
+// DynamicShardOp is the ShardInsideOp for the dynamic-sharding consensus.
 type DynamicShardOp struct {
 	amm *migration.AccMigrateMetadata
 
@@ -37,25 +36,21 @@ type DynamicShardOp struct {
 
 	tbo txblockop.TxBlockOp
 	mbo *migrationblockop.MigrationBlockOp
-	csw *csvwrite.CSVSeqWriter
 
 	cfg config.ConsensusNodeCfg
 	lp  config.LocalParams
 }
 
-func NewDynamicShardOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, txPool txpool.TxPool, amm *migration.AccMigrateMetadata, cfg config.ConsensusNodeCfg, lp config.LocalParams) (*DynamicShardOp, error) {
-	tbo, err := txblockop.NewTxBlockOp(conn, resolver, chain, cfg, lp)
-	if err != nil {
-		return nil, fmt.Errorf("NewTxBlockOp: %w", err)
-	}
-
-	fp := filepath.Join(cfg.BlockRecordDir, fmt.Sprintf(blockRecordPathFmt, lp.ShardID, lp.NodeID))
-
-	csw, err := csvwrite.NewCSVSeqWriter(fp, block.RecordTitle)
-	if err != nil {
-		return nil, fmt.Errorf("NewCSVSeqWriter: %w", err)
-	}
-
+func NewDynamicShardOp(
+	conn *network.ConnHandler,
+	resolver nodetopo.NodeMapper,
+	chain *chain.Chain,
+	txPool txpool.TxPool,
+	amm *migration.AccMigrateMetadata,
+	tbo txblockop.TxBlockOp,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) *DynamicShardOp {
 	return &DynamicShardOp{
 		amm:      amm,
 		conn:     conn,
@@ -64,10 +59,9 @@ func NewDynamicShardOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, 
 		txPool:   txPool,
 		tbo:      tbo,
 		mbo:      migrationblockop.NewMigrationBlockOp(conn, resolver, chain, amm, cfg, lp),
-		csw:      csw,
 		cfg:      cfg,
 		lp:       lp,
-	}, nil
+	}
 }
 
 func (c *DynamicShardOp) BuildProposal(ctx context.Context) (*message.Proposal, error) {
@@ -81,53 +75,32 @@ func (c *DynamicShardOp) BuildProposal(ctx context.Context) (*message.Proposal, 
 }
 
 func (c *DynamicShardOp) ValidateProposal(ctx context.Context, proposal *message.Proposal) error {
-	if proposal.ProposalType != message.BlockProposalType && proposal.ProposalType != message.PartitionProposalType {
-		return fmt.Errorf("invalid proposal type")
-	}
-
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
-
-	if err = c.chain.ValidateBlock(ctx, b); err != nil {
+	if err := c.chain.ValidateBlock(ctx, proposal.Block); err != nil {
 		return fmt.Errorf("validate block failed: %w", err)
 	}
 
 	return nil
 }
 
-func (c *DynamicShardOp) ProposalCommitAndDeliver(ctx context.Context, isLeader bool, proposal *message.Proposal) error {
-	b, err := block.DecodeBlock(proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid payload, decode failed: %w", err)
-	}
+func (c *DynamicShardOp) ProposalCommitAndDeliver(
+	ctx context.Context,
+	isLeader bool,
+	proposal *message.Proposal,
+) error {
+	b := proposal.Block
 
-	switch proposal.ProposalType {
-	case message.BlockProposalType:
-		if err = c.tbo.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
-			return fmt.Errorf("block commit failed: %w", err)
-		}
-	case message.PartitionProposalType:
-		if err = c.mbo.MigrationBlockCommit(ctx, isLeader, b); err != nil {
+	switch b.Type {
+	case block.MigrationBlockType:
+		if err := c.mbo.MigrationBlockCommit(ctx, b); err != nil {
 			return fmt.Errorf("migration block commit failed: %w", err)
 		}
 	default:
-		return fmt.Errorf("invalid proposal type=%s", proposal.ProposalType)
-	}
-
-	if isLeader {
-		if err = recordBlock(c.csw, b); err != nil {
-			return fmt.Errorf("record block failed: %w", err)
+		if err := c.tbo.BlockCommitAndDeliver(ctx, isLeader, b); err != nil {
+			return fmt.Errorf("block commit failed: %w", err)
 		}
 	}
 
 	return nil
-}
-
-func (c *DynamicShardOp) Close() {
-	_ = c.csw.Close()
-	_ = c.chain.Close()
 }
 
 func (c *DynamicShardOp) buildBlockProposal(ctx context.Context) (*message.Proposal, error) {
@@ -155,7 +128,14 @@ func (c *DynamicShardOp) buildPartitionProposal(ctx context.Context) (*message.P
 			return nil, fmt.Errorf("migrateTxs failed: %w", err)
 		}
 
-		slog.InfoContext(ctx, "accounts and txs has been migrated in this epoch", "shard", c.lp.ShardID, "epoch", c.amm.Epoch)
+		slog.InfoContext(
+			ctx,
+			"accounts and txs has been migrated in this epoch",
+			"shard",
+			c.lp.ShardID,
+			"epoch",
+			c.amm.Epoch,
+		)
 	}
 
 	p, err := c.mbo.BuildMigrationProposal(ctx)
@@ -169,7 +149,10 @@ func (c *DynamicShardOp) buildPartitionProposal(ctx context.Context) (*message.P
 // packValidTxs packs transactions from the tx pool.
 // Because of the account migration, if a transaction should not be processed in this shard,
 // it wil also be migrated to the correct shard.
-func (c *DynamicShardOp) packValidTxs(ctx context.Context, size int) ([]transaction.Transaction, error) {
+func (c *DynamicShardOp) packValidTxs(
+	ctx context.Context,
+	size int,
+) ([]transaction.Transaction, error) {
 	if c.cfg.ConsensusType == config.CLPARelayConsensus {
 		return c.packValidTxsInRelay(ctx, size)
 	}
@@ -177,26 +160,24 @@ func (c *DynamicShardOp) packValidTxs(ctx context.Context, size int) ([]transact
 	return c.packValidTxsInBroker(ctx, size)
 }
 
-func (c *DynamicShardOp) packValidTxsInRelay(ctx context.Context, size int) ([]transaction.Transaction, error) {
+func (c *DynamicShardOp) packValidTxsInRelay(
+	ctx context.Context,
+	size int,
+) ([]transaction.Transaction, error) {
 	txsPacked := make([]transaction.Transaction, 0)
 	txs2Shard := make([][]transaction.Transaction, c.cfg.ShardNum)
 
 	for curCnt := 0; curCnt < size; {
-		iterPackedTxs := make([]transaction.Transaction, 0)
-
-		txs, err := c.txPool.PackTxs(size - curCnt)
+		txs, accountLoc, err := c.fetchTxsAndAccountStates(ctx, size-curCnt)
 		if err != nil {
-			return nil, fmt.Errorf("PackTxs failed: %w", err)
+			return nil, fmt.Errorf("fetchTxsAndAccountStates failed: %w", err)
 		}
 
-		if len(txs) == 0 { // no transactions to pack, break
+		if len(txs) == 0 {
 			break
 		}
-		// Get all account states of this txs.
-		accountLoc, err := c.chain.GetAccountLocationsInTxs(ctx, txs)
-		if err != nil {
-			return nil, fmt.Errorf("GetAccountLocationsInTxs failed: %w", err)
-		}
+
+		iterPackedTxs := make([]transaction.Transaction, 0)
 
 		for _, tx := range txs {
 			keyAcc := tx.Sender
@@ -234,27 +215,25 @@ func (c *DynamicShardOp) packValidTxsInRelay(ctx context.Context, size int) ([]t
 	return txsPacked, nil
 }
 
-func (c *DynamicShardOp) packValidTxsInBroker(ctx context.Context, size int) ([]transaction.Transaction, error) {
+func (c *DynamicShardOp) packValidTxsInBroker(
+	ctx context.Context,
+	size int,
+) ([]transaction.Transaction, error) {
 	txsPacked := make([]transaction.Transaction, 0)
 	txs2Supervisor := make([]transaction.Transaction, 0)
 	txs2Shard := make([][]transaction.Transaction, c.cfg.ShardNum)
 
 	for curCnt := 0; curCnt < size; {
-		iterPackedTxs := make([]transaction.Transaction, 0)
-
-		txs, err := c.txPool.PackTxs(size - curCnt)
+		txs, accountLoc, err := c.fetchTxsAndAccountStates(ctx, size-curCnt)
 		if err != nil {
-			return nil, fmt.Errorf("PackTxs failed: %w", err)
+			return nil, fmt.Errorf("fetchTxsAndAccountStates failed: %w", err)
 		}
 
-		if len(txs) == 0 { // no transactions to pack, break
+		if len(txs) == 0 {
 			break
 		}
-		// Get all account states of this txs.
-		accountLoc, err := c.chain.GetAccountLocationsInTxs(ctx, txs)
-		if err != nil {
-			return nil, fmt.Errorf("GetAccountLocationsInTxs failed: %w", err)
-		}
+
+		iterPackedTxs := make([]transaction.Transaction, 0)
 
 		for _, tx := range txs {
 			if destShard := c.getTxDestLocByAccountState(tx, accountLoc); destShard == supervisorShardID {
@@ -277,10 +256,20 @@ func (c *DynamicShardOp) packValidTxsInBroker(ctx context.Context, size int) ([]
 	}
 
 	for i, txs := range txs2Shard {
-		slog.Debug("dynamic-broker: migrate txs to the other shard when packing from pool", "tx size", len(txs), "shard", i)
+		slog.Debug(
+			"dynamic-broker: migrate txs to the other shard when packing from pool",
+			"tx size",
+			len(txs),
+			"shard",
+			i,
+		)
 	}
 
-	slog.Debug("dynamic-broker: migrate txs to the supervisor when packing from pool", "tx size", len(txs2Supervisor))
+	slog.Debug(
+		"dynamic-broker: migrate txs to the supervisor when packing from pool",
+		"tx size",
+		len(txs2Supervisor),
+	)
 
 	if err := message.SendWrappedTxs2Shards(ctx, txs2Shard, c.conn, c.resolver); err != nil {
 		return nil, fmt.Errorf("SendWrappedTxs2Shard failed: %w", err)
@@ -348,7 +337,7 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	tx2Supervisor := make([]transaction.Transaction, 0)
 
 	for _, tx := range allTxs {
-		if dest := c.getBrokerTxDestLocByModifiedMap(tx); dest == supervisorShardID {
+		if dest := c.getMigratedTxDestLocInBroker(tx); dest == supervisorShardID {
 			tx2Supervisor = append(tx2Supervisor, tx)
 		} else if dest == c.lp.ShardID {
 			addBackTxs = append(addBackTxs, tx)
@@ -358,10 +347,20 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	}
 
 	for i, txs := range tx2Shards {
-		slog.Debug("dynamic-broker: migrate txs to the other shard when operating account-migration", "tx size", len(txs), "shard", i)
+		slog.Debug(
+			"dynamic-broker: migrate txs to the other shard when operating account-migration",
+			"tx size",
+			len(txs),
+			"shard",
+			i,
+		)
 	}
 
-	slog.Debug("dynamic-broker: migrate txs to the supervisor when operating account-migration", "tx size", len(tx2Supervisor))
+	slog.Debug(
+		"dynamic-broker: migrate txs to the supervisor when operating account-migration",
+		"tx size",
+		len(tx2Supervisor),
+	)
 
 	// Add the unmigrated txs back to the tx pool.
 	if err = c.txPool.AddTxs(addBackTxs); err != nil {
@@ -379,11 +378,14 @@ func (c *DynamicShardOp) migrateTxsInBroker(ctx context.Context) error {
 	return nil
 }
 
-func (c *DynamicShardOp) getBrokerTxDestLocByModifiedMap(tx transaction.Transaction) int64 {
+// getMigratedTxDestLocInBroker gets the dest location of the given transaction.
+// In the dynamic-sharding + Broker, the transaction may be migrated to another shard.
+// If an inner-shard transaction becomes a cross-shard one, it should be sent back to the supervisor.
+func (c *DynamicShardOp) getMigratedTxDestLocInBroker(tx transaction.Transaction) int64 {
 	sDestShard, sModified := c.amm.CurModifiedMap[tx.Sender]
 	rDestShard, rModified := c.amm.CurModifiedMap[tx.Recipient]
 
-	if len(tx.BOriginalHash) == 0 { // inner-shard tx
+	if tx.TxType() == transaction.NormalTxType { // inner-shard tx
 		if !sModified {
 			sDestShard = int(c.lp.ShardID)
 		}
@@ -422,16 +424,20 @@ func (c *DynamicShardOp) getBrokerTxDestLocByModifiedMap(tx transaction.Transact
 	return supervisorShardID
 }
 
-func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, accountLoc map[account.Address]int64) int64 {
+func (c *DynamicShardOp) getTxDestLocByAccountState(
+	tx transaction.Transaction,
+	accountLoc map[account.Address]int64,
+) int64 {
 	sDestShard, sExist := accountLoc[tx.Sender]
 	rDestShard, rExist := accountLoc[tx.Recipient]
 
 	if !sExist || !rExist {
-		slog.Error("sender or recipient is not found in accountLoc", "sender", tx.Sender, "recipient", tx.Recipient)
+		slog.Error("sender or recipient is not found in accountLoc")
+
 		return supervisorShardID
 	}
 
-	if len(tx.BOriginalHash) == 0 { // inner-shard tx
+	if tx.TxType() == transaction.NormalTxType { // inner-shard tx
 		// After the account-migration, this transaction is still an inner-shard tx. Thus, it should be migrated into sDestShard.
 		if sDestShard == rDestShard {
 			return sDestShard
@@ -455,11 +461,31 @@ func (c *DynamicShardOp) getTxDestLocByAccountState(tx transaction.Transaction, 
 	return supervisorShardID
 }
 
+func (c *DynamicShardOp) fetchTxsAndAccountStates(
+	ctx context.Context, size int,
+) ([]transaction.Transaction, map[account.Address]int64, error) {
+	txs, err := c.txPool.PackTxs(size)
+	if err != nil {
+		return nil, nil, fmt.Errorf("PackTxs failed: %w", err)
+	}
+
+	if len(txs) == 0 { // no transactions to pack, break
+		return nil, nil, nil
+	}
+	// Get all account states of this txs.
+	accountLoc, err := c.chain.GetAccountLocationsInTxs(ctx, txs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("GetAccountLocationsInTxs failed: %w", err)
+	}
+
+	return txs, accountLoc, nil
+}
+
 func (c *DynamicShardOp) brokerCLPATxSendAgain(ctx context.Context, txSentAgain []transaction.Transaction) error {
 	if len(txSentAgain) == 0 {
 		return nil
 	}
-	// Send to the supervisor
+	// Send to the supervisor.
 	w, err := message.WrapMsg(&message.BrokerCLPATxSendAgainMsg{Txs: txSentAgain})
 	if err != nil {
 		return fmt.Errorf("wrap BrokerCLPATxSendAgainMsg failed: %w", err)

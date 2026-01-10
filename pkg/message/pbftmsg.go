@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
@@ -13,19 +14,15 @@ const (
 	PrepareMessageType    = "Prepare"
 	CommitMessageType     = "Commit"
 
-	ReceiveTxsMessageType = "ReceiveTxs"
+	ReceiveTxsMessageType  = "ReceiveTxs"
+	CatchupReqMessageType  = "CatchupReq"
+	CatchupRespMessageType = "CatchupResp"
 
 	StopConsensusMessageType = "StopConsensus"
 )
 
-const (
-	BlockProposalType     = "BlockProposal"
-	PartitionProposalType = "PartitionProposalType"
-)
-
 type Proposal struct {
-	ProposalType string
-	Payload      []byte
+	Block *block.Block
 }
 
 func (p *Proposal) Hash() ([]byte, error) {
@@ -61,10 +58,23 @@ type CommitMsg struct {
 	ShardID, NodeID int64
 }
 
+type CatchupReqMsg struct {
+	StartBlockHeight int64
+	ShardID, NodeID  int64
+}
+
+type CatchupRespMsg struct {
+	Proposals         []Proposal
+	NextSeq, NextView int64
+	ShardID, NodeID   int64
+}
+
+// ReceiveTxsMsg contains transactions.
 type ReceiveTxsMsg struct {
 	Txs []transaction.Transaction
 }
 
+// StopConsensusMsg is the stop-signal to nodes.
 type StopConsensusMsg struct {
 	StopSignal struct{}
 }

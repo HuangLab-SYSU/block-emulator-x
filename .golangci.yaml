@@ -4,19 +4,28 @@ run:
 
 formatters:
   enable:
-    - gofmt
     - gofumpt
     - goimports
+    - gci
+    - golines
   settings:
-    goimports:
-      local-prefixes: github.com/HuangLab-SYSU/block-emulator-x
     gofumpt:
       extra-rules: true
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/HuangLab-SYSU/block-emulator-x)
+        - blank
+    golines:
+      max-len: 120
 
 linters:
   enable:
     - wsl_v5
     - errcheck
+    - errname
+    - errorlint
     - staticcheck
     - unused
     - gocyclo
@@ -26,19 +35,13 @@ linters:
     - dupl
     - misspell
     - tparallel
+    - govet
   settings:
     wsl_v5:
       allow-first-in-block: true
       allow-whole-block: false
       branch-max-lines: 2
-    gocyclo:
-      max-complexity: 10  # Set a threshold for acceptable function complexity
-    gosimple:
-      simplify: true
-    structcheck:
-      ignore-unexported: true  # Ignore unexported struct fields
+
 
 issues:
-  exclude-use-default: false
   max-same-issues: 3
-  severity: "warning"  # Change this to "error" if you want to treat warnings as errors

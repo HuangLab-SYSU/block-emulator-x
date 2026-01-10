@@ -15,6 +15,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
+// RelayTxBlockOp is the TxBlockOp which can handle relay transactions.
 type RelayTxBlockOp struct {
 	c        *chain.Chain
 	conn     *network.ConnHandler
@@ -24,28 +25,32 @@ type RelayTxBlockOp struct {
 	lp  config.LocalParams
 }
 
-func NewRelayTxBlockOp(c *chain.Chain, conn *network.ConnHandler, rs nodetopo.NodeMapper, cfg config.ConsensusNodeCfg, lp config.LocalParams) *RelayTxBlockOp {
+func NewRelayTxBlockOp(
+	c *chain.Chain,
+	conn *network.ConnHandler,
+	rs nodetopo.NodeMapper,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) *RelayTxBlockOp {
 	return &RelayTxBlockOp{c: c, conn: conn, resolver: rs, cfg: cfg, lp: lp}
 }
 
-func (r *RelayTxBlockOp) BuildTxBlockProposal(ctx context.Context, txs []transaction.Transaction) (*message.Proposal, error) {
+func (r *RelayTxBlockOp) BuildTxBlockProposal(
+	ctx context.Context,
+	txs []transaction.Transaction,
+) (*message.Proposal, error) {
 	// if a transaction is a cross-shard tx, modify its RelayOpt
 	mTxs, err := r.modifyTxRelayOpt(ctx, txs)
 	if err != nil {
 		return nil, fmt.Errorf("modifyTxRelayOpt failed: %w", err)
 	}
 
-	b, err := r.c.GenerateBlock(ctx, r.lp.WalletAddr, mTxs)
+	b, err := r.c.GenerateBlock(ctx, r.lp.WalletAddr, block.TxBlockType, block.Body{TxList: mTxs}, block.MigrationOpt{})
 	if err != nil {
 		return nil, fmt.Errorf("chain.GenerateBlock failed: %w", err)
 	}
 
-	p, err := message.WrapProposal(b, message.BlockProposalType)
-	if err != nil {
-		return nil, fmt.Errorf("WrapProposal failed: %w", err)
-	}
-
-	slog.InfoContext(ctx, "block is generated", "shard ID", r.c.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
+	p := message.WrapProposal(b)
 
 	return p, nil
 }
@@ -82,7 +87,10 @@ func (r *RelayTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader boo
 }
 
 // modifyTxRelayOpt sets the RelayOpt of txs.
-func (r *RelayTxBlockOp) modifyTxRelayOpt(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, error) {
+func (r *RelayTxBlockOp) modifyTxRelayOpt(
+	ctx context.Context,
+	txs []transaction.Transaction,
+) ([]transaction.Transaction, error) {
 	accountLocations, err := r.c.GetAccountLocationsInTxs(ctx, txs)
 	if err != nil {
 		return nil, fmt.Errorf("getAccountLocationsInTxs failed: %w", err)
@@ -106,7 +114,15 @@ func (r *RelayTxBlockOp) modifyTxRelayOpt(ctx context.Context, txs []transaction
 		}
 
 		if senderID != shardID {
-			slog.ErrorContext(ctx, "modify tx relay opt failed, the sender of this tx is not in this shard, and this transaction is not a relay-2 tx", "cur shardID", shardID, "expect shardID", senderID)
+			slog.ErrorContext(
+				ctx,
+				"modify tx relay opt failed, the sender of this tx is not in this shard, and this transaction is not a relay-2 tx",
+				"cur shardID",
+				shardID,
+				"expect shardID",
+				senderID,
+			)
+
 			continue
 		}
 
@@ -132,8 +148,20 @@ func (r *RelayTxBlockOp) modifyTxRelayOpt(ctx context.Context, txs []transaction
 	return modifiedTxs, nil
 }
 
-func (r *RelayTxBlockOp) splitTxs(ctx context.Context, txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
-	innerTxs, r1txs, r2txs := make([]transaction.Transaction, 0), make([]transaction.Transaction, 0), make([]transaction.Transaction, 0)
+func (r *RelayTxBlockOp) splitTxs(
+	ctx context.Context,
+	txs []transaction.Transaction,
+) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
+	innerTxs, r1txs, r2txs := make(
+		[]transaction.Transaction,
+		0,
+	), make(
+		[]transaction.Transaction,
+		0,
+	), make(
+		[]transaction.Transaction,
+		0,
+	)
 
 	for _, tx := range txs {
 		switch tx.RelayStage {
@@ -151,7 +179,11 @@ func (r *RelayTxBlockOp) splitTxs(ctx context.Context, txs []transaction.Transac
 	return innerTxs, r1txs, r2txs
 }
 
-func (r *RelayTxBlockOp) deliverBlockInfo2Supervisor(ctx context.Context, innerTxs, r1Txs, r2Txs []transaction.Transaction, b block.Block) error {
+func (r *RelayTxBlockOp) deliverBlockInfo2Supervisor(
+	ctx context.Context,
+	innerTxs, r1Txs, r2Txs []transaction.Transaction,
+	b block.Block,
+) error {
 	rbm := &message.RelayBlockInfoMsg{
 		InnerShardTxs:    innerTxs,
 		Relay1Txs:        r1Txs,

@@ -9,7 +9,10 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/supervisor/txsource/randomsource"
 )
 
+// TxSource provides a transaction source for the supervisor (as the client / wallet).
+// Transactions will be read from TxSource and sent to the consensus nodes periodically.
 type TxSource interface {
+	// ReadTxs reads transactions from the TxSource. If the source is exhausted, it returns (nil, nil).
 	ReadTxs(size int64) ([]transaction.Transaction, error)
 }
 
@@ -19,6 +22,7 @@ func (NoOperationTxSource) ReadTxs(int64) ([]transaction.Transaction, error) {
 	return nil, nil
 }
 
+// NewTxSource creates a TxSource by the given config.
 func NewTxSource(cfg config.TxSourceCfg) (TxSource, error) {
 	var ts TxSource
 

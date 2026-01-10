@@ -13,12 +13,22 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 )
 
+// TxBlockOp describes the operations for blocks which contains transactions.
 type TxBlockOp interface {
+	// BuildTxBlockProposal builds a proposal containing a transaction block, by the given transactions.
 	BuildTxBlockProposal(ctx context.Context, txs []transaction.Transaction) (*message.Proposal, error)
+	// BlockCommitAndDeliver commits and delivers blocks.
+	// Note that, blocks will be delivered to different nodes according to the consensus.
 	BlockCommitAndDeliver(ctx context.Context, isLeader bool, b *block.Block) error
 }
 
-func NewTxBlockOp(conn *network.ConnHandler, resolver nodetopo.NodeMapper, chain *chain.Chain, cfg config.ConsensusNodeCfg, lp config.LocalParams) (TxBlockOp, error) {
+func NewTxBlockOp(
+	conn *network.ConnHandler,
+	resolver nodetopo.NodeMapper,
+	chain *chain.Chain,
+	cfg config.ConsensusNodeCfg,
+	lp config.LocalParams,
+) (TxBlockOp, error) {
 	var tbo TxBlockOp
 
 	switch cfg.ConsensusType {

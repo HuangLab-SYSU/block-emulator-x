@@ -31,7 +31,11 @@ type StaticBrokerCommittee struct {
 	cfg config.SupervisorCfg
 }
 
-func NewStaticBrokerCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*StaticBrokerCommittee, error) {
+func NewStaticBrokerCommittee(
+	conn *network.ConnHandler,
+	r nodetopo.NodeMapper,
+	cfg config.SupervisorCfg,
+) (*StaticBrokerCommittee, error) {
 	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)
@@ -125,8 +129,18 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 	return nil
 }
 
-func (s *StaticBrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction) {
-	innerShardTxs, crossShardTxs := make([]transaction.Transaction, 0, len(txs)), make([]transaction.Transaction, 0, len(txs))
+func (s *StaticBrokerCommittee) classifyTxs(
+	txs []transaction.Transaction,
+) ([]transaction.Transaction, []transaction.Transaction) {
+	innerShardTxs, crossShardTxs := make(
+		[]transaction.Transaction,
+		0,
+		len(txs),
+	), make(
+		[]transaction.Transaction,
+		0,
+		len(txs),
+	)
 	for _, tx := range txs {
 		senderAddr, receiverAddr := tx.Sender, tx.Recipient
 		senderShard := partition.DefaultAccountLoc(senderAddr, s.cfg.ShardNum)
@@ -146,7 +160,7 @@ func (s *StaticBrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]tr
 func (s *StaticBrokerCommittee) getTxLoc(tx transaction.Transaction) int64 {
 	shardNumber := s.cfg.ShardNum
 	// inner-shard tx
-	if len(tx.BOriginalHash) == 0 {
+	if tx.TxType() == transaction.NormalTxType {
 		return partition.DefaultAccountLoc(tx.Sender, shardNumber)
 	}
 	// broker tx

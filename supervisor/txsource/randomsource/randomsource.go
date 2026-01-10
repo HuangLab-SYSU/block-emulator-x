@@ -17,6 +17,8 @@ const (
 	accountPrefixZeroBytes = 18
 	// upperBoundTransferAmount is the upper bound of transfer number.
 	upperBoundTransferAmount = 1000
+	// feePercentage is the percentage of transaction priority fee.
+	feePercentage = 0.1
 )
 
 type RandomSource struct {
@@ -52,6 +54,7 @@ func generateRandomTransaction(c int64) transaction.Transaction {
 	amount, _ := rand.Int(rand.Reader, big.NewInt(upperBoundTransferAmount))
 	// The random transfer number should be at least 1.
 	amount.Add(amount, big.NewInt(1))
+	fee := big.NewInt(int64(float64(amount.Int64()) * feePercentage))
 
-	return *transaction.NewTransaction(sender, receiver, amount, uint64(c), time.Now())
+	return *transaction.NewTransaction(sender, receiver, amount, fee, uint64(c), time.Now())
 }

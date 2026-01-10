@@ -24,3 +24,7 @@ run-consensus:
 .PHONY: run-supervisor
 run-supervisor:
 	docker run --rm $(SUPERVISOR_IMAGE) $(ARGS)
+
+.PHONY: docs-pdf2svg
+docs-pdf2svg:
+	sh ./docs/scripts/pdf2svg.sh

@@ -23,7 +23,7 @@ type CLPABrokerCommittee struct {
 	conn *network.ConnHandler
 	r    nodetopo.NodeMapper
 
-	clpaComponent
+	partitionRunner
 	bManager *broker.Manager
 
 	txSource    txsource.TxSource
@@ -33,7 +33,11 @@ type CLPABrokerCommittee struct {
 	cfg config.SupervisorCfg
 }
 
-func NewCLPABrokerCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.SupervisorCfg) (*CLPABrokerCommittee, error) {
+func NewCLPABrokerCommittee(
+	conn *network.ConnHandler,
+	r nodetopo.NodeMapper,
+	cfg config.SupervisorCfg,
+) (*CLPABrokerCommittee, error) {
 	ts, err := txsource.NewTxSource(cfg.TxSourceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)
@@ -47,7 +51,7 @@ func NewCLPABrokerCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cf
 	return &CLPABrokerCommittee{
 		r:    r,
 		conn: conn,
-		clpaComponent: clpaComponent{
+		partitionRunner: partitionRunner{
 			state:           partition.NewCLPAState(clpaWeightPenalty, clpaMaxIterations, int(cfg.ShardNum)),
 			lastRunTime:     time.Now(),
 			epochSynced:     false,
@@ -65,12 +69,12 @@ func NewCLPABrokerCommittee(conn *network.ConnHandler, r nodetopo.NodeMapper, cf
 func (c *CLPABrokerCommittee) SendTxsAndConsensus(ctx context.Context) error {
 	// if the repartition process between consensus nodes is not over, wait for it and return
 	// This function should not be blocked.
-	if !c.checkEpochSyncAndMark() {
+	if !c.CheckEpochSyncAndMark() {
 		return nil
 	}
 
 	// reach epoch duration threshold, run clpa
-	if time.Since(c.clpaComponent.lastRunTime).Seconds() > float64(c.cfg.EpochDuration) {
+	if time.Since(c.partitionRunner.lastRunTime).Seconds() > float64(c.cfg.EpochDuration) {
 		if err := c.repartition(ctx); err != nil {
 			return fmt.Errorf("repartition failed: %w", err)
 		}
@@ -135,7 +139,7 @@ func (c *CLPABrokerCommittee) repartition(ctx context.Context) error {
 
 	c.conn.GroupBroadcastMessage(ctx, allLeaders, w)
 
-	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch)
+	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch, "migrated number", len(modifiedMap))
 	// set epoch-synced to false
 	c.epochSynced = false
 	c.sl.stopCnt = 0
@@ -173,8 +177,18 @@ func (c *CLPABrokerCommittee) readTxsAndSend(ctx context.Context) error {
 	return nil
 }
 
-func (c *CLPABrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]transaction.Transaction, []transaction.Transaction) {
-	innerShardTxs, crossShardTxs := make([]transaction.Transaction, 0, len(txs)), make([]transaction.Transaction, 0, len(txs))
+func (c *CLPABrokerCommittee) classifyTxs(
+	txs []transaction.Transaction,
+) ([]transaction.Transaction, []transaction.Transaction) {
+	innerShardTxs, crossShardTxs := make(
+		[]transaction.Transaction,
+		0,
+		len(txs),
+	), make(
+		[]transaction.Transaction,
+		0,
+		len(txs),
+	)
 	for _, tx := range txs {
 		senderAddr, receiverAddr := tx.Sender, tx.Recipient
 		senderShard := c.state.GetVertexLocation(partition.Vertex{Addr: senderAddr})
@@ -193,7 +207,7 @@ func (c *CLPABrokerCommittee) classifyTxs(txs []transaction.Transaction) ([]tran
 
 func (c *CLPABrokerCommittee) getTxLocByCLPAState(tx transaction.Transaction) int64 {
 	// inner-shard tx
-	if len(tx.BOriginalHash) == 0 {
+	if tx.TxType() == transaction.NormalTxType {
 		return int64(c.state.GetVertexLocation(partition.Vertex{Addr: tx.Sender}))
 	}
 	// broker tx

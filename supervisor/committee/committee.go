@@ -9,8 +9,8 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 )
 
-// Committee is the interface for a committee.
-// HandleMsg and SendTxsAndConsensus should be called in serial, thus they should be in a thread-safe goroutine.
+// Committee is the interface for a committee / client.
+// HandleMsg and SendTxsAndConsensus should be called in serial, thus they will be in a single goroutine.
 type Committee interface {
 	// SendTxsAndConsensus sends messages including transactions and consensus.
 	SendTxsAndConsensus(ctx context.Context) error
@@ -34,14 +34,18 @@ type stopLogic struct {
 
 type txLocationFunc func(tx transaction.Transaction) int64
 
-func packShardTxs(txs []transaction.Transaction, shardNumber int64, locFunc txLocationFunc) [][]transaction.Transaction {
+func packShardTxs(
+	txs []transaction.Transaction,
+	shardNumber int64,
+	locFunc txLocationFunc,
+) [][]transaction.Transaction {
 	shardTxs := make([][]transaction.Transaction, shardNumber)
 
 	// classify the transactions by the locations of sender
 	for _, tx := range txs {
 		shardID := locFunc(tx)
 		if shardID < 0 || shardID >= shardNumber {
-			slog.Info("packShardTxs get invalid shardID by locFunc", "invalid shardID", shardID)
+			slog.Info("packShardTxs gets invalid shardID by locFunc", "invalid shardID", shardID)
 			continue
 		}
 

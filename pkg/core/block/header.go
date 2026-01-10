@@ -14,6 +14,7 @@ type Header struct {
 	ParentBlockHash []byte
 	StateRoot       []byte
 	Number          uint64
+	Type            uint8
 	Miner           account.Address
 	CreateTime      time.Time
 
@@ -23,7 +24,6 @@ type Header struct {
 
 // TxHeaderOpt is the struct for transaction handling.
 // This struct should be used when this block is a normal one (not a block for account migration).
-// Note that either the variables in TxHeaderOpt or those in MigrationHeaderOpt are nil.
 type TxHeaderOpt struct {
 	TxRoot []byte
 	Bloom  bloom.Filter
@@ -31,9 +31,8 @@ type TxHeaderOpt struct {
 
 // MigrationHeaderOpt is the struct for the account migration.
 // This struct should be used when this block is an account migration one.
-// Note that either the variables in MigrationHeaderOpt or those in TxHeaderOpt are nil.
 type MigrationHeaderOpt struct {
-	MigratedAccountsRoot []byte // MigratedAccountsRoot is the merkle root of MigratedAccounts in MigrationOpt.
+	MigratedAccountsRoot []byte // MigratedAccountsRoot is the Merkle root of MigratedAccounts in MigrationOpt.
 }
 
 // Encode encodes blockHeaders.

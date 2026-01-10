@@ -30,18 +30,8 @@ func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
 	}, nil
 }
 
-func WrapProposal(b *block.Block, proposalType string) (*Proposal, error) {
-	var p Proposal
-
-	payload, err := b.Encode()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode block payload: %w", err)
-	}
-
-	p.Payload = payload
-	p.ProposalType = proposalType
-
-	return &p, nil
+func WrapProposal(b *block.Block) *Proposal {
+	return &Proposal{b}
 }
 
 func getMsgType(msg any) (string, error) {
@@ -59,6 +49,11 @@ func getMsgType(msg any) (string, error) {
 		msgType = CommitMessageType
 	case *ReceiveTxsMsg, ReceiveTxsMsg:
 		msgType = ReceiveTxsMessageType
+	case *CatchupReqMsg, CatchupReqMsg:
+		msgType = CatchupReqMessageType
+	case *CatchupRespMsg, CatchupRespMsg:
+		msgType = CatchupRespMessageType
+
 	case *RelayBlockInfoMsg, RelayBlockInfoMsg:
 		msgType = RelayBlockInfoMessageType
 
