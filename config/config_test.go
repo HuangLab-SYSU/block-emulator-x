@@ -61,8 +61,9 @@ var expectedCfg = Config{
 		SystemCfg: expectedSystemCfg,
 	},
 	NetworkCfg: NetworkCfg{
-		Bandwidth: 1000000,
-		Latency:   0,
+		Bandwidth:         1000000,
+		Latency:           0,
+		CommunicationMode: "libp2p",
 	},
 }
 
