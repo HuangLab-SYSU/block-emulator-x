@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"time"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/cmd/loadnetwork"
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/logger"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/connlibp2p"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 	"github.com/HuangLab-SYSU/block-emulator-x/supervisor"
-
-	_ "net/http/pprof"
 )
 
 const (
@@ -24,15 +25,17 @@ const (
 var (
 	configPath = flag.String("config", "config.yaml", "path to config file")
 	// pprof is a tool to sample the program and collect the runtime data.
-	pprofPort = flag.Int(
-		"pprof-port",
-		0,
-		fmt.Sprintf("port to serve pprof; the port should be larger than %d", pprofPortLowerBound),
-	)
+	pprofPort = flag.Int("pprof-port", 0, fmt.Sprintf("port to serve pprof; the port should be larger than %d", pprofPortLowerBound))
 )
 
 func main() {
 	flag.Parse()
+
+	var (
+		p2p   network.P2PConn
+		nodeM nodetopo.NodeMapper
+		err   error
+	)
 
 	lp, err := config.LoadLocalParams()
 	if err != nil {
@@ -55,28 +58,72 @@ func main() {
 
 	defer logger.CloseLoggerFile()
 
-	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(cfg.GlobalSys, lp)
-	if err != nil {
-		log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
-	}
-
-	networkConn := network.NewConnHandler(p2p)
-
-	spv, err := supervisor.NewSupervisor(networkConn, nodeM, cfg.SupervisorCfg)
-	if err != nil {
-		log.Fatal(fmt.Errorf("new a supervisor failed: %w", err))
-	}
-
-	// start gRPC server
-	go func() {
-		if err = p2p.ListenStart(); err != nil {
-			log.Fatal(fmt.Errorf("startServer: %w", err))
+	switch lp.CommunicationMode {
+	case 0:
+		p2p, nodeM, err = loadnetwork.GetNetworkAndNodeInfo(lp)
+		if err != nil {
+			log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
 		}
-	}()
 
-	time.Sleep(supervisorWaitingTime)
+		networkConn := network.NewConnHandler(p2p)
 
-	if err = spv.Start(); err != nil {
-		log.Fatal(fmt.Errorf("supervisor.Startup error: %w", err))
+		spv, err := supervisor.NewSupervisor(networkConn, nodeM, cfg.SupervisorCfg)
+		if err != nil {
+			log.Fatal(fmt.Errorf("new a supervisor failed: %w", err))
+		}
+
+		// start gRPC server
+		go func() {
+			if err = p2p.ListenStart(); err != nil {
+				log.Fatal(fmt.Errorf("startServer: %w", err))
+			}
+		}()
+
+		time.Sleep(supervisorWaitingTime)
+
+		if err = spv.Start(); err != nil {
+			log.Fatal(fmt.Errorf("supervisor.Startup error: %w", err))
+		}
+
+	case 1:
+		p2p, err = loadnetwork.InitNetworkAndNodeInfoWithLibp2pMode(lp)
+		if err != nil {
+			log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
+		}
+
+		libp2pConn, ok := p2p.(*connlibp2p.Libp2pConn)
+		if !ok {
+			log.Fatal("unexpected P2PConn type; expected *connlibp2p.Libp2pConn")
+		}
+
+		libp2pNodeM := libp2pConn.NodeM
+		if libp2pNodeM == nil {
+			log.Fatal("the Libp2pConn.NodeM is nil")
+		}
+
+		networkConn := network.NewConnHandler(p2p)
+
+		// start gRPC server
+		go func() {
+			if err = p2p.ListenStart(); err != nil {
+				log.Fatal(fmt.Errorf("startServer: %w", err))
+			}
+		}()
+
+		loadnetwork.WaitForNodeMapperReady(libp2pNodeM, cfg.GlobalSys)
+
+		spv, err := supervisor.NewSupervisor(networkConn, libp2pNodeM, cfg.SupervisorCfg)
+		if err != nil {
+			log.Fatal(fmt.Errorf("failed to create a supervisor node: %w", err))
+		}
+
+		time.Sleep(supervisorWaitingTime)
+
+		if err = spv.Start(); err != nil {
+			log.Fatal(fmt.Errorf("failed to start supervisor node: %w", err))
+		}
+
+	default:
+		log.Fatal(fmt.Errorf("unsupported communication mode: %d", lp.CommunicationMode))
 	}
 }
