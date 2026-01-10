@@ -41,3 +41,4 @@ supervisor:
 network:
   bandwidth: 1000000
   latency: 0
+  communication_mode: "libp2p"
