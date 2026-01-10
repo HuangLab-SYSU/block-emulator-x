@@ -28,7 +28,6 @@ type LocalParams struct {
 
 // local parameters are defined here, and they are read from command lines.
 var (
-	localNodeID = flag.Int64("node_id", -1, "local node id")
 	// localNodeID is the node ID of this node.
 	localNodeID = flag.Int64("node_id", -1, "local node id")
 
