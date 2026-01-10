@@ -14,7 +14,3 @@ type Account struct {
 func (a *Account) Encode() ([]byte, error) {
 	return append(a.Addr[:], a.PKey[:]...), nil
 }
-
-func DecodeAccount(b []byte) (*Account, error) {
-	return &Account{Addr: Address(b[:20]), PKey: PublicKey(b[20:])}, nil
-}
