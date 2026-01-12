@@ -58,9 +58,9 @@ func main() {
 
 	defer logger.CloseLoggerFile()
 
-	switch lp.CommunicationMode {
-	case 0:
-		p2p, nodeM, err = loadnetwork.GetNetworkAndNodeInfo(lp)
+	switch cfg.CommunicationMode {
+	case config.DirectConnMode:
+		p2p, nodeM, err = loadnetwork.GetNetworkAndNodeInfo(cfg.GlobalSys, lp)
 		if err != nil {
 			log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
 		}
@@ -83,7 +83,7 @@ func main() {
 
 		consensusNode.Start()
 
-	case 1:
+	case config.LibP2PConnMode:
 		p2p, err = loadnetwork.InitNetworkAndNodeInfoWithLibp2pMode(lp)
 		if err != nil {
 			log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
@@ -119,6 +119,6 @@ func main() {
 		consensusNode.Start()
 
 	default:
-		log.Fatal(fmt.Errorf("unsupported communication mode: %d", lp.CommunicationMode))
+		log.Fatal(fmt.Errorf("unsupported communication mode: %s", cfg.CommunicationMode))
 	}
 }

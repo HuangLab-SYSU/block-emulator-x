@@ -65,7 +65,7 @@ func InitNetworkAndNodeInfoWithLibp2pMode(lp *config.LocalParams) (network.P2PCo
 }
 
 func readIpTableFromFile(cfg config.SystemCfg) (map[nodetopo.NodeInfo]string, error) {
-	// Read the contents of ip table (format: json)
+	// Read the contents of ip table (format: JSON)
 	file, err := os.ReadFile(*ipTablePath)
 	if err != nil {
 		return nil, fmt.Errorf("readIpTableFromFile: %w", err)
