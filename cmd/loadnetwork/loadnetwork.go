@@ -15,8 +15,8 @@ import (
 
 var ipTablePath = flag.String("ip_table", "ip_table.json", "path to ip_table.json")
 
-func GetNetworkAndNodeInfo(lp *config.LocalParams) (network.P2PConn, nodetopo.NodeMapper, error) {
-	info2Host, err := readIpTableFromFile()
+func GetNetworkAndNodeInfo(cfg config.SystemCfg, lp *config.LocalParams) (network.P2PConn, nodetopo.NodeMapper, error) {
+	info2Host, err := readIpTableFromFile(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("getNetworkAndNodeTopo: %w", err)
 	}
@@ -45,7 +45,7 @@ func GetNetworkAndNodeInfo(lp *config.LocalParams) (network.P2PConn, nodetopo.No
 	return p2p, m, nil
 }
 
-func readIpTableFromFile() (map[nodetopo.NodeInfo]string, error) {
+func readIpTableFromFile(cfg config.SystemCfg) (map[nodetopo.NodeInfo]string, error) {
 	// Read the contents of ip table (format: json)
 	file, err := os.ReadFile(*ipTablePath)
 	if err != nil {
@@ -61,7 +61,16 @@ func readIpTableFromFile() (map[nodetopo.NodeInfo]string, error) {
 	ret := make(map[nodetopo.NodeInfo]string)
 
 	for shardID, shardInfoMap := range ipMap {
+		// Skip the invalid shardID
+		if shardID != nodetopo.SupervisorShardID && (shardID >= cfg.ShardNum || shardID < 0) {
+			continue
+		}
+
 		for nodeID, ip := range shardInfoMap {
+			if nodeID >= cfg.NodeNum || nodeID < 0 {
+				continue
+			}
+
 			ret[nodetopo.NodeInfo{ShardID: shardID, NodeID: nodeID}] = ip
 		}
 	}
