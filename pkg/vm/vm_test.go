@@ -7,8 +7,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/tracing"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/ethdb/leveldb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +19,8 @@ import (
 )
 
 const (
-	testVMStateDir = "test_vm_state"
+	testVMStatePath = "test_vm_state"
+	blockNum        = 20_000_000
 )
 
 var (
@@ -25,7 +29,7 @@ var (
 		Transfer:    core.Transfer,
 		GetHash:     func(n uint64) common.Hash { return common.Hash{} },
 		Coinbase:    common.Address{},
-		BlockNumber: big.NewInt(20_000_000),
+		BlockNumber: big.NewInt(blockNum),
 		Time:        1700000000,
 		Difficulty:  common.Big0,
 		GasLimit:    uint64(0x816500),
@@ -53,13 +57,20 @@ var (
 )
 
 func TestVM(t *testing.T) {
-	_ = os.RemoveAll(testVMStateDir)
-	t.Cleanup(func() { _ = os.RemoveAll(testVMStateDir) })
+	_ = os.RemoveAll(testVMStatePath)
+	t.Cleanup(func() { _ = os.RemoveAll(testVMStatePath) })
 
-	vmExec, err := NewExecutor(config.VMCfg{VMStateDir: testVMStateDir}, config.LocalParams{})
+	level, err := leveldb.New(testVMStatePath, 0, 0, "testVM", false)
+	db := rawdb.NewDatabase(level)
+
+	vmExec, err := NewExecutor(blockCtx, db, types.EmptyRootHash, config.VMCfg{VMStateDir: testVMStatePath})
 	require.NoError(t, err)
 
+	// Set the init balance.
 	vmExec.StateDB().AddBalance(from, initialBalance, tracing.BalanceChangeTransfer)
+
+	_, err = vmExec.StateDB().Commit(blockNum, true, false)
+	require.NoError(t, err)
 
 	txContext := vm.TxContext{
 		Origin:   from,
@@ -67,18 +78,21 @@ func TestVM(t *testing.T) {
 	}
 
 	// Deploy the contract.
-	contractAddr, _, err := vmExec.DeployContract(blockCtx, txContext, from, contractCode, txVal, gasLimit)
+	contractAddr, _, err := vmExec.DeployContract(txContext, from, contractCode, txVal, gasLimit)
 	require.NoError(t, err)
 
 	// Call `set` (1).
-	callResult, _, err := vmExec.CallContract(blockCtx, txContext, from, contractAddr, setCallData, txVal, gasLimit)
+	callResult, _, err := vmExec.CallContract(txContext, from, contractAddr, setCallData, txVal, gasLimit)
 	require.NoError(t, err)
 	require.Len(t, callResult, 0)
 
 	// Call `get`.
-	callResult, _, err = vmExec.CallContract(blockCtx, txContext, from, contractAddr, getCallData, txVal, gasLimit)
+	callResult, _, err = vmExec.CallContract(txContext, from, contractAddr, getCallData, txVal, gasLimit)
 	require.NoError(t, err)
 
 	resultInt := new(uint256.Int).SetBytes(callResult).Uint64()
 	require.Equal(t, resultInt, uint64(1))
+
+	_, err = vmExec.Commit()
+	require.NoError(t, err)
 }
