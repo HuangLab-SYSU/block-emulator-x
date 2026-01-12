@@ -55,7 +55,7 @@ func main() {
 
 	defer logger.CloseLoggerFile()
 
-	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(lp)
+	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(cfg.GlobalSys, lp)
 	if err != nil {
 		log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
 	}
