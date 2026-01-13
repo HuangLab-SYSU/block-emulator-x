@@ -21,6 +21,10 @@ const (
 	EIP3855         = 3855
 )
 
+// Executor wraps the functions of stateDB and evm of geth.
+// An executor should only be used in a block (i.e., BlockContext).
+// After updating the stateDB, the executor should be committed to save the modifications.
+// Not that, an executor should be aborted after its commit function is called.
 type Executor struct {
 	bCtx       gethvm.BlockContext
 	stateDB    *state.StateDB
@@ -28,12 +32,8 @@ type Executor struct {
 	evmCfg     gethvm.Config
 }
 
-func NewExecutor(
-	bCtx gethvm.BlockContext,
-	edb ethdb.Database,
-	curRoot [32]byte,
-	cfg config.VMCfg,
-) (*Executor, error) {
+// NewExecutor creates a new executor with given parameters.
+func NewExecutor(bCtx gethvm.BlockContext, edb ethdb.Database, curRoot [32]byte, cfg config.VMCfg) (*Executor, error) {
 	// Init state db.
 	trDB := triedb.NewDatabase(edb, &triedb.Config{Preimages: true, IsVerkle: false})
 	dbRoot := curRoot
@@ -65,21 +65,24 @@ func NewExecutor(
 	}, nil
 }
 
+// StateDB returns the state DB in the executor.
 func (e *Executor) StateDB() *state.StateDB {
 	return e.stateDB
 }
 
+// DeployContract deploys a contract on the state database in the executor.
+// It calls the evm.Create in geth. If the given leftOverGas is not enough, the contract will not be created.
 func (e *Executor) DeployContract(
 	txCtx gethvm.TxContext,
 	from common.Address,
 	code []byte,
 	value *uint256.Int,
-	gasLimit uint64,
+	leftOverGas uint64,
 ) (common.Address, uint64, error) {
 	evm := gethvm.NewEVM(e.bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 	// Create(Deploy) a contract.
-	_, contractAddress, gasUsed, err := evm.Create(from, code, gasLimit, value)
+	_, contractAddress, gasUsed, err := evm.Create(from, code, leftOverGas, value)
 	if err != nil {
 		return common.Address{}, 0, fmt.Errorf("failed to create contract: %w", err)
 	}
@@ -87,19 +90,23 @@ func (e *Executor) DeployContract(
 	return contractAddress, gasUsed, nil
 }
 
+// CallContract calls the contract with the given `to` address.
+// It calls the evm,Call in geth.
 func (e *Executor) CallContract(
 	txCtx gethvm.TxContext,
 	from, to common.Address,
 	data []byte,
 	value *uint256.Int,
-	gasLimit uint64,
+	leftOverGas uint64,
 ) ([]byte, uint64, error) {
 	evm := gethvm.NewEVM(e.bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 
-	return evm.Call(from, to, data, gasLimit, value)
+	return evm.Call(from, to, data, leftOverGas, value)
 }
 
+// Commit commits the stateDB in the executor.
+// Since the executor is committed, it should be aborted or re-created with a new blockCtx.
 func (e *Executor) Commit() ([]byte, error) {
 	root, err := e.stateDB.Commit(e.bCtx.BlockNumber.Uint64(), true, false)
 	if err != nil {
