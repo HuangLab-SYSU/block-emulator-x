@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb/leveldb"
+	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
@@ -62,14 +63,14 @@ func TestVM(t *testing.T) {
 	_ = os.RemoveAll(testVMStatePath)
 	t.Cleanup(func() { _ = os.RemoveAll(testVMStatePath) })
 
-	level, err := leveldb.New(testVMStatePath, 0, 0, "testVM", false)
-	db := rawdb.NewDatabase(level)
+	trDB := getTestTrieDatabase(t)
 
-	vmExec, err := NewExecutor(blockCtx, db, types.EmptyRootHash, config.VMCfg{VMStateDir: testVMStatePath})
+	vmExec, err := NewExecutor(blockCtx, trDB, types.EmptyRootHash, config.VMCfg{VMStateDir: testVMStatePath})
 	require.NoError(t, err)
 
 	// Set the init balance.
 	vmExec.StateDB().AddBalance(from, initialBalance, tracing.BalanceChangeTransfer)
+	require.Equal(t, vmExec.StateDB().GetBalance(from), initialBalance)
 
 	root1, err := vmExec.Commit()
 	require.NoError(t, err)
@@ -83,8 +84,11 @@ func TestVM(t *testing.T) {
 	blockCtx.BlockNumber = big.NewInt(blockNum + 1)
 
 	// New a vm executor with a new blockCtx.
-	vmExec, err = NewExecutor(blockCtx, db, types.EmptyRootHash, config.VMCfg{VMStateDir: testVMStatePath})
+	vmExec, err = NewExecutor(blockCtx, trDB, root1, config.VMCfg{VMStateDir: testVMStatePath})
 	require.NoError(t, err)
+
+	// The balance of from should be equal to the initial balance.
+	require.Equal(t, initialBalance, vmExec.StateDB().GetBalance(from))
 
 	// Deploy the contract.
 	contractAddr, _, err := vmExec.DeployContract(txContext, from, contractCode, txVal, leftOverGas)
@@ -105,4 +109,10 @@ func TestVM(t *testing.T) {
 	root2, err := vmExec.Commit()
 	require.NoError(t, err)
 	require.NotEqual(t, root1, root2)
+}
+
+func getTestTrieDatabase(t *testing.T) *triedb.Database {
+	level, err := leveldb.New(testVMStatePath, 0, 0, "testVM", false)
+	require.NoError(t, err)
+	return triedb.NewDatabase(rawdb.NewDatabase(level), &triedb.Config{Preimages: true, IsVerkle: false})
 }

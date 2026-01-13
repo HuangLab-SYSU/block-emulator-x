@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	gethvm "github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
@@ -24,7 +23,7 @@ const (
 // Executor wraps the functions of stateDB and evm of geth.
 // An executor should only be used in a block (i.e., BlockContext).
 // After updating the stateDB, the executor should be committed to save the modifications.
-// Not that, an executor should be aborted after its commit function is called.
+// Note that, a new executor should be created to handle the transactions in a following block.
 type Executor struct {
 	bCtx       gethvm.BlockContext
 	stateDB    *state.StateDB
@@ -33,17 +32,19 @@ type Executor struct {
 }
 
 // NewExecutor creates a new executor with given parameters.
-func NewExecutor(bCtx gethvm.BlockContext, edb ethdb.Database, curRoot [32]byte, cfg config.VMCfg) (*Executor, error) {
+func NewExecutor(
+	bCtx gethvm.BlockContext,
+	trDB *triedb.Database,
+	root common.Hash,
+	cfg config.VMCfg,
+) (*Executor, error) {
 	// Init state db.
-	trDB := triedb.NewDatabase(edb, &triedb.Config{Preimages: true, IsVerkle: false})
-	dbRoot := curRoot
-
-	sp, err := snapshot.New(snapshot.Config{CacheSize: snapshotCacheMB}, edb, trDB, dbRoot)
+	sp, err := snapshot.New(snapshot.Config{CacheSize: snapshotCacheMB}, trDB.Disk(), trDB, root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new a snapshot: %w", err)
 	}
 
-	stateDB, err := state.New(dbRoot, state.NewDatabase(trDB, sp))
+	stateDB, err := state.New(root, state.NewDatabase(trDB, sp))
 	if err != nil {
 		return nil, fmt.Errorf("failed to new a state database: %w", err)
 	}
@@ -107,11 +108,6 @@ func (e *Executor) CallContract(
 
 // Commit commits the stateDB in the executor.
 // Since the executor is committed, it should be aborted or re-created with a new blockCtx.
-func (e *Executor) Commit() ([]byte, error) {
-	root, err := e.stateDB.Commit(e.bCtx.BlockNumber.Uint64(), true, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to commit state: %w", err)
-	}
-
-	return root[:], nil
+func (e *Executor) Commit() (common.Hash, error) {
+	return e.stateDB.Commit(e.bCtx.BlockNumber.Uint64(), true, false)
 }
