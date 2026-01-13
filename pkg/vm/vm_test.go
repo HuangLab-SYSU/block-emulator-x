@@ -37,7 +37,7 @@ var (
 	}
 	from           = common.HexToAddress("0x8bc3d2a374df5e0b9abc0be98210751c0a8df04e")
 	initialBalance = uint256.NewInt(1000000000)
-	gasLimit       = uint64(530000)
+	leftOverGas    = uint64(530000)
 	txVal          = uint256.NewInt(0)
 	contractCode   = common.Hex2Bytes(
 		"6080604052348015600e575f5ffd5b506101298061001c5f395ff3fe6080604052348015600e575f5ffd5" +
@@ -50,9 +50,11 @@ var (
 			"446ca61080d46660ca34f7d6065d567c364736f6c634300081f0033",
 	)
 
+	// call: set(1)
 	setCallData = common.Hex2Bytes(
 		"60fe47b10000000000000000000000000000000000000000000000000000000000000001",
 	)
+	// call: get
 	getCallData = common.Hex2Bytes("6d4ce63c")
 )
 
@@ -69,7 +71,7 @@ func TestVM(t *testing.T) {
 	// Set the init balance.
 	vmExec.StateDB().AddBalance(from, initialBalance, tracing.BalanceChangeTransfer)
 
-	_, err = vmExec.StateDB().Commit(blockNum, true, false)
+	root1, err := vmExec.Commit()
 	require.NoError(t, err)
 
 	txContext := vm.TxContext{
@@ -77,22 +79,30 @@ func TestVM(t *testing.T) {
 		GasPrice: big.NewInt(100),
 	}
 
+	// Update the blockNum in blockCtx.
+	blockCtx.BlockNumber = big.NewInt(blockNum + 1)
+
+	// New a vm executor with a new blockCtx.
+	vmExec, err = NewExecutor(blockCtx, db, types.EmptyRootHash, config.VMCfg{VMStateDir: testVMStatePath})
+	require.NoError(t, err)
+
 	// Deploy the contract.
-	contractAddr, _, err := vmExec.DeployContract(txContext, from, contractCode, txVal, gasLimit)
+	contractAddr, _, err := vmExec.DeployContract(txContext, from, contractCode, txVal, leftOverGas)
 	require.NoError(t, err)
 
 	// Call `set` (1).
-	callResult, _, err := vmExec.CallContract(txContext, from, contractAddr, setCallData, txVal, gasLimit)
+	callResult, _, err := vmExec.CallContract(txContext, from, contractAddr, setCallData, txVal, leftOverGas)
 	require.NoError(t, err)
 	require.Len(t, callResult, 0)
 
 	// Call `get`.
-	callResult, _, err = vmExec.CallContract(txContext, from, contractAddr, getCallData, txVal, gasLimit)
+	callResult, _, err = vmExec.CallContract(txContext, from, contractAddr, getCallData, txVal, leftOverGas)
 	require.NoError(t, err)
 
 	resultInt := new(uint256.Int).SetBytes(callResult).Uint64()
 	require.Equal(t, resultInt, uint64(1))
 
-	_, err = vmExec.Commit()
+	root2, err := vmExec.Commit()
 	require.NoError(t, err)
+	require.NotEqual(t, root1, root2)
 }

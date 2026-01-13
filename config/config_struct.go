@@ -18,6 +18,7 @@ type BlockchainCfg struct {
 	SystemCfg
 	BloomFilterCfg `json:"bloom_filter" yaml:"bloom_filter"`
 	StorageCfg     `json:"storage"      yaml:"storage"`
+	VMCfg          `json:"vm"           yaml:"vm"`
 }
 
 type StorageCfg struct {
