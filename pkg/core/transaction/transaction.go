@@ -38,6 +38,7 @@ type Transaction struct {
 	Nonce       uint64
 	Signature   Signature
 	CreateTime  time.Time
+	Data        []byte
 
 	RelayTxOpt  // the optional setting only for relay transactions.
 	BrokerTxOpt // the optional setting only for broker transactions.
