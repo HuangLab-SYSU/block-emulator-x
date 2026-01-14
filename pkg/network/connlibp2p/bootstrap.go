@@ -20,57 +20,68 @@ import (
 
 const keyFile = "./pkg/network/connlibp2p/bootstrap.key"
 
-// load or create Ed25519 private key
-func (l *Libp2pConn) getBootstrapKey() (crypto.PrivKey, error) {
+// getBootstrapKey loads or creates Ed25519 private key.
+func (l *LibP2PConn) getBootstrapKey() (crypto.PrivKey, error) {
 
 	dir := filepath.Dir(keyFile)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create key dir: %w", err)
 	}
 
-	// load PK
+	// Load secret key from file.
 	if data, err := os.ReadFile(keyFile); err == nil {
-		priv, err := crypto.UnmarshalPrivateKey(data)
+		sk, err := crypto.UnmarshalPrivateKey(data)
 		if err != nil {
 			slog.Error("failed to unmarshal existing key, will generate new one", "error", err)
 		} else {
 			slog.Info("loaded existing private key", "from", keyFile)
-			return priv, nil
+			return sk, nil
 		}
 	} else {
 		slog.Error("failed to read file for getting the private key, will generate new one", "error", err)
 	}
 
-	// create PK and save
-	priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	// Create secret key and save to file.
+	sk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
 
-	data, err := crypto.MarshalPrivateKey(priv)
+	data, err := crypto.MarshalPrivateKey(sk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal key: %w", err)
 	}
 
-	if err := os.WriteFile(keyFile, data, 0600); err != nil {
+	if err = os.WriteFile(keyFile, data, 0600); err != nil {
 		return nil, fmt.Errorf("failed to save private key to %s: %w", keyFile, err)
-	} else {
-		slog.Info("saved new private key", "to", keyFile)
 	}
+	slog.Info("saved new private key", "to", keyFile)
 
-	return priv, nil
+	return sk, nil
 }
 
-func (l *Libp2pConn) initBootstrap() error {
+// initBootstrap inits the network settings for supervisor node.
+func (l *LibP2PConn) initBootstrap() (rErr error) {
+
+	var cleanups []func()
+
+	defer func() {
+		if rErr != nil {
+			for i := len(cleanups) - 1; i >= 0; i-- {
+				cleanups[i]()
+			}
+		}
+	}()
+
 	ctx := context.Background()
 
-	privKey, err := l.getBootstrapKey()
+	sk, err := l.getBootstrapKey()
 	if err != nil {
 		return fmt.Errorf("failed to get private key for libp2p communication: %w", err)
 	}
 
 	h, err := libp2p.New(
-		libp2p.Identity(privKey),
+		libp2p.Identity(sk),
 		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/12345"),
 		libp2p.EnableRelayService(),
 		libp2p.EnableNATService(),
@@ -80,13 +91,15 @@ func (l *Libp2pConn) initBootstrap() error {
 		return fmt.Errorf("failed to start libp2p: %w", err)
 	}
 
-	if _, err := relay.New(h); err != nil {
+	relayInst, err := relay.New(h)
+	if err != nil {
 		return fmt.Errorf("failed to start relay service:%w", err)
 	}
+	cleanups = append(cleanups, func() { _ = relayInst.Close() })
 	slog.Info("relay server running", "on", l.me)
 
-	h.SetStreamHandler(REGISTER_PROTOCOL, l.handleRegisterStream)
-	h.SetStreamHandler(PROTOCOL_ID, l.handleMessage)
+	h.SetStreamHandler(RegisterProtocol, l.handleRegisterStream)
+	h.SetStreamHandler(ProtocolId, l.handleMessage)
 
 	// start DHT server
 	kad, err := dht.New(ctx, h,
@@ -96,7 +109,7 @@ func (l *Libp2pConn) initBootstrap() error {
 	if err != nil {
 		return fmt.Errorf("failed to start DHT service:%w", err)
 	}
-
+	cleanups = append(cleanups, func() { _ = kad.Close() })
 	if err = kad.Bootstrap(ctx); err != nil {
 		return fmt.Errorf("failed to start bootstrap service:%w", err)
 	}
@@ -120,8 +133,12 @@ func (l *Libp2pConn) initBootstrap() error {
 	select {}
 }
 
-func (l *Libp2pConn) handleRegisterStream(s network.Stream) {
-	defer s.Close()
+func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
+	defer func(s network.Stream) {
+		err := s.Close()
+		if err != nil {
+		}
+	}(s)
 	data, err := io.ReadAll(s)
 	if err != nil {
 		slog.Error("failed to read from register stream", "error", err)
@@ -129,24 +146,33 @@ func (l *Libp2pConn) handleRegisterStream(s network.Stream) {
 	}
 
 	var info node2PeerIdInfo
-	if err := json.Unmarshal(data, &info); err != nil {
+	if err = json.Unmarshal(data, &info); err != nil {
 		slog.Error("invalid node info JSON", "from", s.Conn().RemotePeer(), "error", err)
-		s.Write([]byte("invalid json"))
-		if err := s.CloseWrite(); err != nil {
-			slog.Warn("failed to close write", "to", s.Conn().RemotePeer(), "error", err)
-			s.Reset()
+		_, err = s.Write([]byte("invalid json"))
+		if err != nil {
+			slog.Error("failed to send ACK", "to", s.Conn().RemotePeer(), "error", err)
+		}
+		if err = s.CloseWrite(); err != nil {
+			slog.Error("failed to close write", "to", s.Conn().RemotePeer(), "error", err)
+			err = s.Reset()
+			if err != nil {
+				return
+			}
 		}
 		return
 	}
 
-	// check if the peerID matches
+	// Check if the peerID matches.
 	remotePeer := s.Conn().RemotePeer().String()
 	if info.PeerID != remotePeer {
 		slog.Error("failed to match peerID", "claimed is", info.PeerID, "actually is", remotePeer)
-		s.Write([]byte("ailed to match peerID"))
-		if err := s.CloseWrite(); err != nil {
-			slog.Warn("failed to close write", "to", remotePeer, "error", err)
-			s.Reset()
+		_, err = s.Write([]byte("ailed to match peerID"))
+		if err != nil {
+			slog.Error("failed to send ACK", "to", remotePeer, "error", err)
+		}
+		if err = s.CloseWrite(); err != nil {
+			slog.Error("failed to close write", "to", remotePeer, "error", err)
+			_ = s.Reset()
 		}
 		return
 	}
@@ -161,22 +187,33 @@ func (l *Libp2pConn) handleRegisterStream(s network.Stream) {
 
 	// update the node topo map
 	l.topoMux.Lock()
-	l.NodeM.SetTopoGetter(l.info2Host)
+	err = l.NodeM.SetTopoGetter(l.info2Host)
 	l.topoMux.Unlock()
+	if err != nil {
+		slog.Error("failed to set topogetter map", "error", err)
+		return
+	}
 
 	slog.Info("registered node", "Shard:", info.ShardID, "Node:", info.NodeID, "Peer:", info.PeerID)
-	s.Write([]byte("registered successfully"))
-	if err := s.CloseWrite(); err != nil {
-		slog.Warn("failed to close write", "to", remotePeer, "error", err)
-		s.Reset()
+	_, err = s.Write([]byte("registered successfully"))
+	if err != nil {
+		slog.Error("failed to send ACK", "to", remotePeer, "error", err)
+	}
+	if err = s.CloseWrite(); err != nil {
+		slog.Error("failed to close write", "to", remotePeer, "error", err)
+		_ = s.Reset()
 	}
 
 	l.printRegisteredNodes()
-	l.broadcastNode2PeerIdInfos()
+	err = l.broadcastNode2PeerIdInfos()
+	if err != nil {
+		slog.Warn("failed to broadcast ID map", "to", "error", err)
+		return
+	}
 }
 
-// broadcast the updated ID Map
-func (l *Libp2pConn) broadcastNode2PeerIdInfos() error {
+// broadcastNode2PeerIdInfos broadcasts the updated ID Map.
+func (l *LibP2PConn) broadcastNode2PeerIdInfos() error {
 	data, err := json.Marshal(l.info2Host)
 
 	if err != nil {
@@ -194,30 +231,34 @@ func (l *Libp2pConn) broadcastNode2PeerIdInfos() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			s, err := l.hostInst.NewStream(ctx, pid, BROADCASTIDMAP_PROTOCOL)
+			s, err := l.hostInst.NewStream(ctx, pid, BroadcastIdMapProtocol)
 			if err != nil {
 				slog.Error("failed to open stream", "to", pid, "error", err)
 				return
-			}
-			defer s.Close()
 
-			if _, err := s.Write(data); err != nil {
+			}
+			defer func(s network.Stream) {
+				if err = s.Close(); err != nil {
+				}
+			}(s)
+
+			if _, err = s.Write(data); err != nil {
 				slog.Error("failed to send id map data", "to", pid, "error", err)
 			} else {
 				slog.Info("synced id map", "to", pid)
 			}
 
-			if err := s.CloseWrite(); err != nil {
-				slog.Warn("failed to close write", "to", pid, "error", err)
-				s.Reset()
+			if err = s.CloseWrite(); err != nil {
+				slog.Error("failed to close write", "to", pid, "error", err)
+				_ = s.Reset()
 			}
 		}(peerID)
 	}
 	return nil
 }
 
-// print the registered nodes list
-func (l *Libp2pConn) printRegisteredNodes() {
+// printRegisteredNodes prints the registered nodes list.
+func (l *LibP2PConn) printRegisteredNodes() {
 	slog.Info("Total registered shards", "count", len(l.info2Host))
 	for shardID, shardInfo := range l.info2Host {
 		for nodeID, nodeInfo := range shardInfo {

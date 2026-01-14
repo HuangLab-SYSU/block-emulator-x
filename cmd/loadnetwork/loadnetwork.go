@@ -48,8 +48,7 @@ func GetNetworkAndNodeInfo(cfg config.SystemCfg, lp *config.LocalParams) (networ
 	return p2p, m, nil
 }
 
-func InitNetworkAndNodeInfoWithLibp2pMode(lp *config.LocalParams) (network.P2PConn, error) {
-
+func InitNetworkAndNodeInfoWithLibP2PMode(lp *config.LocalParams) (network.P2PConn, error) {
 	slog.Info("local params is loaded successfully",
 		"shard id", lp.ShardID, "node id", lp.NodeID, "wallet addr", lp.WalletAddr)
 	meNode := nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}
@@ -59,7 +58,7 @@ func InitNetworkAndNodeInfoWithLibp2pMode(lp *config.LocalParams) (network.P2PCo
 	shardLeader := make(map[int64]nodetopo.NodeInfo)
 
 	m := nodetopo.NewTopoGetter(shardLeader, shardNodeInfo)
-	p2p := connlibp2p.NewLibp2pConn(meNode, m)
+	p2p := connlibp2p.NewLibP2PConn(meNode, m)
 
 	return p2p, nil
 }

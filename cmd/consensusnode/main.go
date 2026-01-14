@@ -84,19 +84,19 @@ func main() {
 		consensusNode.Start()
 
 	case config.LibP2PConnMode:
-		p2p, err = loadnetwork.InitNetworkAndNodeInfoWithLibp2pMode(lp)
+		p2p, err = loadnetwork.InitNetworkAndNodeInfoWithLibP2PMode(lp)
 		if err != nil {
 			log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
 		}
 
-		libp2pConn, ok := p2p.(*connlibp2p.Libp2pConn)
+		libP2PConn, ok := p2p.(*connlibp2p.LibP2PConn)
 		if !ok {
-			log.Fatal("unexpected P2PConn type; expected *connlibp2p.Libp2pConn")
+			log.Fatal("unexpected P2PConn type; expected *connlibp2p.LibP2PConn")
 		}
 
-		libp2pNodeM := libp2pConn.NodeM
-		if libp2pNodeM == nil {
-			log.Fatal("the Libp2pConn.NodeM is nil")
+		libP2PNodeM := libP2PConn.NodeM
+		if libP2PNodeM == nil {
+			log.Fatal("the LibP2PConn.NodeM is nil")
 		}
 
 		networkConn := network.NewConnHandler(p2p)
@@ -107,9 +107,9 @@ func main() {
 			}
 		}()
 
-		loadnetwork.WaitForNodeMapperReady(libp2pNodeM, cfg.GlobalSys)
+		loadnetwork.WaitForNodeMapperReady(libP2PNodeM, cfg.GlobalSys)
 
-		consensusNode, err := pbft.NewPBFTNode(networkConn, libp2pNodeM, cfg.ConsensusNodeCfg, *lp)
+		consensusNode, err := pbft.NewPBFTNode(networkConn, libP2PNodeM, cfg.ConsensusNodeCfg, *lp)
 		if err != nil {
 			log.Fatal(fmt.Errorf("failed to create a PBFT node: %w", err))
 		}

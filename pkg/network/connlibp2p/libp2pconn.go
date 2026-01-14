@@ -27,14 +27,14 @@ import (
 )
 
 const (
-	msgBufferSize           = 1 << 20
-	bootstrapPeerID         = "12D3KooWR6siPMZ2sMFKbgwaJFwQfnKczuPZnxHfyy1dHTzZSAUY"
-	PROTOCOL_ID             = "/myapp/chat/1.0.0"
-	REGISTER_PROTOCOL       = "/myapp/register/1.0.0"
-	BROADCASTIDMAP_PROTOCOL = "/myapp/broadcastIdMap/1.0.0"
+	msgBufferSize          = 1 << 20
+	bootstrapPeerID        = "12D3KooWR6siPMZ2sMFKbgwaJFwQfnKczuPZnxHfyy1dHTzZSAUY"
+	ProtocolId             = "/myapp/chat/1.0.0"
+	RegisterProtocol       = "/myapp/register/1.0.0"
+	BroadcastIdMapProtocol = "/myapp/broadcastIdMap/1.0.0"
 )
 
-type Libp2pConn struct {
+type LibP2PConn struct {
 	mux        sync.Mutex
 	infoMapMux sync.RWMutex
 
@@ -63,12 +63,12 @@ func init() {
 	golog.SetAllLoggers(golog.LevelError)
 }
 
-func NewLibp2pConn(me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *Libp2pConn {
+func NewLibP2PConn(me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *LibP2PConn {
 	info2Host := make(map[int64]map[int64]string)
 	info2Host[nodetopo.SupervisorShardID] = map[int64]string{
 		0: bootstrapPeerID,
 	}
-	return &Libp2pConn{
+	return &LibP2PConn{
 		me:        me,
 		info2Host: info2Host,
 		msgBuffer: make(chan *rpcserver.WrappedMsg, msgBufferSize),
@@ -76,14 +76,14 @@ func NewLibp2pConn(me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *Libp2pConn 
 	}
 }
 
-func (l *Libp2pConn) ListenStart() error {
+func (l *LibP2PConn) ListenStart() error {
 	if l.me.ShardID == 0x7fffffff && l.me.NodeID == 0 {
 		return l.initBootstrap()
 	}
-	return l.initLibp2pConnect()
+	return l.initLibP2PConnect()
 }
 
-func (l *Libp2pConn) initLibp2pConnect() error {
+func (l *LibP2PConn) initLibP2PConnect() error {
 	// hostAddr := "/ip4/" + params.RelayIP + "/tcp/" + strconv.Itoa(params.RelayPort) + "/p2p/" + params.RelayID
 	hostAddr := "/ip4/127.0.0.1/tcp/12345/p2p/" + bootstrapPeerID
 	l.once.Do(func() {
@@ -101,7 +101,7 @@ func (l *Libp2pConn) initLibp2pConnect() error {
 			return
 		}
 
-		// create host
+		// Create host.
 		h, err := libp2p.New(
 			libp2p.EnableAutoNATv2(),
 			libp2p.NATPortMap(),
@@ -115,7 +115,7 @@ func (l *Libp2pConn) initLibp2pConnect() error {
 			return
 		}
 
-		// try to connect the bootstrap node for 30 times
+		// Try to connect the bootstrap node for 30 times.
 		var connectErr error
 		maxRetries := 30
 		for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -136,7 +136,7 @@ func (l *Libp2pConn) initLibp2pConnect() error {
 			return
 		}
 
-		// start private DHT
+		// Start private DHT.
 		kad, err := dht.New(l.ctx, h,
 			dht.Mode(dht.ModeAuto),
 			dht.ProtocolPrefix("/myapp/kad/1.0.0"),
@@ -151,18 +151,18 @@ func (l *Libp2pConn) initLibp2pConnect() error {
 			return
 		}
 
-		// start mDNS
+		// Start mDNS.
 		mdnsService := mdns.NewMdnsService(h, "myapp.local", &mdnsNotifee{h: h})
 		if err = mdnsService.Start(); err != nil {
 			log.Printf("mDNS start failed (non-fatal): %v", err)
 		}
 
-		// set stream handler to recieve message from other client nodes
-		h.SetStreamHandler(PROTOCOL_ID, l.handleMessage)
-		// set stream handler to recieve id map message from supervisor nodes
-		h.SetStreamHandler(BROADCASTIDMAP_PROTOCOL, l.handleIdMapMessage)
+		// Set stream handler to receive message from other client nodes.
+		h.SetStreamHandler(ProtocolId, l.handleMessage)
+		// Set stream handler to receive id map message from supervisor nodes.
+		h.SetStreamHandler(BroadcastIdMapProtocol, l.handleIdMapMessage)
 
-		// record the connection type
+		// Record the connection type.
 		var (
 			mu        sync.Mutex
 			hasDirect = make(map[peer.ID]bool)
@@ -210,7 +210,7 @@ func (l *Libp2pConn) initLibp2pConnect() error {
 	return l.initErr
 }
 
-func (l *Libp2pConn) DrainMsgBuffer() []*rpcserver.WrappedMsg {
+func (l *LibP2PConn) DrainMsgBuffer() []*rpcserver.WrappedMsg {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 
@@ -226,17 +226,17 @@ func (l *Libp2pConn) DrainMsgBuffer() []*rpcserver.WrappedMsg {
 	}
 }
 
-func (l *Libp2pConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
+func (l *LibP2PConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
 	err := l.sendMessage(ctx, dest, msg)
 	if err != nil {
 		slog.ErrorContext(ctx, "SendMessage failed", "dest", dest, "err", err)
 	}
 }
 
-func (l *Libp2pConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
+func (l *LibP2PConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(group))
-	// broadcast to all nodes in this group
+	// Broadcast to all nodes in this group.
 	for _, node := range group {
 		go func(nif nodetopo.NodeInfo) {
 			defer wg.Done()
@@ -251,11 +251,11 @@ func (l *Libp2pConn) GroupBroadcastMessage(ctx context.Context, group []nodetopo
 	wg.Wait()
 }
 
-// close closes all the connections in the client pool.
-func (l *Libp2pConn) Close() {
+// Close closes all the connections in the client pool.
+func (l *LibP2PConn) Close() {
 }
 
-func (l *Libp2pConn) registerNodeInfo(me nodetopo.NodeInfo) error {
+func (l *LibP2PConn) registerNodeInfo(me nodetopo.NodeInfo) error {
 	if l.hostInst == nil || l.kadInst == nil {
 		return fmt.Errorf("libp2p not initialized")
 	}
@@ -279,29 +279,29 @@ func (l *Libp2pConn) registerNodeInfo(me nodetopo.NodeInfo) error {
 	ctxWithTimeout, cancel := context.WithTimeout(l.ctx, 10*time.Second)
 	defer cancel()
 
-	// create stream
+	// Create stream.
 	s, err := l.hostInst.NewStream(
 		network.WithAllowLimitedConn(ctxWithTimeout, "register"),
 		relayPeerID,
-		REGISTER_PROTOCOL,
+		RegisterProtocol,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to open register stream: %w", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
-	// send data
+	// Send data to supervisor.
 	_, err = s.Write(data)
 	if err != nil {
 		return fmt.Errorf("failed to send node info: %w", err)
 	}
 
-	if err := s.CloseWrite(); err != nil {
-		slog.Warn("failed to close write", "to", relayPeerID, "error", err)
-		s.Reset()
+	if err = s.CloseWrite(); err != nil {
+		slog.Error("failed to close write", "to", relayPeerID, "error", err)
+		_ = s.Reset()
 	}
 
-	// read ACK
+	// Read ACK from supervisor.
 	ack, err := io.ReadAll(s)
 	if err != nil {
 		l.initErr = fmt.Errorf("failed to read ACK: %w", err)
@@ -312,15 +312,14 @@ func (l *Libp2pConn) registerNodeInfo(me nodetopo.NodeInfo) error {
 	return nil
 }
 
-func (l *Libp2pConn) handleMessage(s network.Stream) {
-	defer s.Close()
+func (l *LibP2PConn) handleMessage(s network.Stream) {
+	defer func() { _ = s.Close() }()
 	data, err := io.ReadAll(s)
 	if err != nil {
 		slog.Error("failed to read stream", "from", string(s.Conn().RemotePeer()))
 	}
 	var msg rpcserver.WrappedMsg
-	if err := proto.Unmarshal(data, &msg); err != nil {
-		// if err := json.Unmarshal(data, &msg); err != nil {
+	if err = proto.Unmarshal(data, &msg); err != nil {
 		slog.Error("failed to unmarshal protobuf message",
 			"from", s.Conn().RemotePeer().String(),
 			"error", err,
@@ -328,11 +327,14 @@ func (l *Libp2pConn) handleMessage(s network.Stream) {
 		return
 	}
 	slog.Info("received message", "from", s.Conn().RemotePeer())
-	l.add2LocalBuffer(&msg)
+	err = l.add2LocalBuffer(&msg)
+	if err != nil {
+		slog.Error("failed to add message to local buffer")
+	}
 }
 
-func (l *Libp2pConn) handleIdMapMessage(s network.Stream) {
-	defer s.Close()
+func (l *LibP2PConn) handleIdMapMessage(s network.Stream) {
+	defer func() { _ = s.Close() }()
 	data := make([]byte, 4096)
 	n, err := s.Read(data)
 	if err != nil {
@@ -341,24 +343,28 @@ func (l *Libp2pConn) handleIdMapMessage(s network.Stream) {
 	}
 
 	var newMap map[int64]map[int64]string
-	if err := json.Unmarshal(data[:n], &newMap); err != nil {
+	if err = json.Unmarshal(data[:n], &newMap); err != nil {
 		slog.Error("failed to unmarshal id map from message stream")
 		return
 	}
 
-	// update the ID map
+	// Update the ID map.
 	l.infoMapMux.Lock()
 	l.info2Host = newMap
 	l.infoMapMux.Unlock()
 
-	// update the node topo map
+	// Update the nodetopo map.
 	l.topoMux.Lock()
-	l.NodeM.SetTopoGetter(l.info2Host)
+	err = l.NodeM.SetTopoGetter(l.info2Host)
 	l.topoMux.Unlock()
+	if err != nil {
+		slog.Error("failed to set topogetter map", "error", err)
+		return
+	}
 
 }
 
-func (l *Libp2pConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) error {
+func (l *LibP2PConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) error {
 	// if the dest node is me, add the message to the buffer directly
 	if l.me == dest {
 		return l.add2LocalBuffer(msg)
@@ -373,11 +379,11 @@ func (l *Libp2pConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, ms
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	s, err := l.hostInst.NewStream(ctxWithTimeout, targetID, PROTOCOL_ID)
+	s, err := l.hostInst.NewStream(ctxWithTimeout, targetID, ProtocolId)
 	if err != nil {
 		return fmt.Errorf("p2pDial failed to open stream to %s: %w", peerID, err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	// send data
 	data, err := proto.Marshal(msg)
@@ -390,14 +396,14 @@ func (l *Libp2pConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, ms
 
 	if err := s.CloseWrite(); err != nil {
 		slog.Warn("failed to close write", "to", peerID, "error", err)
-		s.Reset()
+		_ = s.Reset()
 	}
 
 	return nil
 
 }
 
-func (l *Libp2pConn) add2LocalBuffer(msg *rpcserver.WrappedMsg) error {
+func (l *LibP2PConn) add2LocalBuffer(msg *rpcserver.WrappedMsg) error {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 
