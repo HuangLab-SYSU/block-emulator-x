@@ -114,15 +114,8 @@ func (e *Executor) CallContract(
 
 // Commit commits the stateDB in the executor.
 // Since the executor is committed, it should be aborted or re-created with a new blockCtx.
-// Note that, the updates will not flush to the database.
 func (e *Executor) Commit() (common.Hash, error) {
 	return e.stateDB.Commit(e.bCtx.BlockNumber.Uint64(), true, false)
-}
-
-// TrieCommit commits the trie database in stateDB.
-// It will flush the updates into the disk.
-func (e *Executor) TrieCommit(root common.Hash) error {
-	return e.stateDB.Database().TrieDB().Commit(root, true)
 }
 
 func bigToUInt256(b *big.Int) (*uint256.Int, error) {

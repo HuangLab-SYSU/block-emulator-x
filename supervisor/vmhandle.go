@@ -94,9 +94,7 @@ func (v *VMHandle) HandleBlock(b block.Block) error {
 		return fmt.Errorf("commit state database in vm failed: %w", err)
 	}
 
-	if err = e.TrieCommit(root); err != nil {
-		return fmt.Errorf("commit trie databse in vm failed: %w", err)
-	}
+	slog.Info("handle block succeed", "new state root", root)
 
 	return nil
 }

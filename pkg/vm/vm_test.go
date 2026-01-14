@@ -74,10 +74,10 @@ func TestVM(t *testing.T) {
 	vmExec.StateDB().AddBalance(from, initialBalance, tracing.BalanceChangeTransfer)
 	require.Equal(t, vmExec.StateDB().GetBalance(from), initialBalance)
 
+	r1 := vmExec.StateDB().IntermediateRoot(true)
 	root1, err := vmExec.Commit()
 	require.NoError(t, err)
-	err = vmExec.TrieCommit(root1)
-	require.NoError(t, err)
+	require.Equal(t, r1, root1)
 
 	txContext := vm.TxContext{
 		Origin:   from,
@@ -113,9 +113,6 @@ func TestVM(t *testing.T) {
 	root2, err := vmExec.Commit()
 	require.NoError(t, err)
 	require.NotEqual(t, root1, root2)
-
-	err = vmExec.TrieCommit(root2)
-	require.NoError(t, err)
 }
 
 func getTestTrieDatabase(t *testing.T) *triedb.Database {
