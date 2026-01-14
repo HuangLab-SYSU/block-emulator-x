@@ -45,12 +45,12 @@ const (
 type LibP2PConn struct {
 	buffMux sync.Mutex
 
-	infoMapMux, topoMux sync.Mutex
-	NodeM               nodetopo.NodeMapper
+	infoMapMux sync.Mutex
+	NodeM      nodetopo.NodeMapper
 
-	me        nodetopo.NodeInfo
-	info2Host map[int64]map[int64]string
-	msgBuffer chan *rpcserver.WrappedMsg
+	me          nodetopo.NodeInfo
+	info2PeerID map[int64]map[int64]string
+	msgBuffer   chan *rpcserver.WrappedMsg
 
 	hostInst host.Host
 	kadInst  *dht.IpfsDHT
@@ -69,10 +69,10 @@ func NewLibP2PConn(me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *LibP2PConn 
 	info2Host[nodetopo.SupervisorShardID] = map[int64]string{0: bootstrapPeerID}
 
 	return &LibP2PConn{
-		me:        me,
-		info2Host: info2Host,
-		msgBuffer: make(chan *rpcserver.WrappedMsg, msgBufferSize),
-		NodeM:     nodeM,
+		me:          me,
+		info2PeerID: info2Host,
+		msgBuffer:   make(chan *rpcserver.WrappedMsg, msgBufferSize),
+		NodeM:       nodeM,
 	}
 }
 
@@ -305,27 +305,23 @@ func (l *LibP2PConn) handleIdMapMessage(s network.Stream) {
 
 	data, err := io.ReadAll(s)
 	if err != nil {
-		slog.Error("failed to read id map from message stream")
+		slog.Error("failed to read id map from message stream", "error", err)
 		return
 	}
 
 	var newMap map[int64]map[int64]string
 	if err = json.Unmarshal(data, &newMap); err != nil {
-		slog.Error("failed to unmarshal id map from message stream")
+		slog.Error("failed to unmarshal id map from message stream", "error", err)
 		return
 	}
 
 	// Update the ID map.
 	l.infoMapMux.Lock()
-	l.info2Host = newMap
+	l.info2PeerID = newMap
 	l.infoMapMux.Unlock()
 
 	// Update the nodetopo map.
-	l.topoMux.Lock()
-	defer l.topoMux.Unlock()
-
-	err = l.NodeM.SetTopoGetter(l.info2Host)
-	if err != nil {
+	if err = l.NodeM.SetTopoGetter(l.info2PeerID); err != nil {
 		slog.Error("failed to set topogetter map", "error", err)
 	}
 }
@@ -336,7 +332,7 @@ func (l *LibP2PConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, ms
 		return l.add2LocalBuffer(msg)
 	}
 
-	peerID := l.info2Host[dest.ShardID][dest.NodeID]
+	peerID := l.info2PeerID[dest.ShardID][dest.NodeID]
 
 	targetID, err := peer.Decode(peerID)
 	if err != nil {

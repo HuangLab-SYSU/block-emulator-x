@@ -153,24 +153,21 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 	// store Node2PeerIdInfo
 	l.infoMapMux.Lock()
 
-	if l.info2Host[info.ShardID] == nil {
-		l.info2Host[info.ShardID] = make(map[int64]string)
+	if l.info2PeerID[info.ShardID] == nil {
+		l.info2PeerID[info.ShardID] = make(map[int64]string)
 	}
 
-	l.info2Host[info.ShardID][info.NodeID] = info.PeerID
+	l.info2PeerID[info.ShardID][info.NodeID] = info.PeerID
 	l.infoMapMux.Unlock()
 
 	// update the node topo map
-	l.topoMux.Lock()
-	defer l.topoMux.Unlock()
-
-	err = l.NodeM.SetTopoGetter(l.info2Host)
+	err = l.NodeM.SetTopoGetter(l.info2PeerID)
 	if err != nil {
 		slog.Error("failed to set topogetter map", "error", err)
 		return
 	}
 
-	slog.Info("registered node", "Shard:", info.ShardID, "Node:", info.NodeID, "Peer:", info.PeerID)
+	slog.Info("registered node", "Shard", info.ShardID, "Node", info.NodeID, "Peer", info.PeerID)
 
 	_, err = s.Write([]byte("registered successfully"))
 	if err != nil {
@@ -192,7 +189,7 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 
 // broadcastNode2PeerIdInfos broadcasts the updated ID Map.
 func (l *LibP2PConn) broadcastNode2PeerIdInfos() error {
-	data, err := json.Marshal(l.info2Host)
+	data, err := json.Marshal(l.info2PeerID)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Node2PeerIdInfos: %w", err)
 	}
@@ -236,11 +233,11 @@ func (l *LibP2PConn) broadcastNode2PeerIdInfos() error {
 
 // printRegisteredNodes prints the registered nodes list.
 func (l *LibP2PConn) printRegisteredNodes() {
-	slog.Info("Total registered shards", "count", len(l.info2Host))
+	slog.Info("Total registered shards", "count", len(l.info2PeerID))
 
-	for shardID, shardInfo := range l.info2Host {
+	for shardID, shardInfo := range l.info2PeerID {
 		for nodeID, nodeInfo := range shardInfo {
-			slog.Info("  - ", "Shard:", shardID, "Node:", nodeID, "Peer:", nodeInfo)
+			slog.Info("register node info", "Shard", shardID, "Node", nodeID, "Peer", nodeInfo)
 		}
 	}
 }
