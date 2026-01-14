@@ -12,11 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb/leveldb"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-
-	"github.com/HuangLab-SYSU/block-emulator-x/config"
 )
 
 const (
@@ -63,9 +62,11 @@ func TestVM(t *testing.T) {
 	_ = os.RemoveAll(testVMStatePath)
 	t.Cleanup(func() { _ = os.RemoveAll(testVMStatePath) })
 
+	// Set the chainID to the chainConfig.
+	cc := params.MainnetChainConfig
 	trDB := getTestTrieDatabase(t)
 
-	vmExec, err := NewExecutor(blockCtx, trDB, types.EmptyRootHash, config.VMCfg{VMStateDir: testVMStatePath})
+	vmExec, err := NewExecutor(blockCtx, trDB, types.EmptyRootHash, cc)
 	require.NoError(t, err)
 
 	// Set the init balance.
@@ -86,7 +87,7 @@ func TestVM(t *testing.T) {
 	blockCtx.BlockNumber = big.NewInt(blockNum + 1)
 
 	// New a vm executor with a new blockCtx.
-	vmExec, err = NewExecutor(blockCtx, trDB, root1, config.VMCfg{VMStateDir: testVMStatePath})
+	vmExec, err = NewExecutor(blockCtx, trDB, root1, cc)
 	require.NoError(t, err)
 
 	// The balance of from should be equal to the initial balance.

@@ -2,7 +2,6 @@ package vm
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -11,8 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
-
-	"github.com/HuangLab-SYSU/block-emulator-x/config"
 )
 
 const (
@@ -36,7 +33,7 @@ func NewExecutor(
 	bCtx gethvm.BlockContext,
 	trDB *triedb.Database,
 	root common.Hash,
-	cfg config.VMCfg,
+	vmChainCfg *params.ChainConfig,
 ) (*Executor, error) {
 	// Init state db.
 	sp, err := snapshot.New(snapshot.Config{CacheSize: snapshotCacheMB}, trDB.Disk(), trDB, root)
@@ -49,10 +46,6 @@ func NewExecutor(
 		return nil, fmt.Errorf("failed to new a state database: %w", err)
 	}
 
-	// Set the chainID to the chainConfig.
-	cc := *params.MainnetChainConfig
-	cc.ChainID = big.NewInt(cfg.ChainID)
-
 	// Set the evmCfg config for evmCfg.
 	evmCfg := gethvm.Config{
 		ExtraEips: []int{EIP3855},
@@ -61,7 +54,7 @@ func NewExecutor(
 	return &Executor{
 		bCtx:       bCtx,
 		stateDB:    stateDB,
-		vmChainCfg: &cc,
+		vmChainCfg: vmChainCfg,
 		evmCfg:     evmCfg,
 	}, nil
 }
