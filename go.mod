@@ -5,6 +5,7 @@ go 1.24.6
 toolchain go1.24.10
 
 require (
+	github.com/avast/retry-go/v4 v4.7.0
 	github.com/bits-and-blooms/bitset v1.24.4
 	github.com/ethereum/go-ethereum v1.16.7
 	github.com/ipfs/go-log/v2 v2.9.0

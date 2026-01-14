@@ -107,29 +107,40 @@ func WaitForNodeMapperReady(nodeM nodetopo.NodeMapper, cfg config.SystemCfg) {
 		case <-ticker.C:
 			// nodetopo 须符合条件： 1.分片Leader与数量正确；2.分片内节点数量正确
 			ready := true
+
 			allLeaders, err := nodeM.GetAllLeaders()
 			if err != nil {
 				slog.Error("failed to get all leaders in nodetopo")
 			}
+
 			if len(allLeaders) != int(cfg.ShardNum) {
 				slog.Warn("count of shards is not correct")
 				continue
 			}
+
 			for shardID := int64(0); shardID < cfg.ShardNum; shardID++ {
 				if _, err := nodeM.GetLeader(shardID); err != nil {
 					slog.Error("failed to get leader in", "shard", shardID)
+
 					ready = false
+
 					break
 				}
+
 				shardInfo, err := nodeM.GetNodesInShard(shardID)
 				if err != nil {
 					slog.Error("failed to get all nodes in", "shard", shardID)
+
 					ready = false
+
 					break
 				}
+
 				if len(shardInfo) != int(cfg.NodeNum) {
 					slog.Warn("count of nodes is not correct in", "shard", shardID)
+
 					ready = false
+
 					break
 				}
 			}
