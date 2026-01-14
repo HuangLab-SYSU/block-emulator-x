@@ -2,6 +2,7 @@ package vm
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -10,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
+
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 )
 
 const (
@@ -68,15 +71,20 @@ func (e *Executor) StateDB() *state.StateDB {
 // It calls the evm.Create in geth. If the given leftOverGas is not enough, the contract will not be created.
 func (e *Executor) DeployContract(
 	txCtx gethvm.TxContext,
-	from common.Address,
+	from account.Address,
 	code []byte,
-	value *uint256.Int,
+	value *big.Int,
 	leftOverGas uint64,
 ) (common.Address, uint64, error) {
+	uValue, err := bigToUInt256(value)
+	if err != nil {
+		return common.Address{}, 0, fmt.Errorf("failed to convert value to uint256: %w", err)
+	}
+
 	evm := gethvm.NewEVM(e.bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 	// Create(Deploy) a contract.
-	_, contractAddress, gasUsed, err := evm.Create(from, code, leftOverGas, value)
+	_, contractAddress, gasUsed, err := evm.Create(common.Address(from), code, leftOverGas, uValue)
 	if err != nil {
 		return common.Address{}, 0, fmt.Errorf("failed to create contract: %w", err)
 	}
@@ -88,15 +96,20 @@ func (e *Executor) DeployContract(
 // It calls the evm,Call in geth.
 func (e *Executor) CallContract(
 	txCtx gethvm.TxContext,
-	from, to common.Address,
+	from, to account.Address,
 	data []byte,
-	value *uint256.Int,
+	value *big.Int,
 	leftOverGas uint64,
 ) ([]byte, uint64, error) {
+	uValue, err := bigToUInt256(value)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to convert value to uint256: %w", err)
+	}
+
 	evm := gethvm.NewEVM(e.bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 
-	return evm.Call(from, to, data, leftOverGas, value)
+	return evm.Call(common.Address(from), common.Address(to), data, leftOverGas, uValue)
 }
 
 // Commit commits the stateDB in the executor.
@@ -110,4 +123,17 @@ func (e *Executor) Commit() (common.Hash, error) {
 // It will flush the updates into the disk.
 func (e *Executor) TrieCommit(root common.Hash) error {
 	return e.stateDB.Database().TrieDB().Commit(root, true)
+}
+
+func bigToUInt256(b *big.Int) (*uint256.Int, error) {
+	if b.Sign() < 0 {
+		return nil, fmt.Errorf("the input big int is a negative number")
+	}
+
+	u, overflow := uint256.FromBig(b)
+	if overflow {
+		return nil, fmt.Errorf("call FromBig overflow")
+	}
+
+	return u, nil
 }

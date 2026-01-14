@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -38,7 +39,7 @@ var (
 	from           = common.HexToAddress("0x8bc3d2a374df5e0b9abc0be98210751c0a8df04e")
 	initialBalance = uint256.NewInt(1000000000)
 	leftOverGas    = uint64(530000)
-	txVal          = uint256.NewInt(0)
+	txVal          = big.NewInt(0)
 	contractCode   = common.Hex2Bytes(
 		"6080604052348015600e575f5ffd5b506101298061001c5f395ff3fe6080604052348015600e575f5ffd5" +
 			"b50600436106030575f3560e01c806360fe47b11460345780636d4ce63c14604c575b5f5ffd5b604a6004" +
@@ -94,16 +95,16 @@ func TestVM(t *testing.T) {
 	require.Equal(t, initialBalance, vmExec.StateDB().GetBalance(from))
 
 	// Deploy the contract.
-	contractAddr, _, err := vmExec.DeployContract(txContext, from, contractCode, txVal, leftOverGas)
+	contractAddr, _, err := vmExec.DeployContract(txContext, account.Address(from), contractCode, txVal, leftOverGas)
 	require.NoError(t, err)
 
 	// Call `set` (1).
-	callResult, _, err := vmExec.CallContract(txContext, from, contractAddr, setCallData, txVal, leftOverGas)
+	callResult, _, err := vmExec.CallContract(txContext, account.Address(from), account.Address(contractAddr), setCallData, txVal, leftOverGas)
 	require.NoError(t, err)
 	require.Len(t, callResult, 0)
 
 	// Call `get`.
-	callResult, _, err = vmExec.CallContract(txContext, from, contractAddr, getCallData, txVal, leftOverGas)
+	callResult, _, err = vmExec.CallContract(txContext, account.Address(from), account.Address(contractAddr), getCallData, txVal, leftOverGas)
 	require.NoError(t, err)
 
 	resultInt := new(uint256.Int).SetBytes(callResult).Uint64()
