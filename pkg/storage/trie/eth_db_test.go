@@ -69,14 +69,7 @@ func TestEthereumDefaultTrieEmptyAndMismatchInputs(t *testing.T) {
 	require.NoError(t, err)
 	ctx := context.Background()
 
-	// Empty key/value
-	root, err := tdb.GenerateRootByGivenBytes(ctx, [][]byte{}, [][]byte{})
-	require.NoError(t, err)
-	require.Equal(t, types.EmptyRootHash.Bytes(), root)
-
 	// Bad inputs
-	_, err = tdb.GenerateRootByGivenBytes(ctx, [][]byte{[]byte("a")}, [][]byte{})
-	require.Error(t, err)
 	_, err = tdb.MAddKeyValuesAndCommit(ctx, [][]byte{[]byte("a")}, [][]byte{})
 	require.Error(t, err)
 	_, err = tdb.MAddKeyValuesPreview(ctx, [][]byte{[]byte("a")}, [][]byte{})

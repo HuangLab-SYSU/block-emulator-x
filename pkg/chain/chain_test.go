@@ -131,8 +131,8 @@ func addMigrationBlockAndCheck(t *testing.T, bc *Chain) {
 	// Generate a migration block.
 	migratedB, err := bc.GenerateBlock(ctx, testMiner, block.TxBlockType, block.Body{},
 		block.MigrationOpt{
-			MigratedAccounts: []account.Address{testSender},
-			MigratedStates:   []account.State{*account.NewState(testSender, testLoc)},
+			MigratedAddrs:  []account.Address{testSender},
+			MigratedStates: []account.State{*account.NewState(testSender, testLoc)},
 		},
 	)
 	require.NoError(t, err)

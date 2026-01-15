@@ -36,7 +36,7 @@ type TxHeaderOpt struct {
 // MigrationHeaderOpt is the struct for the account migration.
 // This struct should be used when this block is an account migration one.
 type MigrationHeaderOpt struct {
-	MigratedAccountsRoot []byte // MigratedAccountsRoot is the Merkle root of MigratedAccounts in MigrationOpt.
+	MigratedAccountsRoot []byte // MigratedAccountsRoot is the Merkle root of MigratedAddrs in MigrationOpt.
 }
 
 // Encode encodes blockHeaders.

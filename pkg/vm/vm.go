@@ -10,9 +10,9 @@ import (
 	gethvm "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/triedb"
-	"github.com/holiman/uint256"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
 )
 
 const (
@@ -25,19 +25,13 @@ const (
 // After updating the stateDB, the executor should be committed to save the modifications.
 // Note that, a new executor should be created to handle the transactions in a following block.
 type Executor struct {
-	bCtx       gethvm.BlockContext
 	stateDB    *state.StateDB
 	vmChainCfg *params.ChainConfig
 	evmCfg     gethvm.Config
 }
 
 // NewExecutor creates a new executor with given parameters.
-func NewExecutor(
-	bCtx gethvm.BlockContext,
-	trDB *triedb.Database,
-	root common.Hash,
-	vmChainCfg *params.ChainConfig,
-) (*Executor, error) {
+func NewExecutor(trDB *triedb.Database, root common.Hash, vmChainCfg *params.ChainConfig) (*Executor, error) {
 	// Init state db.
 	sp, err := snapshot.New(snapshot.Config{CacheSize: snapshotCacheMB}, trDB.Disk(), trDB, root)
 	if err != nil {
@@ -55,7 +49,6 @@ func NewExecutor(
 	}
 
 	return &Executor{
-		bCtx:       bCtx,
 		stateDB:    stateDB,
 		vmChainCfg: vmChainCfg,
 		evmCfg:     evmCfg,
@@ -70,18 +63,19 @@ func (e *Executor) StateDB() *state.StateDB {
 // DeployContract deploys a contract on the state database in the executor.
 // It calls the evm.Create in geth. If the given leftOverGas is not enough, the contract will not be created.
 func (e *Executor) DeployContract(
+	bCtx gethvm.BlockContext,
 	txCtx gethvm.TxContext,
 	from account.Address,
 	code []byte,
 	value *big.Int,
 	leftOverGas uint64,
 ) (common.Address, uint64, error) {
-	uValue, err := bigToUInt256(value)
+	uValue, err := utils.BigToUInt256(value)
 	if err != nil {
 		return common.Address{}, 0, fmt.Errorf("failed to convert value to uint256: %w", err)
 	}
 
-	evm := gethvm.NewEVM(e.bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
+	evm := gethvm.NewEVM(bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 	// Create(Deploy) a contract.
 	_, contractAddress, gasUsed, err := evm.Create(common.Address(from), code, leftOverGas, uValue)
@@ -95,18 +89,19 @@ func (e *Executor) DeployContract(
 // CallContract calls the contract with the given `to` address.
 // It calls the evm,Call in geth.
 func (e *Executor) CallContract(
+	bCtx gethvm.BlockContext,
 	txCtx gethvm.TxContext,
 	from, to account.Address,
 	data []byte,
 	value *big.Int,
 	leftOverGas uint64,
 ) ([]byte, uint64, error) {
-	uValue, err := bigToUInt256(value)
+	uValue, err := utils.BigToUInt256(value)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to convert value to uint256: %w", err)
 	}
 
-	evm := gethvm.NewEVM(e.bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
+	evm := gethvm.NewEVM(bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 
 	return evm.Call(common.Address(from), common.Address(to), data, leftOverGas, uValue)
@@ -114,19 +109,6 @@ func (e *Executor) CallContract(
 
 // Commit commits the stateDB in the executor.
 // Since the executor is committed, it should be aborted or re-created with a new blockCtx.
-func (e *Executor) Commit() (common.Hash, error) {
-	return e.stateDB.Commit(e.bCtx.BlockNumber.Uint64(), true, false)
-}
-
-func bigToUInt256(b *big.Int) (*uint256.Int, error) {
-	if b.Sign() < 0 {
-		return nil, fmt.Errorf("the input big int is a negative number")
-	}
-
-	u, overflow := uint256.FromBig(b)
-	if overflow {
-		return nil, fmt.Errorf("call FromBig overflow")
-	}
-
-	return u, nil
+func (e *Executor) Commit(blockNumber uint64) (common.Hash, error) {
+	return e.stateDB.Commit(blockNumber, true, false)
 }

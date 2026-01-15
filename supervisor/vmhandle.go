@@ -59,7 +59,7 @@ func (v *VMHandle) HandleBlock(b block.Block) error {
 		Time:        uint64(b.CreateTime.Second()),
 	}
 
-	e, err := vm.NewExecutor(bCtx, v.trDB, v.root, v.vmChainCfg)
+	e, err := vm.NewExecutor(v.trDB, v.root, v.vmChainCfg)
 	if err != nil {
 		return fmt.Errorf("new an vm executor failed: %w", err)
 	}
@@ -71,14 +71,14 @@ func (v *VMHandle) HandleBlock(b block.Block) error {
 		}
 		switch tx.TxType() {
 		case transaction.CreateContractTxType:
-			contractAddr, gasUsed, err := e.DeployContract(txCtx, tx.Sender, tx.Data, tx.Value, unlimitedGas)
+			contractAddr, gasUsed, err := e.DeployContract(bCtx, txCtx, tx.Sender, tx.Data, tx.Value, unlimitedGas)
 			if err != nil {
 				slog.Error("deploy contract tx failed", "err", err)
 			} else {
 				slog.Info("deploy contract succeed", "contractAddr", contractAddr, "gasUsed", gasUsed)
 			}
 		case transaction.CallContractTxType:
-			ret, gasLeft, err := e.CallContract(txCtx, tx.Sender, tx.Recipient, tx.Data, tx.Value, unlimitedGas)
+			ret, gasLeft, err := e.CallContract(bCtx, txCtx, tx.Sender, tx.Recipient, tx.Data, tx.Value, unlimitedGas)
 			if err != nil {
 				slog.Error("deploy contract tx failed", "err", err)
 			} else {
@@ -89,7 +89,7 @@ func (v *VMHandle) HandleBlock(b block.Block) error {
 		}
 	}
 
-	root, err := e.Commit()
+	root, err := e.Commit(bCtx.BlockNumber.Uint64())
 	if err != nil {
 		return fmt.Errorf("commit state database in vm failed: %w", err)
 	}

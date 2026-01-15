@@ -81,6 +81,6 @@ func ConvertBlock2Line(b *Block) ([]string, error) {
 		hex.EncodeToString(b.TxRoot),               // "TxRoot"
 		fmt.Sprintf("%d", len(b.TxList)),           // "TxBodyLen"
 		hex.EncodeToString(b.MigratedAccountsRoot), // "MigratedAccountsRoot"
-		fmt.Sprintf("%d", len(b.MigratedAccounts)), // "MigrationAccountLen"
+		fmt.Sprintf("%d", len(b.MigratedAddrs)),    // "MigrationAccountLen"
 	}, nil
 }

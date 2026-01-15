@@ -17,6 +17,11 @@ const (
 )
 
 func newVMTrieDB(cfg config.StorageCfg, lp config.LocalParams) (*triedb.Database, error) {
+	if cfg.IsMemoryDB {
+		db := rawdb.NewMemoryDatabase()
+		return triedb.NewDatabase(rawdb.NewDatabase(db), &triedb.Config{Preimages: true, IsVerkle: false}), nil
+	}
+
 	level, err := leveldb.New(
 		filepath.Join(cfg.LevelFilePathDir, fmt.Sprintf(vmStateDBFilePathFmt, lp.ShardID, lp.NodeID)),
 		0, 0, vmStateNameSpace, false)

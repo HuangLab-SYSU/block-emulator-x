@@ -16,11 +16,11 @@ var ErrNotEnoughBalance = errors.New("not enough balance")
 // Note that, to meet the compatible to evm, `ShardLocation` will be stored in a single mpt,
 // while other will be set to a state db.
 type State struct {
-	Account     Account
+	Address     Address
 	Nonce       uint64
 	Balance     *big.Int
 	StorageRoot []byte // storage root of contract structure
-	CodeHash    []byte // the code hash of the smart contract account
+	Code        []byte // the code hash of the smart contract account
 
 	// ShardLocation is only used in sharding blockchain.
 	// It is to denotes the location of an account.
@@ -28,15 +28,15 @@ type State struct {
 	ShardLocation uint64
 }
 
-func NewState(addr Address, loc int64) *State {
+func NewState(addr Address, loc uint64) *State {
 	var b big.Int
 	b.SetString(initBalanceStr, 10)
 
 	return &State{
-		Account: Account{Addr: addr},
+		Address: addr,
 		Balance: &b,
 
-		ShardLocation: uint64(loc),
+		ShardLocation: loc,
 	}
 }
 
