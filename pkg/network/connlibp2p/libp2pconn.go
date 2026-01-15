@@ -46,7 +46,7 @@ type LibP2PConn struct {
 	buffMux sync.Mutex
 
 	infoMapMux sync.Mutex
-	NodeM      nodetopo.NodeMapper
+	nodeM      nodetopo.NodeMapper
 
 	me          nodetopo.NodeInfo
 	info2PeerID map[int64]map[int64]string
@@ -72,7 +72,7 @@ func NewLibP2PConn(me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *LibP2PConn 
 		me:          me,
 		info2PeerID: info2Host,
 		msgBuffer:   make(chan *rpcserver.WrappedMsg, msgBufferSize),
-		NodeM:       nodeM,
+		nodeM:       nodeM,
 	}
 }
 
@@ -321,7 +321,7 @@ func (l *LibP2PConn) handleIdMapMessage(s network.Stream) {
 	l.infoMapMux.Unlock()
 
 	// Update the nodetopo map.
-	if err = l.NodeM.SetTopoGetter(l.info2PeerID); err != nil {
+	if err = l.nodeM.SetTopoGetter(l.info2PeerID); err != nil {
 		slog.Error("failed to set topogetter map", "error", err)
 	}
 }

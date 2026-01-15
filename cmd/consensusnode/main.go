@@ -12,8 +12,6 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/consensus/pbft"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/logger"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/connlibp2p"
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 
 	_ "net/http/pprof"
 )
@@ -36,12 +34,6 @@ var (
 func main() {
 	flag.Parse()
 
-	var (
-		p2p   network.P2PConn
-		nodeM nodetopo.NodeMapper
-		err   error
-	)
-
 	lp, err := config.LoadLocalParams()
 	if err != nil {
 		log.Fatal(fmt.Errorf("config.LoadLocalParams: %w", err))
@@ -63,67 +55,17 @@ func main() {
 
 	defer logger.CloseLoggerFile()
 
-	switch cfg.CommunicationMode {
-	case config.DirectConnMode:
-		p2p, nodeM, err = loadnetwork.GetNetworkAndNodeInfo(cfg.GlobalSys, lp)
-		if err != nil {
-			log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
-		}
-
-		networkConn := network.NewConnHandler(p2p)
-
-		consensusNode, err := pbft.NewPBFTNode(networkConn, nodeM, cfg.ConsensusNodeCfg, *lp)
-		if err != nil {
-			log.Fatal(fmt.Errorf("new a PBFT node failed: %w", err))
-		}
-
-		// start gRPC server
-		go func() {
-			if err = p2p.ListenStart(); err != nil {
-				log.Panic(fmt.Errorf("failed to start listening: %w", err))
-			}
-		}()
-
-		time.Sleep(nodeWaitingTime)
-
-		consensusNode.Start()
-
-	case config.LibP2PConnMode:
-		p2p, err = loadnetwork.InitNetworkAndNodeInfoWithLibP2PMode(lp)
-		if err != nil {
-			log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
-		}
-
-		libP2PConn, ok := p2p.(*connlibp2p.LibP2PConn)
-		if !ok {
-			log.Fatal("unexpected P2PConn type; expected *connlibp2p.LibP2PConn")
-		}
-
-		libP2PNodeM := libP2PConn.NodeM
-		if libP2PNodeM == nil {
-			log.Fatal("the LibP2PConn.NodeM is nil")
-		}
-
-		networkConn := network.NewConnHandler(p2p)
-		// start gRPC server
-		go func() {
-			if err = p2p.ListenStart(); err != nil {
-				log.Panic(fmt.Errorf("failed to start listening: %w", err))
-			}
-		}()
-
-		loadnetwork.WaitForNodeMapperReady(libP2PNodeM, cfg.GlobalSys)
-
-		consensusNode, err := pbft.NewPBFTNode(networkConn, libP2PNodeM, cfg.ConsensusNodeCfg, *lp)
-		if err != nil {
-			log.Fatal(fmt.Errorf("failed to create a PBFT node: %w", err))
-		}
-
-		time.Sleep(nodeWaitingTime)
-
-		consensusNode.Start()
-
-	default:
-		log.Fatal(fmt.Errorf("unsupported communication mode: %s", cfg.CommunicationMode))
+	p2p, nodeM, err := loadnetwork.PrepareNetworkByCfg(cfg, lp)
+	if err != nil {
+		log.Fatal(fmt.Errorf("prepare network: %w", err))
 	}
+
+	consensusNode, err := pbft.NewPBFTNode(network.NewConnHandler(p2p), nodeM, cfg.ConsensusNodeCfg, *lp)
+	if err != nil {
+		log.Fatal(fmt.Errorf("failed to create a PBFT node: %w", err))
+	}
+
+	time.Sleep(nodeWaitingTime)
+
+	consensusNode.Start()
 }
