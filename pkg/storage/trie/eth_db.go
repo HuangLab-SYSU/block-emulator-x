@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	levelDBNamespace    = "trie"
+	levelDBNamespace    = "shard_loc_trie"
 	defaultLevelCache   = 16
 	defaultLevelHandler = 16
-	levelDBFilePathFmt  = "shard_%d_node_%d"
+	levelDBFilePathFmt  = "account_loc_shard_%d_node_%d"
 )
 
 type EthereumDefaultTrieDB struct {

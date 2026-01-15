@@ -18,6 +18,10 @@ type Header struct {
 	Miner           account.Address
 	CreateTime      time.Time
 
+	// LocationRoot is only used in a sharded blockchain system to denotes the root of location trie.
+	// This trie is used to store the account location.
+	LocationRoot []byte
+
 	TxHeaderOpt
 	MigrationHeaderOpt
 }

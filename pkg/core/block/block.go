@@ -22,6 +22,7 @@ var RecordTitle = []string{
 	"StateRoot",
 	"Number",
 	"CreateTime",
+	"LocationRoot",
 	"TxRoot",
 	"TxBodyLen",
 	"MigratedAccountsRoot",
@@ -76,6 +77,7 @@ func ConvertBlock2Line(b *Block) ([]string, error) {
 		hex.EncodeToString(b.StateRoot),            // "StateRoot"
 		fmt.Sprintf("%d", b.Number),                // "Number"
 		utils.ConvertTime2Str(b.CreateTime),        // "CreateTime"
+		hex.EncodeToString(b.LocationRoot),         // "LocationRoot"
 		hex.EncodeToString(b.TxRoot),               // "TxRoot"
 		fmt.Sprintf("%d", len(b.TxList)),           // "TxBodyLen"
 		hex.EncodeToString(b.MigratedAccountsRoot), // "MigratedAccountsRoot"

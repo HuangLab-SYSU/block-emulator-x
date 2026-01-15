@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/exp/maps"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
@@ -24,12 +26,13 @@ const blocksFetchLimit = 100
 
 // Chain describes a blockchain.
 type Chain struct {
-	s         *storage.Storage // the storage for both block-storage and trie-storage.
+	s         *storage.Storage // the storage for both block-storage, trie-storage and geth's state db.
 	curHeader block.Header     // the current header in this blockchain.
 	shardID   int64
 	epochID   int64
 
-	cfg config.BlockchainCfg
+	cfg        config.BlockchainCfg
+	vmChainCfg *params.ChainConfig
 
 	mux sync.Mutex
 }
@@ -41,12 +44,17 @@ func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
 		return nil, err
 	}
 
+	vmChainCfg := *params.MainnetChainConfig
+	vmChainCfg.ChainID = big.NewInt(cfg.ChainID)
+
 	chain := &Chain{
-		shardID:   lp.ShardID,
-		epochID:   0,
 		s:         s,
-		cfg:       cfg,
 		curHeader: block.Header{},
+		epochID:   0,
+		shardID:   lp.ShardID,
+
+		cfg:        cfg,
+		vmChainCfg: &vmChainCfg,
 	}
 
 	genesisBlock, err := chain.initWithGenesisBlock()
@@ -302,7 +310,7 @@ func (c *Chain) Close() error {
 		return fmt.Errorf("close block storage err: %w", err)
 	}
 
-	err = c.s.TrieStorage.Close()
+	err = c.s.LocStorage.Close()
 	if err != nil {
 		return fmt.Errorf("close trie storage err: %w", err)
 	}
@@ -333,7 +341,7 @@ func (c *Chain) previewStateRootByBlock(ctx context.Context, b *block.Block) ([]
 		return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
 	}
 
-	root, err := c.s.TrieStorage.MAddKeyValuesPreview(ctx, keys, values)
+	root, err := c.s.LocStorage.MAddKeyValuesPreview(ctx, keys, values)
 	if err != nil {
 		return nil, fmt.Errorf("preview updated accounts err: %w", err)
 	}
@@ -347,7 +355,7 @@ func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, 
 		return nil, fmt.Errorf("calculate the modified accounts bytes by the given block err: %w", err)
 	}
 
-	root, err := c.s.TrieStorage.MAddKeyValuesAndCommit(ctx, keys, values)
+	root, err := c.s.LocStorage.MAddKeyValuesAndCommit(ctx, keys, values)
 	if err != nil {
 		return nil, fmt.Errorf("commit updated accounts err: %w", err)
 	}
@@ -568,7 +576,7 @@ func (c *Chain) calcTxHeaderOpt(ctx context.Context, body block.Body) (*block.Tx
 
 	bf.Add(keyBytes...)
 
-	root, err := c.s.TrieStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
+	root, err := c.s.LocStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
 	if err != nil {
 		return nil, fmt.Errorf("generate root err: %w", err)
 	}
@@ -586,7 +594,7 @@ func (c *Chain) calcMigrationHeaderOpt(ctx context.Context, opt block.MigrationO
 		return nil, fmt.Errorf("get migrated state Merkle root err: %w", err)
 	}
 
-	root, err := c.s.TrieStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
+	root, err := c.s.LocStorage.GenerateRootByGivenBytes(ctx, keyBytes, valBytes)
 	if err != nil {
 		return nil, fmt.Errorf("generate root err: %w", err)
 	}
@@ -602,7 +610,7 @@ func (c *Chain) getAccountStates(ctx context.Context, addresses []account.Addres
 		accountByteList[i] = addr[:]
 	}
 
-	stateByteList, err := c.s.TrieStorage.MGetValsByKeys(ctx, accountByteList)
+	stateByteList, err := c.s.LocStorage.MGetValsByKeys(ctx, accountByteList)
 	if err != nil {
 		return nil, fmt.Errorf("get account states from trie err: %w", err)
 	}

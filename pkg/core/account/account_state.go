@@ -24,7 +24,7 @@ type State struct {
 
 	// ShardLocation is only used in sharding blockchain.
 	// It is to denotes the location of an account.
-	// In block-emulator, a new trie is used to store it.
+	// In block-emulator, a location trie is used to store it.
 	ShardLocation uint64
 }
 
