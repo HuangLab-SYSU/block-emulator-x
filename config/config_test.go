@@ -64,6 +64,12 @@ var expectedCfg = Config{
 		Bandwidth:         1000000,
 		Latency:           0,
 		CommunicationMode: "libp2p",
+		LibP2PConnCfg: LibP2PConnCfg{
+			BootstrapKeyFp: "./pkg/network/connlibp2p/bootstrap.key",
+			BootstrapPeer:  "12D3KooWR6siPMZ2sMFKbgwaJFwQfnKczuPZnxHfyy1dHTzZSAUY",
+			BootstrapIP:    "127.0.0.1",
+			BootstrapPort:  12345,
+		},
 	},
 }
 

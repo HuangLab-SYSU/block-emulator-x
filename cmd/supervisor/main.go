@@ -55,28 +55,20 @@ func main() {
 
 	defer logger.CloseLoggerFile()
 
-	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(cfg.GlobalSys, lp)
+	p2p, nodeM, err := loadnetwork.PrepareNetworkByCfg(cfg, lp)
 	if err != nil {
-		log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
+		log.Fatal(fmt.Errorf("prepare network: %w", err))
 	}
 
-	networkConn := network.NewConnHandler(p2p)
-
-	spv, err := supervisor.NewSupervisor(networkConn, nodeM, cfg.SupervisorCfg)
+	spv, err := supervisor.NewSupervisor(network.NewConnHandler(p2p), nodeM, cfg.SupervisorCfg)
 	if err != nil {
 		log.Fatal(fmt.Errorf("new a supervisor failed: %w", err))
 	}
 
-	// start gRPC server
-	go func() {
-		if err = p2p.ListenStart(); err != nil {
-			log.Fatal(fmt.Errorf("startServer: %w", err))
-		}
-	}()
-
+	// Wait other nodes to start listening.
 	time.Sleep(supervisorWaitingTime)
 
 	if err = spv.Start(); err != nil {
-		log.Fatal(fmt.Errorf("supervisor.Startup error: %w", err))
+		log.Fatal(fmt.Errorf("failed to start supervisor node: %w", err))
 	}
 }
