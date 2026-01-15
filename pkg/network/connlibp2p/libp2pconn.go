@@ -132,11 +132,21 @@ func (l *LibP2PConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, m
 func (l *LibP2PConn) Close() {
 }
 
-func (l *LibP2PConn) initLibP2PConnect() error {
+func (l *LibP2PConn) initLibP2PConnect() (rErr error) {
 	hostAddr := fmt.Sprintf(hostAddrFmt, l.cfg.BootstrapIP, l.cfg.BootstrapPort, l.cfg.BootstrapPeer)
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
+
+	var cleanups []func()
+
+	defer func() {
+		if rErr != nil {
+			for i := len(cleanups) - 1; i >= 0; i-- {
+				cleanups[i]()
+			}
+		}
+	}()
 
 	// Decode the relay address.
 	bootAddr, err := multiaddr.NewMultiaddr(hostAddr)
@@ -174,12 +184,17 @@ func (l *LibP2PConn) initLibP2PConnect() error {
 		return fmt.Errorf("DHT new failed: %w", err)
 	}
 
+	cleanups = append(cleanups, func() { _ = kad.Close() })
+
 	if err = kad.Bootstrap(ctx); err != nil {
 		return fmt.Errorf("DHT bootstrap failed: %w", err)
 	}
 
 	// Start mDNS.
 	mdnsService := mdns.NewMdnsService(h, mdnsServerName, &mdnsNotifee{h: h})
+
+	cleanups = append(cleanups, func() { _ = mdnsService.Close() })
+
 	if err = mdnsService.Start(); err != nil {
 		return fmt.Errorf("mDNS start failed (non-fatal): %w", err)
 	}
