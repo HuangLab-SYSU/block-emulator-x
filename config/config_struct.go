@@ -18,6 +18,7 @@ type BlockchainCfg struct {
 	SystemCfg
 	BloomFilterCfg `json:"bloom_filter" yaml:"bloom_filter"`
 	StorageCfg     `json:"storage"      yaml:"storage"`
+	VMCfg          `json:"vm"           yaml:"vm"`
 }
 
 type StorageCfg struct {
@@ -40,4 +41,9 @@ type EthStorageCfg struct {
 type BloomFilterCfg struct {
 	BitsetLen      int      `json:"bitset_len"       yaml:"bitset_len"`
 	FilterHashFunc []string `json:"filter_hash_func" yaml:"filter_hash_func"`
+}
+
+type VMCfg struct {
+	ChainID    int64  `json:"chain_id"     yaml:"chain_id"`
+	VMStateDir string `json:"vm_state_dir" yaml:"vm_state_dir"`
 }
