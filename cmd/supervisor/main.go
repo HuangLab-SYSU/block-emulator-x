@@ -60,12 +60,13 @@ func main() {
 		log.Fatal(fmt.Errorf("prepare network: %w", err))
 	}
 
-	time.Sleep(supervisorWaitingTime)
-
 	spv, err := supervisor.NewSupervisor(network.NewConnHandler(p2p), nodeM, cfg.SupervisorCfg)
 	if err != nil {
 		log.Fatal(fmt.Errorf("new a supervisor failed: %w", err))
 	}
+
+	// Wait other nodes to start listening.
+	time.Sleep(supervisorWaitingTime)
 
 	if err = spv.Start(); err != nil {
 		log.Fatal(fmt.Errorf("failed to start supervisor node: %w", err))

@@ -65,6 +65,7 @@ func main() {
 		log.Fatal(fmt.Errorf("failed to create a PBFT node: %w", err))
 	}
 
+	// Wait other nodes to start listening.
 	time.Sleep(nodeWaitingTime)
 
 	consensusNode.Start()

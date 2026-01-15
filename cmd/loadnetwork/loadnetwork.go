@@ -21,13 +21,15 @@ import (
 
 const (
 	nodeMapperCheckInterval = 2 * time.Second
-	nodeMapperCheckTimes    = 60
+	nodeMapperCheckTimes    = 30
+
+	bootstrapAheadTime = 8 * time.Second
 )
 
 var (
 	ipTablePath = flag.String("ip_table", "ip_table.json", "path to ip_table.json")
 
-	errNodeMapperNotReady = errors.New("node mapper is not ready")
+	errNodeMapNotReady = errors.New("node mapper is not ready")
 )
 
 func PrepareNetworkByCfg(cfg *config.Config, lp *config.LocalParams) (network.P2PConn, nodetopo.NodeMapper, error) {
@@ -54,11 +56,11 @@ func PrepareNetworkByCfg(cfg *config.Config, lp *config.LocalParams) (network.P2
 	case config.LibP2PConnMode:
 		p2p, nodeM = initLibP2PNetwork(lp)
 
-		if err != nil {
-			return nil, nil, fmt.Errorf("initLibP2PNetwork: %w", err)
+		// Make sure that the supervisor (bootstrap) node starts first.
+		if lp.ShardID != nodetopo.SupervisorShardID {
+			time.Sleep(bootstrapAheadTime)
 		}
 
-		// Start gRPC server.
 		go func() {
 			if err = p2p.ListenStart(); err != nil {
 				log.Fatal(fmt.Errorf("startServer: %w", err))
@@ -123,8 +125,8 @@ func waitForNodeMapperReady(nodeM nodetopo.NodeMapper, cfg config.SystemCfg) err
 
 	err := retry.Do(func() error {
 		err := checkNodeMapperReady(nodeM, cfg)
-		if errors.Is(err, errNodeMapperNotReady) {
-			slog.Info("node mapper is not ready", "reason", err)
+		if errors.Is(err, errNodeMapNotReady) {
+			slog.Warn("node mapper is not ready, try again", "reason", err)
 		} else if err != nil {
 			slog.Error("failed to check node mapper ready, retry it", "error", err)
 		}
@@ -175,7 +177,7 @@ func checkNodeMapperReady(nodeM nodetopo.NodeMapper, cfg config.SystemCfg) error
 	}
 
 	if len(allLeaders) != int(cfg.ShardNum) {
-		return fmt.Errorf("some leaders are not found: %w", errNodeMapperNotReady)
+		return fmt.Errorf("actual leader number %d: %w", len(allLeaders), errNodeMapNotReady)
 	}
 
 	for shardID := range cfg.ShardNum {
@@ -189,7 +191,7 @@ func checkNodeMapperReady(nodeM nodetopo.NodeMapper, cfg config.SystemCfg) error
 		}
 
 		if len(shardInfo) != int(cfg.NodeNum) {
-			return fmt.Errorf("some nodes are not found in shard %d: %w", shardID, errNodeMapperNotReady)
+			return fmt.Errorf("actual node number %d in shard %d: %w", cfg.NodeNum, shardID, errNodeMapNotReady)
 		}
 	}
 

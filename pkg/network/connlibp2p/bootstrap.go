@@ -176,19 +176,19 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 
 	if err = s.CloseWrite(); err != nil {
 		slog.Error("failed to close write", "to", remotePeer, "error", err)
-
 		_ = s.Reset()
+		return
 	}
 
 	l.printRegisteredNodes()
 
-	if err = l.broadcastNode2PeerIdInfos(); err != nil {
-		slog.Warn("failed to broadcast ID map", "error", err)
+	if err = l.broadcastNode2PeerIdMap(); err != nil {
+		slog.Error("failed to broadcast ID map", "error", err)
 	}
 }
 
-// broadcastNode2PeerIdInfos broadcasts the updated ID Map.
-func (l *LibP2PConn) broadcastNode2PeerIdInfos() error {
+// broadcastNode2PeerIdMap broadcasts the updated ID Map.
+func (l *LibP2PConn) broadcastNode2PeerIdMap() error {
 	data, err := json.Marshal(l.info2PeerID)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Node2PeerIdInfos: %w", err)

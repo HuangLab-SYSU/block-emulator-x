@@ -68,19 +68,27 @@ func NewLibP2PConn(me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *LibP2PConn 
 	info2Host := make(map[int64]map[int64]string)
 	info2Host[nodetopo.SupervisorShardID] = map[int64]string{0: bootstrapPeerID}
 
-	return &LibP2PConn{
+	l := &LibP2PConn{
 		me:          me,
 		info2PeerID: info2Host,
 		msgBuffer:   make(chan *rpcserver.WrappedMsg, msgBufferSize),
 		nodeM:       nodeM,
 	}
+
+	return l
 }
 
 func (l *LibP2PConn) ListenStart() error {
+	// If this node is a consensus node.
 	if l.me.ShardID != nodetopo.SupervisorShardID {
-		return l.initLibP2PConnect()
+		if err := l.initLibP2PConnect(); err != nil {
+			return fmt.Errorf("failed to init LibP2P connect: %w", err)
+		}
+
+		return nil
 	}
 
+	// If this node is a supervisor one.
 	if err := l.initBootstrap(); err != nil {
 		return fmt.Errorf("failed to init bootstrap: %w", err)
 	}
