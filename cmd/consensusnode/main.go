@@ -55,25 +55,17 @@ func main() {
 
 	defer logger.CloseLoggerFile()
 
-	p2p, nodeM, err := loadnetwork.GetNetworkAndNodeInfo(cfg.GlobalSys, lp)
+	p2p, nodeM, err := loadnetwork.PrepareNetworkByCfg(cfg, lp)
 	if err != nil {
-		log.Fatal(fmt.Errorf("get network and node topology failed: %w", err))
+		log.Fatal(fmt.Errorf("prepare network: %w", err))
 	}
 
-	networkConn := network.NewConnHandler(p2p)
-
-	consensusNode, err := pbft.NewPBFTNode(networkConn, nodeM, cfg.ConsensusNodeCfg, *lp)
+	consensusNode, err := pbft.NewPBFTNode(network.NewConnHandler(p2p), nodeM, cfg.ConsensusNodeCfg, *lp)
 	if err != nil {
-		log.Fatal(fmt.Errorf("new a PBFT node failed: %w", err))
+		log.Fatal(fmt.Errorf("failed to create a PBFT node: %w", err))
 	}
 
-	// start gRPC server
-	go func() {
-		if err = p2p.ListenStart(); err != nil {
-			log.Fatal(fmt.Errorf("startServer: %w", err))
-		}
-	}()
-
+	// Wait other nodes to start listening.
 	time.Sleep(nodeWaitingTime)
 
 	consensusNode.Start()
