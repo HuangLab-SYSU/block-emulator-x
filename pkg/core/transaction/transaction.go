@@ -16,6 +16,8 @@ const (
 	NormalTxType byte = iota
 	RelayTxType
 	BrokerTxType
+	CreateContractTxType
+	CallContractTxType
 )
 
 const (
@@ -38,6 +40,7 @@ type Transaction struct {
 	Nonce       uint64
 	Signature   Signature
 	CreateTime  time.Time
+	Data        []byte
 
 	RelayTxOpt  // the optional setting only for relay transactions.
 	BrokerTxOpt // the optional setting only for broker transactions.
@@ -60,8 +63,7 @@ type BrokerTxOpt struct {
 func NewTransaction(
 	sender, recipient account.Address,
 	value, priorityFee *big.Int,
-	nonce uint64,
-	proposeTime time.Time,
+	nonce uint64, proposeTime time.Time,
 ) *Transaction {
 	tx := &Transaction{
 		Sender:      sender,
@@ -92,6 +94,7 @@ func (tx *Transaction) Hash() ([]byte, error) {
 	return sum[:], nil
 }
 
+// TxType returns the type of a transaction by its variables.
 func (tx *Transaction) TxType() byte {
 	if len(tx.BOriginalHash) != 0 {
 		return BrokerTxType
@@ -101,5 +104,13 @@ func (tx *Transaction) TxType() byte {
 		return RelayTxType
 	}
 
-	return NormalTxType
+	if len(tx.Data) == 0 {
+		return NormalTxType
+	}
+
+	if tx.Recipient == account.EmptyAccountAddr {
+		return CreateContractTxType
+	}
+
+	return CallContractTxType
 }

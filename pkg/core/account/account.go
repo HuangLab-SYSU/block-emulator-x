@@ -1,5 +1,7 @@
 package account
 
+var EmptyAccountAddr = [20]byte{}
+
 // Address is defined as a byte array whose size is fixed to 20.
 type Address [20]byte
 

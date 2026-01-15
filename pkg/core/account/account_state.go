@@ -13,13 +13,19 @@ const initBalanceStr = "1000000000000000000000000000000000000"
 var ErrNotEnoughBalance = errors.New("not enough balance")
 
 // State record the details of an account, and it will be saved in the mpt.
+// Note that, to meet the compatible to evm, `ShardLocation` will be stored in a single mpt,
+// while other will be set to a state db.
 type State struct {
-	Account       Account
+	Account     Account
+	Nonce       uint64
+	Balance     *big.Int
+	StorageRoot []byte // storage root of contract structure
+	CodeHash    []byte // the code hash of the smart contract account
+
+	// ShardLocation is only used in sharding blockchain.
+	// It is to denotes the location of an account.
+	// In block-emulator, a new trie is used to store it.
 	ShardLocation uint64
-	Nonce         uint64
-	Balance       *big.Int
-	StorageRoot   []byte // storage root of contract structure
-	CodeHash      []byte // the code hash of the smart contract account
 }
 
 func NewState(addr Address, loc int64) *State {
@@ -27,9 +33,10 @@ func NewState(addr Address, loc int64) *State {
 	b.SetString(initBalanceStr, 10)
 
 	return &State{
-		Account:       Account{Addr: addr},
+		Account: Account{Addr: addr},
+		Balance: &b,
+
 		ShardLocation: uint64(loc),
-		Balance:       &b,
 	}
 }
 
