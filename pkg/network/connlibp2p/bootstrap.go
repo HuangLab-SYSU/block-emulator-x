@@ -161,7 +161,7 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 	// update the node topo map
 	err = l.nodeM.SetTopoGetter(l.info2PeerID)
 	if err != nil {
-		slog.Error("failed to set topogetter map", "error", err)
+		slog.Error("failed to set topo getter map", "error", err)
 		return
 	}
 
