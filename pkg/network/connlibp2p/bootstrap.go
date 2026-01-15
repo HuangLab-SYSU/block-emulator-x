@@ -19,9 +19,7 @@ import (
 )
 
 const (
-	keyFile         = "./pkg/network/connlibp2p/bootstrap.key"
-	secretKeyBitLen = 256
-
+	secretKeyBitLen        = 256
 	reportConnTimeInterval = 30 * time.Second
 )
 
@@ -39,7 +37,7 @@ func (l *LibP2PConn) initBootstrap() (rErr error) {
 
 	ctx := context.Background()
 
-	sk, err := loadOrInitBootstrapKey()
+	sk, err := loadOrInitBootstrapKey(l.cfg.BootstrapKeyFp)
 	if err != nil {
 		return fmt.Errorf("failed to get private key for libp2p communication: %w", err)
 	}
@@ -64,7 +62,7 @@ func (l *LibP2PConn) initBootstrap() (rErr error) {
 
 	slog.Info("relay server running", "me", l.me)
 
-	h.SetStreamHandler(RegisterProtocol, l.handleRegisterStream)
+	h.SetStreamHandler(registerProtocol, l.handleRegisterStream)
 	h.SetStreamHandler(consensusMsgProtocol, l.handleMessage)
 
 	// start DHT server
@@ -176,7 +174,9 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 
 	if err = s.CloseWrite(); err != nil {
 		slog.Error("failed to close write", "to", remotePeer, "error", err)
+
 		_ = s.Reset()
+
 		return
 	}
 
@@ -206,7 +206,7 @@ func (l *LibP2PConn) broadcastNode2PeerIdMap() error {
 			ctx, cancel := context.WithTimeout(context.Background(), ctxTimeOut)
 			defer cancel()
 
-			s, err := l.hostInst.NewStream(ctx, pid, BroadcastIdMapProtocol)
+			s, err := l.hostInst.NewStream(ctx, pid, broadcastIdMapProtocol)
 			if err != nil {
 				slog.Error("failed to open stream", "to", pid, "error", err)
 				return
@@ -242,15 +242,15 @@ func (l *LibP2PConn) printRegisteredNodes() {
 	}
 }
 
-func loadOrInitBootstrapKey() (crypto.PrivKey, error) {
-	sk, err := loadBootstrapKey()
+func loadOrInitBootstrapKey(bootstrapFp string) (crypto.PrivKey, error) {
+	sk, err := loadBootstrapKey(bootstrapFp)
 	if err == nil {
 		return sk, nil
 	}
 
 	slog.Info("loading bootstrap key failed, now creating a new bootstrap key ...")
 
-	sk, err = generateBootstrapKey()
+	sk, err = generateBootstrapKey(bootstrapFp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate bootstrap key: %w", err)
 	}
@@ -259,8 +259,8 @@ func loadOrInitBootstrapKey() (crypto.PrivKey, error) {
 }
 
 // loadBootstrapKey loads or creates Ed25519 private key.
-func loadBootstrapKey() (crypto.PrivKey, error) {
-	data, err := os.ReadFile(keyFile)
+func loadBootstrapKey(bootstrapFp string) (crypto.PrivKey, error) {
+	data, err := os.ReadFile(bootstrapFp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file for getting the private key: %w", err)
 	}
@@ -270,13 +270,13 @@ func loadBootstrapKey() (crypto.PrivKey, error) {
 		return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
 	}
 
-	slog.Info("loaded existing private key", "from", keyFile)
+	slog.Info("loaded existing private key", "from", bootstrapFp)
 
 	return sk, nil
 }
 
 // generateBootstrapKey creates secret key and save to file.
-func generateBootstrapKey() (crypto.PrivKey, error) {
+func generateBootstrapKey(bootstrapFp string) (crypto.PrivKey, error) {
 	sk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, secretKeyBitLen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %w", err)
@@ -287,16 +287,16 @@ func generateBootstrapKey() (crypto.PrivKey, error) {
 		return nil, fmt.Errorf("failed to marshal key: %w", err)
 	}
 
-	dir := filepath.Dir(keyFile)
+	dir := filepath.Dir(bootstrapFp)
 	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create key dir: %w", err)
 	}
 
-	if err = os.WriteFile(keyFile, data, 0o600); err != nil {
-		return nil, fmt.Errorf("failed to save private key to %s: %w", keyFile, err)
+	if err = os.WriteFile(bootstrapFp, data, 0o600); err != nil {
+		return nil, fmt.Errorf("failed to save private key to %s: %w", bootstrapFp, err)
 	}
 
-	slog.Info("saved new private key", "to", keyFile)
+	slog.Info("saved new private key", "to", bootstrapFp)
 
 	return sk, nil
 }

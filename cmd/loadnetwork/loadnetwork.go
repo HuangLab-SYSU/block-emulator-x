@@ -54,7 +54,7 @@ func PrepareNetworkByCfg(cfg *config.Config, lp *config.LocalParams) (network.P2
 		}()
 
 	case config.LibP2PConnMode:
-		p2p, nodeM = initLibP2PNetwork(lp)
+		p2p, nodeM = initLibP2PNetwork(cfg.NetworkCfg, lp)
 
 		// Make sure that the supervisor (bootstrap) node starts first.
 		if lp.ShardID != nodetopo.SupervisorShardID {
@@ -108,13 +108,13 @@ func loadDirectNetwork(cfg config.SystemCfg, lp *config.LocalParams) (network.P2
 	return p2p, m, nil
 }
 
-func initLibP2PNetwork(lp *config.LocalParams) (network.P2PConn, nodetopo.NodeMapper) {
+func initLibP2PNetwork(cfg config.NetworkCfg, lp *config.LocalParams) (network.P2PConn, nodetopo.NodeMapper) {
 	slog.Info("local params is loaded successfully",
 		"shard id", lp.ShardID, "node id", lp.NodeID, "wallet addr", lp.WalletAddr)
 	meNode := nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}
 
 	m := nodetopo.NewTopoGetter(make(map[int64]nodetopo.NodeInfo), make(map[int64][]nodetopo.NodeInfo))
-	p2p := connlibp2p.NewLibP2PConn(meNode, m)
+	p2p := connlibp2p.NewLibP2PConn(cfg, meNode, m)
 
 	return p2p, m
 }

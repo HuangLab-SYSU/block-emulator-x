@@ -21,6 +21,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/nodetopo"
 
@@ -28,14 +29,17 @@ import (
 )
 
 const (
-	msgBufferSize          = 1 << 20
-	bootstrapPeerID        = "12D3KooWR6siPMZ2sMFKbgwaJFwQfnKczuPZnxHfyy1dHTzZSAUY"
-	consensusMsgProtocol   = "/myapp/chat/1.0.0"
-	RegisterProtocol       = "/myapp/register/1.0.0"
-	BroadcastIdMapProtocol = "/myapp/broadcastIdMap/1.0.0"
+	msgBufferSize = 1 << 20
+
+	consensusMsgProtocol   = "/blockemulator/consensus/0.0.1"
+	registerProtocol       = "/blockemulator/register/0.0.1"
+	broadcastIdMapProtocol = "/blockemulator/peer-id-map/0.0.1"
 	multiAddrSubstr        = "/p2p-circuit"
-	mdnsServerName         = "myapp.local"
-	dhtProtocolPrefix      = "/myapp/kad/1.0.0"
+	mdnsServerName         = "blockemulator.lib-p2p"
+	dhtProtocolPrefix      = "/blockemulator/kad/1.0.0"
+
+	// hostAddrFmt uses ip4 as default
+	hostAddrFmt = "/ip4/%s/tcp/%d/p2p/%s"
 
 	ctxTimeOut    = 10 * time.Second
 	retryInterval = 2 * time.Second
@@ -54,6 +58,8 @@ type LibP2PConn struct {
 
 	hostInst host.Host
 	kadInst  *dht.IpfsDHT
+
+	cfg config.NetworkCfg
 }
 
 type node2PeerIdInfo struct {
@@ -62,17 +68,18 @@ type node2PeerIdInfo struct {
 	PeerID  string
 }
 
-func NewLibP2PConn(me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *LibP2PConn {
+func NewLibP2PConn(cfg config.NetworkCfg, me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *LibP2PConn {
 	golog.SetAllLoggers(golog.LevelError)
 
 	info2Host := make(map[int64]map[int64]string)
-	info2Host[nodetopo.SupervisorShardID] = map[int64]string{0: bootstrapPeerID}
+	info2Host[nodetopo.SupervisorShardID] = map[int64]string{0: cfg.BootstrapPeer}
 
 	l := &LibP2PConn{
 		me:          me,
 		info2PeerID: info2Host,
 		msgBuffer:   make(chan *rpcserver.WrappedMsg, msgBufferSize),
 		nodeM:       nodeM,
+		cfg:         cfg,
 	}
 
 	return l
@@ -126,7 +133,7 @@ func (l *LibP2PConn) Close() {
 }
 
 func (l *LibP2PConn) initLibP2PConnect() error {
-	hostAddr := "/ip4/127.0.0.1/tcp/12345/p2p/" + bootstrapPeerID
+	hostAddr := fmt.Sprintf(hostAddrFmt, l.cfg.BootstrapIP, l.cfg.BootstrapPort, l.cfg.BootstrapPeer)
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
@@ -180,7 +187,7 @@ func (l *LibP2PConn) initLibP2PConnect() error {
 	// Set stream handler to receive message from other client nodes.
 	h.SetStreamHandler(consensusMsgProtocol, l.handleMessage)
 	// Set stream handler to receive id map message from supervisor nodes.
-	h.SetStreamHandler(BroadcastIdMapProtocol, l.handleIdMapMessage)
+	h.SetStreamHandler(broadcastIdMapProtocol, l.handleIdMapMessage)
 
 	// Record the connection type.
 	var (
@@ -232,7 +239,7 @@ func (l *LibP2PConn) registerNodeInfo(me nodetopo.NodeInfo) error {
 		return fmt.Errorf("libp2p not initialized")
 	}
 
-	relayPeerID, err := peer.Decode(bootstrapPeerID)
+	relayPeerID, err := peer.Decode(l.cfg.BootstrapPeer)
 	if err != nil {
 		return fmt.Errorf("invalid relay peer ID: %w", err)
 	}
@@ -255,7 +262,7 @@ func (l *LibP2PConn) registerNodeInfo(me nodetopo.NodeInfo) error {
 	s, err := l.hostInst.NewStream(
 		network.WithAllowLimitedConn(ctxWithTimeout, "register"),
 		relayPeerID,
-		RegisterProtocol,
+		registerProtocol,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to open register stream: %w", err)

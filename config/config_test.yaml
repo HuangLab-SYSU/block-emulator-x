@@ -42,3 +42,8 @@ network:
   bandwidth: 1000000
   latency: 0
   communication_mode: "libp2p"
+  libp2p:
+    bootstrap_key_fp: "./pkg/network/connlibp2p/bootstrap.key"
+    bootstrap_peer: "12D3KooWR6siPMZ2sMFKbgwaJFwQfnKczuPZnxHfyy1dHTzZSAUY"
+    bootstrap_ip: "127.0.0.1"
+    bootstrap_port: 12345
