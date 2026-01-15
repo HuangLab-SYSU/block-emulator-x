@@ -94,7 +94,7 @@ func (e *EthereumDefaultTrieDB) GetCurrentRoot(_ context.Context) ([]byte, error
 	return e.curStateRoot.Bytes(), nil
 }
 
-func (e *EthereumDefaultTrieDB) MAddAccountStatesPreview(_ context.Context, keys, values [][]byte) ([]byte, error) {
+func (e *EthereumDefaultTrieDB) MAddKeyValuesPreview(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf(
@@ -119,7 +119,7 @@ func (e *EthereumDefaultTrieDB) MAddAccountStatesPreview(_ context.Context, keys
 	return curTrie.Hash().Bytes(), nil
 }
 
-func (e *EthereumDefaultTrieDB) MAddAccountStatesAndCommit(_ context.Context, keys, values [][]byte) ([]byte, error) {
+func (e *EthereumDefaultTrieDB) MAddKeyValuesAndCommit(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf(
@@ -159,7 +159,7 @@ func (e *EthereumDefaultTrieDB) MAddAccountStatesAndCommit(_ context.Context, ke
 	return e.curStateRoot.Bytes(), nil
 }
 
-func (e *EthereumDefaultTrieDB) MGetAccountStates(_ context.Context, keys [][]byte) ([][]byte, error) {
+func (e *EthereumDefaultTrieDB) MGetValsByKeys(_ context.Context, keys [][]byte) ([][]byte, error) {
 	curTrie, err := trie.New(trie.TrieID(e.curStateRoot), e.trieDB)
 	if err != nil {
 		return nil, fmt.Errorf("new trie failed, err=%w", err)

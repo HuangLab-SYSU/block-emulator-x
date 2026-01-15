@@ -333,7 +333,7 @@ func (c *Chain) previewStateRootByBlock(ctx context.Context, b *block.Block) ([]
 		return nil, fmt.Errorf("get updated accounts bytes err: %w", err)
 	}
 
-	root, err := c.s.TrieStorage.MAddAccountStatesPreview(ctx, keys, values)
+	root, err := c.s.TrieStorage.MAddKeyValuesPreview(ctx, keys, values)
 	if err != nil {
 		return nil, fmt.Errorf("preview updated accounts err: %w", err)
 	}
@@ -347,7 +347,7 @@ func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, 
 		return nil, fmt.Errorf("calculate the modified accounts bytes by the given block err: %w", err)
 	}
 
-	root, err := c.s.TrieStorage.MAddAccountStatesAndCommit(ctx, keys, values)
+	root, err := c.s.TrieStorage.MAddKeyValuesAndCommit(ctx, keys, values)
 	if err != nil {
 		return nil, fmt.Errorf("commit updated accounts err: %w", err)
 	}
@@ -602,7 +602,7 @@ func (c *Chain) getAccountStates(ctx context.Context, addresses []account.Addres
 		accountByteList[i] = addr[:]
 	}
 
-	stateByteList, err := c.s.TrieStorage.MGetAccountStates(ctx, accountByteList)
+	stateByteList, err := c.s.TrieStorage.MGetValsByKeys(ctx, accountByteList)
 	if err != nil {
 		return nil, fmt.Errorf("get account states from trie err: %w", err)
 	}
