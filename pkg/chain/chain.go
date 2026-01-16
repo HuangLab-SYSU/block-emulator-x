@@ -157,8 +157,14 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	}
 
 	// Update the location trie and vm trie db.
-	if _, _, err = c.updateTrieByBlock(ctx, b); err != nil {
+	stateRoot, _, err := c.updateTrieByBlock(ctx, b)
+	if err != nil {
 		return fmt.Errorf("update trie err: %w", err)
+	}
+
+	// Commit the updates to disk.
+	if err = c.s.StateStorage.TrieDB.Commit(common.Hash(stateRoot), false); err != nil {
+		return fmt.Errorf("commit state-db trie err: %w", err)
 	}
 
 	// Add to storage.
@@ -172,10 +178,6 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 
 	slog.InfoContext(ctx, "block is generated",
 		"shard ID", c.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
-
-	if err = c.s.StateStorage.TrieDB.Cap(trieDatabaseCapSize); err != nil {
-		return fmt.Errorf("state storage trie database err: %w", err)
-	}
 
 	return nil
 }
