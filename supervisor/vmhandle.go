@@ -59,7 +59,7 @@ func (v *VMHandle) HandleBlock(b block.Block) error {
 		Time:        uint64(b.CreateTime.Second()),
 	}
 
-	e, err := vm.NewExecutor(v.trDB, v.root, v.vmChainCfg)
+	e, err := vm.NewExecutor(v.trDB, nil, v.root, v.vmChainCfg)
 	if err != nil {
 		return fmt.Errorf("new an vm executor failed: %w", err)
 	}

@@ -68,7 +68,7 @@ func TestVM(t *testing.T) {
 	cc := params.MainnetChainConfig
 	trDB := getTestTrieDatabase(t)
 
-	vmExec, err := NewExecutor(trDB, types.EmptyRootHash, cc)
+	vmExec, err := NewExecutor(trDB, nil, types.EmptyRootHash, cc)
 	require.NoError(t, err)
 
 	// Set the init balance.
@@ -89,7 +89,7 @@ func TestVM(t *testing.T) {
 	blockCtx.BlockNumber = big.NewInt(blockNum + 1)
 
 	// New a vm executor with a new blockCtx.
-	vmExec, err = NewExecutor(trDB, root1, cc)
+	vmExec, err = NewExecutor(trDB, nil, root1, cc)
 	require.NoError(t, err)
 
 	// The balance of from should be equal to the initial balance.

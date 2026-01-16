@@ -15,10 +15,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
 )
 
-const (
-	snapshotCacheMB = 1 << 5
-	EIP3855         = 3855
-)
+const EIP3855 = 3855
 
 // Executor wraps the functions of stateDB and evm of geth.
 // An executor should only be used in a block (i.e., BlockContext).
@@ -31,13 +28,13 @@ type Executor struct {
 }
 
 // NewExecutor creates a new executor with given parameters.
-func NewExecutor(trDB *triedb.Database, root common.Hash, vmChainCfg *params.ChainConfig) (*Executor, error) {
+func NewExecutor(
+	trDB *triedb.Database,
+	sp *snapshot.Tree,
+	root common.Hash,
+	vmChainCfg *params.ChainConfig,
+) (*Executor, error) {
 	// Init state db.
-	sp, err := snapshot.New(snapshot.Config{CacheSize: snapshotCacheMB}, trDB.Disk(), trDB, root)
-	if err != nil {
-		return nil, fmt.Errorf("failed to new a snapshot: %w", err)
-	}
-
 	stateDB, err := state.New(root, state.NewDatabase(trDB, sp))
 	if err != nil {
 		return nil, fmt.Errorf("failed to new a state database: %w", err)

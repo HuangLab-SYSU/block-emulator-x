@@ -324,7 +324,12 @@ func (c *Chain) initWithGenesisBlock() (*block.Block, error) {
 }
 
 func (c *Chain) previewStateRootByBlock(ctx context.Context, b *block.Block) ([]byte, []byte, error) {
-	vme, accountBytes, locationBytes, err := c.calcStateModification(ctx, b)
+	vme, err := c.getVMExecutor()
+	if err != nil {
+		return nil, nil, fmt.Errorf("get vm executor err: %w", err)
+	}
+
+	accountBytes, locationBytes, err := c.calcStateModification(ctx, vme, b)
 	if err != nil {
 		return nil, nil, fmt.Errorf("calc state modification err: %w", err)
 	}
@@ -341,7 +346,12 @@ func (c *Chain) previewStateRootByBlock(ctx context.Context, b *block.Block) ([]
 }
 
 func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, []byte, error) {
-	vme, accountBytes, locationBytes, err := c.calcStateModification(ctx, b)
+	vme, err := c.getVMExecutor()
+	if err != nil {
+		return nil, nil, fmt.Errorf("get vm executor err: %w", err)
+	}
+
+	accountBytes, locationBytes, err := c.calcStateModification(ctx, vme, b)
 	if err != nil {
 		return nil, nil, fmt.Errorf("calc state modification err: %w", err)
 	}
@@ -558,25 +568,21 @@ func (c *Chain) getAccountLocations(ctx context.Context, addresses []account.Add
 }
 
 func (c *Chain) getVMExecutor() (*vm.Executor, error) {
-	return vm.NewExecutor(c.s.VMTrieDB, common.Hash(c.curHeader.StateRoot), c.vmChainCfg)
+	root := common.Hash(c.curHeader.StateRoot)
+	return vm.NewExecutor(c.s.StateStorage.TrieDB, c.s.StateStorage.Snapshot, root, c.vmChainCfg)
 }
 
-func (c *Chain) calcStateModification(ctx context.Context, b *block.Block) (*vm.Executor, [][]byte, [][]byte, error) {
+func (c *Chain) calcStateModification(ctx context.Context, v *vm.Executor, b *block.Block) ([][]byte, [][]byte, error) {
 	accountLocMap, err := c.getAccountLocationsInTxs(ctx, b.TxList)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("get account locations err: %w", err)
-	}
-
-	vme, err := c.getVMExecutor()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("get vm executor err: %w", err)
+		return nil, nil, fmt.Errorf("get account locations err: %w", err)
 	}
 
 	// Handle the transactions in Body.
 	bCtx := getBlockCtxByBlock(b)
 	for _, tx := range b.TxList {
-		if err = c.txExecute(vme, bCtx, accountLocMap, tx); err != nil {
-			return nil, nil, nil, fmt.Errorf("execute tx err: %w", err)
+		if err = c.txExecute(v, bCtx, accountLocMap, tx); err != nil {
+			return nil, nil, fmt.Errorf("execute tx err: %w", err)
 		}
 	}
 
@@ -586,19 +592,19 @@ func (c *Chain) calcStateModification(ctx context.Context, b *block.Block) (*vm.
 	locationBytes := make([][]byte, len(b.MigratedAddrs))
 	for i, acc := range b.MigratedAddrs {
 		state := b.MigratedStates[i]
-		if err = setMigratedStates2VMTrie(acc, state, vme); err != nil {
-			return nil, nil, nil, fmt.Errorf("set migrated state err: %w", err)
+		if err = setMigratedStates2VMTrie(acc, state, v); err != nil {
+			return nil, nil, fmt.Errorf("set migrated state err: %w", err)
 		}
 
 		accountBytes[i] = acc[:]
 
 		var buf bytes.Buffer
 		if err = gob.NewEncoder(&buf).Encode(state.ShardLocation); err != nil {
-			return nil, nil, nil, fmt.Errorf("encode state err: %w", err)
+			return nil, nil, fmt.Errorf("encode state err: %w", err)
 		}
 
 		locationBytes[i] = buf.Bytes()
 	}
 
-	return vme, accountBytes, locationBytes, nil
+	return accountBytes, locationBytes, nil
 }
