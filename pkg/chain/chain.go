@@ -27,7 +27,10 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/vm"
 )
 
-const blocksFetchLimit = 100
+const (
+	blocksFetchLimit    = 100
+	trieDatabaseCapSize = 1 << 10
+)
 
 // Chain describes a blockchain.
 type Chain struct {
@@ -169,6 +172,10 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 
 	slog.InfoContext(ctx, "block is generated",
 		"shard ID", c.GetShardID(), "block height", b.Number, "block create time", b.CreateTime)
+
+	if err = c.s.StateStorage.TrieDB.Cap(trieDatabaseCapSize); err != nil {
+		return fmt.Errorf("state storage trie database err: %w", err)
+	}
 
 	return nil
 }
@@ -592,8 +599,12 @@ func (c *Chain) calcStateModification(ctx context.Context, v *vm.Executor, b *bl
 	locationBytes := make([][]byte, len(b.MigratedAddrs))
 	for i, acc := range b.MigratedAddrs {
 		state := b.MigratedStates[i]
-		if err = setMigratedStates2VMTrie(acc, state, v); err != nil {
-			return nil, nil, fmt.Errorf("set migrated state err: %w", err)
+
+		// If this account is in this shard, set the migrated states to the vm trie.
+		if state.ShardLocation == uint64(c.shardID) {
+			if err = setMigratedStates2VMTrie(acc, state, v); err != nil {
+				return nil, nil, fmt.Errorf("set migrated state err: %w", err)
+			}
 		}
 
 		accountBytes[i] = acc[:]

@@ -18,6 +18,7 @@ const (
 	vmStateNameSpace     = "vm_state"
 
 	snapshotCacheMB = 1 << 6
+	levelDBCacheMB  = 1 << 6
 )
 
 type Store struct {
@@ -34,7 +35,7 @@ func NewVMStateStore(cfg config.StorageCfg, lp config.LocalParams) (*Store, erro
 	} else {
 		level, err := leveldb.New(
 			filepath.Join(cfg.LevelFilePathDir, fmt.Sprintf(vmStateDBFilePathFmt, lp.ShardID, lp.NodeID)),
-			0, 0, vmStateNameSpace, false)
+			levelDBCacheMB, 0, vmStateNameSpace, false)
 		if err != nil {
 			return nil, fmt.Errorf("new StateStorage failed: %w", err)
 		}

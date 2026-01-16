@@ -7,8 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	gethvm "github.com/ethereum/go-ethereum/core/vm"
+	"github.com/holiman/uint256"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/block"
@@ -21,9 +23,11 @@ const (
 	// blockNumBias increase the number of block, so that the contract can be called correctly.
 	blockNumBias  = 20_000_000
 	blockGasLimit = 1000000000000
+
+	initStr = "1000000000000000000000000000000000000"
 )
 
-var initBalanceOfAccount = account.NewState([20]byte{}, 0).Balance
+var initBalance, _ = uint256.FromDecimal(initStr)
 
 func getBlockCtxByBlock(b *block.Block) gethvm.BlockContext {
 	return gethvm.BlockContext{
@@ -45,18 +49,17 @@ func normalTxExecute(v *vm.Executor, tx transaction.Transaction) error {
 		return fmt.Errorf("convert value to uint256 failed: %w", err)
 	}
 
+	s := v.StateDB()
 	sAddr, rAddr := common.Address(tx.Sender), common.Address(tx.Recipient)
 
-	if err = setInitBalanceIfNotExist(v, sAddr, rAddr); err != nil {
-		return fmt.Errorf("set init balance failed: %w", err)
-	}
+	setInitBalanceIfNotExist(s, sAddr, rAddr)
 
-	if !core.CanTransfer(v.StateDB(), sAddr, uVal) {
+	if !core.CanTransfer(s, sAddr, uVal) {
 		return fmt.Errorf("transfer failed: the balance of %x is not enough", tx.Sender)
 	}
 
-	v.StateDB().SubBalance(sAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
-	v.StateDB().AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
+	s.SubBalance(sAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
+	s.AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 
 	return nil
 }
@@ -67,6 +70,8 @@ func relayTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard int
 		return fmt.Errorf("convert value to uint256 failed: %w", err)
 	}
 
+	s := v.StateDB()
+
 	switch tx.RelayStage {
 	case transaction.Relay1Tx:
 		// For a relay1 transaction, debit the sender's balance.
@@ -76,15 +81,13 @@ func relayTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard int
 		}
 
 		sAddr := common.Address(tx.Sender)
-		if err = setInitBalanceIfNotExist(v, sAddr); err != nil {
-			return fmt.Errorf("set init balance failed: %w", err)
-		}
+		setInitBalanceIfNotExist(s, sAddr)
 
-		if !core.CanTransfer(v.StateDB(), sAddr, uVal) {
+		if !core.CanTransfer(s, sAddr, uVal) {
 			return fmt.Errorf("transfer failed: the balance of %x is not enough", tx.Sender)
 		}
 
-		v.StateDB().SubBalance(sAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
+		s.SubBalance(sAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 	case transaction.Relay2Tx:
 		// For a relay2 transaction credit the recipient's balance.
 		if addrLoc[tx.Recipient] != shard {
@@ -92,11 +95,9 @@ func relayTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard int
 		}
 
 		rAddr := common.Address(tx.Recipient)
-		if err = setInitBalanceIfNotExist(v, rAddr); err != nil {
-			return fmt.Errorf("set init balance failed: %w", err)
-		}
+		setInitBalanceIfNotExist(s, rAddr)
 
-		v.StateDB().AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
+		s.AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 	default:
 		return fmt.Errorf("unknown relay transaction type: %b", tx.RelayStage)
 	}
@@ -110,6 +111,8 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 		return fmt.Errorf("convert value to uint256 failed: %w", err)
 	}
 
+	s := v.StateDB()
+
 	switch tx.BrokerStage {
 	case transaction.Sigma1BrokerStage:
 		// For a broker1 transaction, debit the sender's balance and credit the broker's balance.
@@ -119,16 +122,14 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 		}
 
 		sAddr, bAddr := common.Address(tx.Sender), common.Address(tx.Broker)
-		if err = setInitBalanceIfNotExist(v, sAddr, bAddr); err != nil {
-			return fmt.Errorf("set init balance failed: %w", err)
-		}
+		setInitBalanceIfNotExist(s, sAddr, bAddr)
 
-		if !core.CanTransfer(v.StateDB(), sAddr, uVal) {
+		if !core.CanTransfer(s, sAddr, uVal) {
 			return fmt.Errorf("transfer failed: the balance of %x is not enough", tx.Sender)
 		}
 
-		v.StateDB().SubBalance(sAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
-		v.StateDB().AddBalance(bAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
+		s.SubBalance(sAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
+		s.AddBalance(bAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 	case transaction.Sigma2BrokerStage:
 		// For a broker2 transaction, debit the broker's balance and credit the recipient's balance.
 		if addrLoc[tx.Recipient] != shard {
@@ -137,11 +138,9 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 		}
 
 		rAddr := common.Address(tx.Recipient)
-		if err = setInitBalanceIfNotExist(v, rAddr); err != nil {
-			return fmt.Errorf("set init balance failed: %w", err)
-		}
+		setInitBalanceIfNotExist(s, rAddr)
 
-		v.StateDB().AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
+		s.AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 
 	default:
 		return fmt.Errorf("unknown broker transaction type: %b", tx.BrokerStage)
@@ -150,19 +149,10 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 	return nil
 }
 
-func setInitBalanceIfNotExist(v *vm.Executor, addresses ...common.Address) error {
+func setInitBalanceIfNotExist(s *state.StateDB, addresses ...common.Address) {
 	for _, address := range addresses {
-		if v.StateDB().Exist(address) {
-			continue
+		if !s.Exist(address) {
+			s.SetBalance(address, initBalance, tracing.BalanceChangeReason(stateReasonBalanceInit))
 		}
-
-		initBalance, err := utils.BigToUInt256(initBalanceOfAccount)
-		if err != nil {
-			return fmt.Errorf("convert init balance to uint256 failed: %w", err)
-		}
-
-		v.StateDB().SetBalance(address, initBalance, tracing.BalanceChangeReason(stateReasonBalanceInit))
 	}
-
-	return nil
 }

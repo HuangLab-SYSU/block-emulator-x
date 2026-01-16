@@ -28,24 +28,14 @@ func readStateFromVMExecutor(address account.Address, e *vm.Executor, location u
 
 	balance := e.StateDB().GetBalance(addr)
 	nonce := e.StateDB().GetNonce(addr)
-	code := e.StateDB().GetCode(addr)
-
-	var storageRoot []byte
-
-	if len(code) > 0 {
-		root := e.StateDB().GetStorageRoot(addr)
-		storageRoot = root[:]
-	}
 
 	var bInt *big.Int
 	balance.IntoBig(&bInt)
 
 	return &account.State{
-		Address:     address,
-		Nonce:       nonce,
-		Balance:     bInt,
-		Code:        code[:],
-		StorageRoot: storageRoot[:],
+		Address: address,
+		Nonce:   nonce,
+		Balance: bInt,
 
 		ShardLocation: location,
 	}

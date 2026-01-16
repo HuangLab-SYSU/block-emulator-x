@@ -19,7 +19,7 @@ import (
 
 const (
 	levelDBNamespace    = "shard_loc_trie"
-	defaultLevelCache   = 16
+	defaultLevelCache   = 1 << 6
 	defaultLevelHandler = 16
 	levelDBFilePathFmt  = "account_loc_shard_%d_node_%d"
 )
