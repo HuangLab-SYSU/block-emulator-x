@@ -27,10 +27,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/vm"
 )
 
-const (
-	blocksFetchLimit    = 100
-	trieDatabaseCapSize = 1 << 10
-)
+const blocksFetchLimit = 100
 
 // Chain describes a blockchain.
 type Chain struct {
@@ -157,19 +154,12 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 	}
 
 	// Update the location trie and vm trie db.
-	stateRoot, _, err := c.updateTrieByBlock(ctx, b)
-	if err != nil {
+	if _, _, err = c.updateTrieByBlock(ctx, b); err != nil {
 		return fmt.Errorf("update trie err: %w", err)
 	}
 
-	// Commit the updates to disk.
-	if err = c.s.StateStorage.TrieDB.Commit(common.Hash(stateRoot), false); err != nil {
-		return fmt.Errorf("commit state-db trie err: %w", err)
-	}
-
 	// Add to storage.
-	err = c.s.BlockStorage.AddBlock(ctx, blockHash, blockByte, headerByte)
-	if err != nil {
+	if err = c.s.BlockStorage.AddBlock(ctx, blockHash, blockByte, headerByte); err != nil {
 		return fmt.Errorf("failed to add block to storage: %w", err)
 	}
 
@@ -375,7 +365,10 @@ func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("preview updated accounts err: %w", err)
 	}
-
+	// Commit the updates to disk.
+	if err = c.s.StateStorage.TrieDB().Commit(stateRoot, false); err != nil {
+		return nil, nil, fmt.Errorf("commit state-db trie err: %w", err)
+	}
 	return stateRoot[:], locRoot, nil
 }
 
@@ -578,7 +571,7 @@ func (c *Chain) getAccountLocations(ctx context.Context, addresses []account.Add
 
 func (c *Chain) getVMExecutor() (*vm.Executor, error) {
 	root := common.Hash(c.curHeader.StateRoot)
-	return vm.NewExecutor(c.s.StateStorage.TrieDB, c.s.StateStorage.Snapshot, root, c.vmChainCfg)
+	return vm.NewExecutor(c.s.StateStorage, root, c.vmChainCfg)
 }
 
 func (c *Chain) calcStateModification(ctx context.Context, v *vm.Executor, b *block.Block) ([][]byte, [][]byte, error) {

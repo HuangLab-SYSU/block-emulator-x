@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb/leveldb"
@@ -17,16 +18,11 @@ const (
 	vmStateDBFilePathFmt = "vm_state_shard_%d_node_%d"
 	vmStateNameSpace     = "vm_state"
 
-	snapshotCacheMB = 1 << 6
-	levelDBCacheMB  = 1 << 6
+	snapshotCacheMB = 1 << 5
+	levelDBCacheMB  = 1 << 5
 )
 
-type Store struct {
-	Snapshot *snapshot.Tree
-	TrieDB   *triedb.Database
-}
-
-func NewVMStateStore(cfg config.StorageCfg, lp config.LocalParams) (*Store, error) {
+func NewStateStore(cfg config.StorageCfg, lp config.LocalParams) (state.Database, error) {
 	var trDB *triedb.Database
 
 	if cfg.IsMemoryDB {
@@ -40,7 +36,7 @@ func NewVMStateStore(cfg config.StorageCfg, lp config.LocalParams) (*Store, erro
 			return nil, fmt.Errorf("new StateStorage failed: %w", err)
 		}
 
-		trDB = triedb.NewDatabase(rawdb.NewDatabase(level), nil)
+		trDB = triedb.NewDatabase(rawdb.NewDatabase(level), triedb.HashDefaults)
 	}
 
 	sp, err := snapshot.New(snapshot.Config{CacheSize: snapshotCacheMB}, trDB.Disk(), trDB, types.EmptyRootHash)
@@ -48,5 +44,5 @@ func NewVMStateStore(cfg config.StorageCfg, lp config.LocalParams) (*Store, erro
 		return nil, fmt.Errorf("failed to new a snapshot: %w", err)
 	}
 
-	return &Store{TrieDB: trDB, Snapshot: sp}, nil
+	return state.NewDatabase(trDB, sp), nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	gethvm "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb/leveldb"
@@ -27,7 +28,7 @@ const (
 )
 
 type VMHandle struct {
-	trDB       *triedb.Database
+	stateStore state.Database
 	root       common.Hash
 	vmChainCfg *params.ChainConfig
 }
@@ -42,7 +43,10 @@ func NewVMHandle(cfg config.VMCfg) (*VMHandle, error) {
 	cc.ChainID = big.NewInt(cfg.ChainID)
 
 	return &VMHandle{
-		trDB:       triedb.NewDatabase(rawdb.NewDatabase(level), &triedb.Config{Preimages: true, IsVerkle: false}),
+		stateStore: state.NewDatabase(
+			triedb.NewDatabase(rawdb.NewDatabase(level), &triedb.Config{Preimages: true, IsVerkle: false}),
+			nil,
+		),
 		root:       types.EmptyRootHash,
 		vmChainCfg: &cc,
 	}, nil
@@ -59,7 +63,7 @@ func (v *VMHandle) HandleBlock(b block.Block) error {
 		Time:        uint64(b.CreateTime.Second()),
 	}
 
-	e, err := vm.NewExecutor(v.trDB, nil, v.root, v.vmChainCfg)
+	e, err := vm.NewExecutor(v.stateStore, v.root, v.vmChainCfg)
 	if err != nil {
 		return fmt.Errorf("new an vm executor failed: %w", err)
 	}

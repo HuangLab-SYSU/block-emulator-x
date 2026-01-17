@@ -6,10 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	gethvm "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/triedb"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
@@ -28,14 +26,9 @@ type Executor struct {
 }
 
 // NewExecutor creates a new executor with given parameters.
-func NewExecutor(
-	trDB *triedb.Database,
-	sp *snapshot.Tree,
-	root common.Hash,
-	vmChainCfg *params.ChainConfig,
-) (*Executor, error) {
+func NewExecutor(stateStore state.Database, root common.Hash, vmChainCfg *params.ChainConfig) (*Executor, error) {
 	// Init state db.
-	stateDB, err := state.New(root, state.NewDatabase(trDB, sp))
+	stateDB, err := state.New(root, stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new a state database: %w", err)
 	}

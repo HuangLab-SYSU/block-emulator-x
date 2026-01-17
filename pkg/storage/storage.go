@@ -3,6 +3,8 @@ package storage
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/core/state"
+
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/storage/block"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/storage/trie"
@@ -13,7 +15,7 @@ import (
 type Storage struct {
 	BlockStorage block.Store    // BlockStorage is used to record block information.
 	LocStorage   trie.Store     // LocStorage is used to record the account locations, which is introduced in a sharded blockchain system.
-	StateStorage *vmstate.Store // StateStorage is to record the states of accounts and execute contracts.
+	StateStorage state.Database // StateStorage is to record the states of accounts and execute contracts.
 }
 
 // NewStorage creates a Storage with the given config and local parameters.
@@ -22,7 +24,7 @@ func NewStorage(cfg config.StorageCfg, lp config.LocalParams) (*Storage, error) 
 
 	var err error
 
-	s.StateStorage, err = vmstate.NewVMStateStore(cfg, lp)
+	s.StateStorage, err = vmstate.NewStateStore(cfg, lp)
 	if err != nil {
 		return nil, fmt.Errorf("new vm trie db: %w", err)
 	}

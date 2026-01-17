@@ -8,6 +8,6 @@ import (
 )
 
 func TestNewVMStateStore(t *testing.T) {
-	_, err := NewVMStateStore(config.StorageCfg{EthStorageCfg: config.EthStorageCfg{IsMemoryDB: true}}, config.LocalParams{})
+	_, err := NewStateStore(config.StorageCfg{EthStorageCfg: config.EthStorageCfg{IsMemoryDB: true}}, config.LocalParams{})
 	require.NoError(t, err)
 }

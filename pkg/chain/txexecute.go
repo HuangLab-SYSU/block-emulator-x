@@ -23,11 +23,9 @@ const (
 	// blockNumBias increase the number of block, so that the contract can be called correctly.
 	blockNumBias  = 20_000_000
 	blockGasLimit = 1000000000000
-
-	initStr = "1000000000000000000000000000000000000"
 )
 
-var initBalance, _ = uint256.FromDecimal(initStr)
+var initBalance, _ = uint256.FromDecimal(account.InitBalanceStr)
 
 func getBlockCtxByBlock(b *block.Block) gethvm.BlockContext {
 	return gethvm.BlockContext{

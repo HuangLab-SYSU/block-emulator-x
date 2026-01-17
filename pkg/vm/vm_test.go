@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -68,7 +69,9 @@ func TestVM(t *testing.T) {
 	cc := params.MainnetChainConfig
 	trDB := getTestTrieDatabase(t)
 
-	vmExec, err := NewExecutor(trDB, nil, types.EmptyRootHash, cc)
+	stateStore := state.NewDatabase(trDB, nil)
+
+	vmExec, err := NewExecutor(stateStore, types.EmptyRootHash, cc)
 	require.NoError(t, err)
 
 	// Set the init balance.
@@ -89,7 +92,7 @@ func TestVM(t *testing.T) {
 	blockCtx.BlockNumber = big.NewInt(blockNum + 1)
 
 	// New a vm executor with a new blockCtx.
-	vmExec, err = NewExecutor(trDB, nil, root1, cc)
+	vmExec, err = NewExecutor(stateStore, root1, cc)
 	require.NoError(t, err)
 
 	// The balance of from should be equal to the initial balance.

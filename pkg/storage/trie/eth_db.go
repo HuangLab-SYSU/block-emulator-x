@@ -18,10 +18,9 @@ import (
 )
 
 const (
-	levelDBNamespace    = "shard_loc_trie"
-	defaultLevelCache   = 1 << 6
-	defaultLevelHandler = 16
-	levelDBFilePathFmt  = "account_loc_shard_%d_node_%d"
+	levelDBNamespace   = "shard_loc_trie"
+	defaultLevelCache  = 1 << 5
+	levelDBFilePathFmt = "account_loc_shard_%d_node_%d"
 )
 
 type EthereumDefaultTrieDB struct {
@@ -36,11 +35,7 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg, lp config.LocalParams) (
 	} else {
 		level, err := leveldb.New(
 			filepath.Join(cfg.LevelFilePathDir, fmt.Sprintf(levelDBFilePathFmt, lp.ShardID, lp.NodeID)),
-			defaultLevelCache,
-			defaultLevelHandler,
-			levelDBNamespace,
-			false,
-		)
+			defaultLevelCache, 0, levelDBNamespace, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open level db: %w", err)
 		}
@@ -48,10 +43,7 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg, lp config.LocalParams) (
 		db = rawdb.NewDatabase(level)
 	}
 
-	trieDb := triedb.NewDatabase(db, &triedb.Config{
-		Preimages: true,
-		IsVerkle:  false,
-	})
+	trieDb := triedb.NewDatabase(db, triedb.HashDefaults)
 
 	trieId := trie.TrieID(types.EmptyRootHash)
 	// if there are existing merkle, try to re-build it.
