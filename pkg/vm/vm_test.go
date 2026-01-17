@@ -5,10 +5,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -17,6 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 )
 
 const (
@@ -67,7 +69,9 @@ func TestVM(t *testing.T) {
 	cc := params.MainnetChainConfig
 	trDB := getTestTrieDatabase(t)
 
-	vmExec, err := NewExecutor(blockCtx, trDB, types.EmptyRootHash, cc)
+	stateStore := state.NewDatabase(trDB, nil)
+
+	vmExec, err := NewExecutor(stateStore, types.EmptyRootHash, cc)
 	require.NoError(t, err)
 
 	// Set the init balance.
@@ -75,7 +79,7 @@ func TestVM(t *testing.T) {
 	require.Equal(t, vmExec.StateDB().GetBalance(from), initialBalance)
 
 	r1 := vmExec.StateDB().IntermediateRoot(true)
-	root1, err := vmExec.Commit()
+	root1, err := vmExec.Commit(blockCtx.BlockNumber.Uint64())
 	require.NoError(t, err)
 	require.Equal(t, r1, root1)
 
@@ -88,29 +92,52 @@ func TestVM(t *testing.T) {
 	blockCtx.BlockNumber = big.NewInt(blockNum + 1)
 
 	// New a vm executor with a new blockCtx.
-	vmExec, err = NewExecutor(blockCtx, trDB, root1, cc)
+	vmExec, err = NewExecutor(stateStore, root1, cc)
 	require.NoError(t, err)
 
 	// The balance of from should be equal to the initial balance.
 	require.Equal(t, initialBalance, vmExec.StateDB().GetBalance(from))
 
 	// Deploy the contract.
-	contractAddr, _, err := vmExec.DeployContract(txContext, account.Address(from), contractCode, txVal, leftOverGas)
+	contractAddr, _, err := vmExec.DeployContract(
+		blockCtx,
+		txContext,
+		account.Address(from),
+		contractCode,
+		txVal,
+		leftOverGas,
+	)
 	require.NoError(t, err)
 
 	// Call `set` (1).
-	callResult, _, err := vmExec.CallContract(txContext, account.Address(from), account.Address(contractAddr), setCallData, txVal, leftOverGas)
+	callResult, _, err := vmExec.CallContract(
+		blockCtx,
+		txContext,
+		account.Address(from),
+		account.Address(contractAddr),
+		setCallData,
+		txVal,
+		leftOverGas,
+	)
 	require.NoError(t, err)
 	require.Len(t, callResult, 0)
 
 	// Call `get`.
-	callResult, _, err = vmExec.CallContract(txContext, account.Address(from), account.Address(contractAddr), getCallData, txVal, leftOverGas)
+	callResult, _, err = vmExec.CallContract(
+		blockCtx,
+		txContext,
+		account.Address(from),
+		account.Address(contractAddr),
+		getCallData,
+		txVal,
+		leftOverGas,
+	)
 	require.NoError(t, err)
 
 	resultInt := new(uint256.Int).SetBytes(callResult).Uint64()
 	require.Equal(t, resultInt, uint64(1))
 
-	root2, err := vmExec.Commit()
+	root2, err := vmExec.Commit(blockCtx.BlockNumber.Uint64())
 	require.NoError(t, err)
 	require.NotEqual(t, root1, root2)
 }

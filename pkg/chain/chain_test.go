@@ -123,16 +123,16 @@ func validateAndAddBlock(t *testing.T, bc *Chain, b *block.Block) {
 
 func addMigrationBlockAndCheck(t *testing.T, bc *Chain) {
 	ctx := context.Background()
-	const testLoc = 100
+	const testLoc = 0
 
 	oldHeaderHash, err := bc.GetCurHeader().Hash()
 	require.NoError(t, err)
 
 	// Generate a migration block.
-	migratedB, err := bc.GenerateBlock(ctx, testMiner, block.TxBlockType, block.Body{},
+	migratedB, err := bc.GenerateBlock(ctx, testMiner, block.MigrationBlockType, block.Body{},
 		block.MigrationOpt{
-			MigratedAccounts: []account.Address{testSender},
-			MigratedStates:   []account.State{*account.NewState(testSender, testLoc)},
+			MigratedAddrs:  []account.Address{testSender},
+			MigratedStates: []account.State{*account.NewState(testSender, testLoc)},
 		},
 	)
 	require.NoError(t, err)

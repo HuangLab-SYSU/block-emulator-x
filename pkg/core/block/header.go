@@ -18,6 +18,10 @@ type Header struct {
 	Miner           account.Address
 	CreateTime      time.Time
 
+	// LocationRoot is only used in a sharded blockchain system to denotes the root of location trie.
+	// This trie is used to store the account location.
+	LocationRoot []byte
+
 	TxHeaderOpt
 	MigrationHeaderOpt
 }
@@ -32,7 +36,7 @@ type TxHeaderOpt struct {
 // MigrationHeaderOpt is the struct for the account migration.
 // This struct should be used when this block is an account migration one.
 type MigrationHeaderOpt struct {
-	MigratedAccountsRoot []byte // MigratedAccountsRoot is the Merkle root of MigratedAccounts in MigrationOpt.
+	MigratedAccountsRoot []byte // MigratedAccountsRoot is the Merkle root of MigratedAddrs in MigrationOpt.
 }
 
 // Encode encodes blockHeaders.
