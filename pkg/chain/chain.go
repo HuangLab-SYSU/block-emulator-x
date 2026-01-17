@@ -420,9 +420,6 @@ func (c *Chain) txExecute(
 	addrLoc map[account.Address]int64,
 	tx transaction.Transaction,
 ) error {
-	txCtx := gethvm.TxContext{
-		Origin: common.Address(tx.Sender),
-	}
 	switch tx.TxType() {
 	case transaction.NormalTxType:
 		if err := normalTxExecute(v, tx); err != nil {
@@ -437,21 +434,21 @@ func (c *Chain) txExecute(
 			return fmt.Errorf("execute broker tx failed: %w", err)
 		}
 	case transaction.CreateContractTxType:
-		contractAddr, _, err := v.DeployContract(bCtx, txCtx, tx.Sender, tx.Data, tx.Value, tx.GasLimit)
+		contractAddr, _, err := v.DeployContract(bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to deploy contract: %w", err)
 		}
 
 		slog.Info("deploy contract succeed", "contract addr", contractAddr)
 	case transaction.CallContractTxType:
-		ret, _, err := v.CallContract(bCtx, txCtx, tx.Sender, tx.Recipient, tx.Data, tx.Value, tx.GasLimit)
+		ret, _, err := v.CallContract(bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to call contract: %w", err)
 		}
 
 		slog.Info("call contract succeed", "result", ret)
 	default:
-		return fmt.Errorf("unknown transaction type: %b", tx.TxType())
+		return fmt.Errorf("unknown transaction type: %d", tx.TxType())
 	}
 
 	return nil
