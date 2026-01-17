@@ -173,7 +173,7 @@ network:
 
   ### -----------------------------------------------------------------------------------
   ### `communication_mode` is the communication mode in the network.
-  communication_mode: "libp2p" # [direct, libp2p]
+  communication_mode: "direct" # [direct, libp2p]
   ### -----------------------------------------------------------------------------------
 
   libp2p:

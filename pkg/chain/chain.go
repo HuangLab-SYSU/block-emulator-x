@@ -369,6 +369,7 @@ func (c *Chain) updateTrieByBlock(ctx context.Context, b *block.Block) ([]byte, 
 	if err = c.s.StateStorage.TrieDB().Commit(stateRoot, false); err != nil {
 		return nil, nil, fmt.Errorf("commit state-db trie err: %w", err)
 	}
+
 	return stateRoot[:], locRoot, nil
 }
 
