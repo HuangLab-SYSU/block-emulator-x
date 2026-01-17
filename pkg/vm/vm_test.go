@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 )
 
 const (
@@ -83,11 +84,6 @@ func TestVM(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, r1, root1)
 
-	txContext := vm.TxContext{
-		Origin:   from,
-		GasPrice: big.NewInt(100),
-	}
-
 	// Update the blockNum in blockCtx.
 	blockCtx.BlockNumber = big.NewInt(blockNum + 1)
 
@@ -101,23 +97,26 @@ func TestVM(t *testing.T) {
 	// Deploy the contract.
 	contractAddr, _, err := vmExec.DeployContract(
 		blockCtx,
-		txContext,
-		account.Address(from),
-		contractCode,
-		txVal,
-		leftOverGas,
+		transaction.Transaction{
+			Sender:    account.Address(from),
+			Recipient: account.EmptyAccountAddr,
+			Data:      contractCode,
+			Value:     txVal,
+			GasLimit:  leftOverGas,
+		},
 	)
 	require.NoError(t, err)
 
 	// Call `set` (1).
 	callResult, _, err := vmExec.CallContract(
 		blockCtx,
-		txContext,
-		account.Address(from),
-		account.Address(contractAddr),
-		setCallData,
-		txVal,
-		leftOverGas,
+		transaction.Transaction{
+			Sender:    account.Address(from),
+			Recipient: account.Address(contractAddr),
+			Data:      setCallData,
+			Value:     txVal,
+			GasLimit:  leftOverGas,
+		},
 	)
 	require.NoError(t, err)
 	require.Len(t, callResult, 0)
@@ -125,12 +124,13 @@ func TestVM(t *testing.T) {
 	// Call `get`.
 	callResult, _, err = vmExec.CallContract(
 		blockCtx,
-		txContext,
-		account.Address(from),
-		account.Address(contractAddr),
-		getCallData,
-		txVal,
-		leftOverGas,
+		transaction.Transaction{
+			Sender:    account.Address(from),
+			Recipient: account.Address(contractAddr),
+			Data:      getCallData,
+			Value:     txVal,
+			GasLimit:  leftOverGas,
+		},
 	)
 	require.NoError(t, err)
 

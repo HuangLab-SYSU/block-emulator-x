@@ -24,7 +24,6 @@ import (
 const (
 	vmStateNameSpace = "vm_state"
 	blockGasLimit    = uint64(1000000)
-	unlimitedGas     = uint64(1000000)
 )
 
 type VMHandle struct {
@@ -70,19 +69,16 @@ func (v *VMHandle) HandleBlock(b block.Block) error {
 
 	// Handle transactions
 	for _, tx := range b.TxList {
-		txCtx := gethvm.TxContext{
-			Origin: common.Address(tx.Sender),
-		}
 		switch tx.TxType() {
 		case transaction.CreateContractTxType:
-			contractAddr, gasUsed, err := e.DeployContract(bCtx, txCtx, tx.Sender, tx.Data, tx.Value, unlimitedGas)
+			contractAddr, gasUsed, err := e.DeployContract(bCtx, tx)
 			if err != nil {
 				slog.Error("deploy contract tx failed", "err", err)
 			} else {
 				slog.Info("deploy contract succeed", "contractAddr", contractAddr, "gasUsed", gasUsed)
 			}
 		case transaction.CallContractTxType:
-			ret, gasLeft, err := e.CallContract(bCtx, txCtx, tx.Sender, tx.Recipient, tx.Data, tx.Value, unlimitedGas)
+			ret, gasLeft, err := e.CallContract(bCtx, tx)
 			if err != nil {
 				slog.Error("deploy contract tx failed", "err", err)
 			} else {

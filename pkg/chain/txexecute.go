@@ -97,7 +97,7 @@ func relayTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard int
 
 		s.AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 	default:
-		return fmt.Errorf("unknown relay transaction type: %b", tx.RelayStage)
+		return fmt.Errorf("unknown relay transaction type: %d", tx.RelayStage)
 	}
 
 	return nil
@@ -141,7 +141,7 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 		s.AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 
 	default:
-		return fmt.Errorf("unknown broker transaction type: %b", tx.BrokerStage)
+		return fmt.Errorf("unknown broker transaction type: %d", tx.BrokerStage)
 	}
 
 	return nil
