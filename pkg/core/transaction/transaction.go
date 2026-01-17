@@ -30,6 +30,8 @@ const (
 	Sigma2BrokerStage = 2
 )
 
+const defaultGasLimit = 1000000
+
 type Signature []byte
 
 type Transaction struct {
@@ -41,6 +43,8 @@ type Transaction struct {
 	Signature   Signature
 	CreateTime  time.Time
 	Data        []byte
+
+	GasLimit uint64
 
 	RelayTxOpt  // the optional setting only for relay transactions.
 	BrokerTxOpt // the optional setting only for broker transactions.
@@ -72,6 +76,7 @@ func NewTransaction(
 		PriorityFee: priorityFee,
 		Nonce:       nonce,
 		CreateTime:  proposeTime,
+		GasLimit:    defaultGasLimit,
 	}
 
 	return tx

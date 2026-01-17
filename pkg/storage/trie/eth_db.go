@@ -18,10 +18,9 @@ import (
 )
 
 const (
-	levelDBNamespace    = "trie"
-	defaultLevelCache   = 16
-	defaultLevelHandler = 16
-	levelDBFilePathFmt  = "shard_%d_node_%d"
+	levelDBNamespace   = "shard_loc_trie"
+	defaultLevelCache  = 1 << 5
+	levelDBFilePathFmt = "account_loc_shard_%d_node_%d"
 )
 
 type EthereumDefaultTrieDB struct {
@@ -36,11 +35,7 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg, lp config.LocalParams) (
 	} else {
 		level, err := leveldb.New(
 			filepath.Join(cfg.LevelFilePathDir, fmt.Sprintf(levelDBFilePathFmt, lp.ShardID, lp.NodeID)),
-			defaultLevelCache,
-			defaultLevelHandler,
-			levelDBNamespace,
-			false,
-		)
+			defaultLevelCache, 0, levelDBNamespace, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open level db: %w", err)
 		}
@@ -48,10 +43,7 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg, lp config.LocalParams) (
 		db = rawdb.NewDatabase(level)
 	}
 
-	trieDb := triedb.NewDatabase(db, &triedb.Config{
-		Preimages: true,
-		IsVerkle:  false,
-	})
+	trieDb := triedb.NewDatabase(db, triedb.HashDefaults)
 
 	trieId := trie.TrieID(types.EmptyRootHash)
 	// if there are existing merkle, try to re-build it.
@@ -67,34 +59,11 @@ func NewEthereumDefaultTrieDB(cfg config.EthStorageCfg, lp config.LocalParams) (
 	return &EthereumDefaultTrieDB{trieDB: trieDb, curStateRoot: trieId.StateRoot}, nil
 }
 
-func (*EthereumDefaultTrieDB) GenerateRootByGivenBytes(_ context.Context, keys, values [][]byte) ([]byte, error) {
-	// Validate parameters.
-	if len(keys) != len(values) {
-		return nil, fmt.Errorf(
-			"bad input, len(keys) != len(values): len(keys)=%d, len(values)=%d",
-			len(keys),
-			len(values),
-		)
-	}
-	// Create a new trie.
-	memTrieDb := triedb.NewDatabase(rawdb.NewMemoryDatabase(), &triedb.Config{IsVerkle: false})
-
-	tempTrie := trie.NewEmpty(memTrieDb)
-	for i := range keys {
-		err := tempTrie.Update(keys[i], values[i])
-		if err != nil {
-			return nil, fmt.Errorf("update trie db failed, err=%w", err)
-		}
-	}
-
-	return tempTrie.Hash().Bytes(), nil
-}
-
 func (e *EthereumDefaultTrieDB) GetCurrentRoot(_ context.Context) ([]byte, error) {
 	return e.curStateRoot.Bytes(), nil
 }
 
-func (e *EthereumDefaultTrieDB) MAddAccountStatesPreview(_ context.Context, keys, values [][]byte) ([]byte, error) {
+func (e *EthereumDefaultTrieDB) MAddKeyValuesPreview(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf(
@@ -119,7 +88,7 @@ func (e *EthereumDefaultTrieDB) MAddAccountStatesPreview(_ context.Context, keys
 	return curTrie.Hash().Bytes(), nil
 }
 
-func (e *EthereumDefaultTrieDB) MAddAccountStatesAndCommit(_ context.Context, keys, values [][]byte) ([]byte, error) {
+func (e *EthereumDefaultTrieDB) MAddKeyValuesAndCommit(_ context.Context, keys, values [][]byte) ([]byte, error) {
 	// Validate parameters.
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf(
@@ -159,7 +128,7 @@ func (e *EthereumDefaultTrieDB) MAddAccountStatesAndCommit(_ context.Context, ke
 	return e.curStateRoot.Bytes(), nil
 }
 
-func (e *EthereumDefaultTrieDB) MGetAccountStates(_ context.Context, keys [][]byte) ([][]byte, error) {
+func (e *EthereumDefaultTrieDB) MGetValsByKeys(_ context.Context, keys [][]byte) ([][]byte, error) {
 	curTrie, err := trie.New(trie.TrieID(e.curStateRoot), e.trieDB)
 	if err != nil {
 		return nil, fmt.Errorf("new trie failed, err=%w", err)

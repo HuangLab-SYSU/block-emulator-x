@@ -130,7 +130,7 @@ func (am *AccMigrateMetadata) GetMigratedAddrStates() ([]account.Address, []acco
 				slog.Warn("missing account in GetMigratedAddrStates", "account", acc)
 			}
 
-			state = account.NewState(acc, int64(destShardID))
+			state = account.NewState(acc, uint64(destShardID))
 		} else {
 			// Set the location of this state to be this one.
 			state.ShardLocation = uint64(destShardID)
