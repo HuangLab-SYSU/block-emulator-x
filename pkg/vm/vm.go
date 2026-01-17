@@ -2,14 +2,13 @@ package vm
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	gethvm "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
 )
 
@@ -52,23 +51,24 @@ func (e *Executor) StateDB() *state.StateDB {
 
 // DeployContract deploys a contract on the state database in the executor.
 // It calls the evm.Create in geth. If the given leftOverGas is not enough, the contract will not be created.
-func (e *Executor) DeployContract(
-	bCtx gethvm.BlockContext,
-	txCtx gethvm.TxContext,
-	from account.Address,
-	code []byte,
-	value *big.Int,
-	leftOverGas uint64,
-) (common.Address, uint64, error) {
-	uValue, err := utils.BigToUInt256(value)
+func (e *Executor) DeployContract(ctx gethvm.BlockContext, tx transaction.Transaction) (common.Address, uint64, error) {
+	if tx.TxType() != transaction.CreateContractTxType {
+		return common.Address{}, 0, fmt.Errorf("not a create contract tx, tx type: %d", tx.TxType())
+	}
+
+	txCtx := gethvm.TxContext{
+		Origin: common.Address(tx.Sender),
+	}
+
+	uValue, err := utils.BigToUInt256(tx.Value)
 	if err != nil {
 		return common.Address{}, 0, fmt.Errorf("failed to convert value to uint256: %w", err)
 	}
 
-	evm := gethvm.NewEVM(bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
+	evm := gethvm.NewEVM(ctx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 	// Create(Deploy) a contract.
-	_, contractAddress, gasUsed, err := evm.Create(common.Address(from), code, leftOverGas, uValue)
+	_, contractAddress, gasUsed, err := evm.Create(common.Address(tx.Sender), tx.Data, tx.GasLimit, uValue)
 	if err != nil {
 		return common.Address{}, 0, fmt.Errorf("failed to create contract: %w", err)
 	}
@@ -78,23 +78,24 @@ func (e *Executor) DeployContract(
 
 // CallContract calls the contract with the given `to` address.
 // It calls the evm,Call in geth.
-func (e *Executor) CallContract(
-	bCtx gethvm.BlockContext,
-	txCtx gethvm.TxContext,
-	from, to account.Address,
-	data []byte,
-	value *big.Int,
-	leftOverGas uint64,
-) ([]byte, uint64, error) {
-	uValue, err := utils.BigToUInt256(value)
+func (e *Executor) CallContract(ctx gethvm.BlockContext, tx transaction.Transaction) ([]byte, uint64, error) {
+	if tx.TxType() != transaction.CallContractTxType {
+		return nil, 0, fmt.Errorf("not a call contract tx, tx type: %d", tx.TxType())
+	}
+
+	txCtx := gethvm.TxContext{
+		Origin: common.Address(tx.Sender),
+	}
+
+	uValue, err := utils.BigToUInt256(tx.Value)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to convert value to uint256: %w", err)
 	}
 
-	evm := gethvm.NewEVM(bCtx, e.stateDB, e.vmChainCfg, e.evmCfg)
+	evm := gethvm.NewEVM(ctx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 
-	return evm.Call(common.Address(from), common.Address(to), data, leftOverGas, uValue)
+	return evm.Call(common.Address(tx.Sender), common.Address(tx.Recipient), tx.Data, tx.GasLimit, uValue)
 }
 
 // Commit commits the stateDB in the executor.
