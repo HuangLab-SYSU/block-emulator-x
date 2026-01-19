@@ -142,6 +142,7 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 
 	// store Node2PeerIdInfo
 	l.infoMapMux.Lock()
+
 	if l.info2PeerID[info.ShardID] == nil {
 		l.info2PeerID[info.ShardID] = make(map[int64]string)
 	}
@@ -184,9 +185,12 @@ func (l *LibP2PConn) broadcastNode2PeerIdMap() error {
 		if peerID == l.hostInst.ID() {
 			continue
 		}
+
 		wg.Add(1)
+
 		go func(pid peer.ID) {
 			defer wg.Done()
+
 			ctx, cancel := context.WithTimeout(context.Background(), ctxTimeOut)
 			defer cancel()
 
@@ -238,6 +242,7 @@ func (l *LibP2PConn) throttledSender(interval time.Duration) {
 		case <-ticker.C:
 			if hasNewMsg {
 				hasNewMsg = false // 重置标志
+
 				if err := l.broadcastNode2PeerIdMap(); err != nil {
 					slog.Error("failed to broadcast ID map", "error", err)
 				}
