@@ -60,6 +60,8 @@ type LibP2PConn struct {
 	hostInst host.Host
 	kadInst  *dht.IpfsDHT
 
+	idMapUpdateChan chan struct{}
+
 	cfg config.NetworkCfg
 }
 
@@ -74,7 +76,10 @@ func NewLibP2PConn(cfg config.NetworkCfg, me nodetopo.NodeInfo, nodeM nodetopo.N
 		info2PeerID: info2Host,
 		msgBuffer:   make(chan *rpcserver.WrappedMsg, msgBufferSize),
 		nodeM:       nodeM,
-		cfg:         cfg,
+
+		idMapUpdateChan: make(chan struct{}),
+
+		cfg: cfg,
 	}
 
 	return l

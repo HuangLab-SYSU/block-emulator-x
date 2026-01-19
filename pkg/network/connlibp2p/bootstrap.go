@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -21,6 +22,8 @@ import (
 const (
 	secretKeyBitLen        = 256
 	reportConnTimeInterval = 30 * time.Second
+
+	broadcastMaxFreq = 2 * time.Second
 )
 
 var (
@@ -87,6 +90,8 @@ func (l *LibP2PConn) initBootstrap() (rErr error) {
 
 	slog.Info("successfully start bootstrap & relay & DHT service")
 
+	go l.throttledSender(broadcastMaxFreq)
+
 	return nil
 }
 
@@ -137,13 +142,12 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 
 	// store Node2PeerIdInfo
 	l.infoMapMux.Lock()
-	defer l.infoMapMux.Unlock()
-
 	if l.info2PeerID[info.ShardID] == nil {
 		l.info2PeerID[info.ShardID] = make(map[int64]string)
 	}
 
 	l.info2PeerID[info.ShardID][info.NodeID] = info.PeerID
+	l.infoMapMux.Unlock()
 
 	// update the node topo map
 	err = l.nodeM.SetTopoGetter(l.info2PeerID)
@@ -160,9 +164,7 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 
 	l.printRegisteredNodes()
 
-	if err = l.broadcastNode2PeerIdMap(); err != nil {
-		slog.Error("failed to broadcast ID map", "error", err)
-	}
+	l.idMapUpdateChan <- struct{}{}
 }
 
 // broadcastNode2PeerIdMap broadcasts the updated ID Map.
@@ -174,13 +176,17 @@ func (l *LibP2PConn) broadcastNode2PeerIdMap() error {
 
 	// Get all connected peers.
 	conns := l.hostInst.Network().Conns()
+
+	wg := sync.WaitGroup{}
+
 	for _, conn := range conns {
 		peerID := conn.RemotePeer()
 		if peerID == l.hostInst.ID() {
 			continue
 		}
-
+		wg.Add(1)
 		go func(pid peer.ID) {
+			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), ctxTimeOut)
 			defer cancel()
 
@@ -200,6 +206,8 @@ func (l *LibP2PConn) broadcastNode2PeerIdMap() error {
 		}(peerID)
 	}
 
+	wg.Wait()
+
 	return nil
 }
 
@@ -210,6 +218,30 @@ func (l *LibP2PConn) printRegisteredNodes() {
 	for shardID, shardInfo := range l.info2PeerID {
 		for nodeID, nodeInfo := range shardInfo {
 			slog.Info("register node info", "Shard", shardID, "Node", nodeID, "Peer ID", nodeInfo)
+		}
+	}
+}
+
+// throttledSender limits the broadcast msg.
+// It broadcasts the node-to-peer map periodically if this map is updated.
+func (l *LibP2PConn) throttledSender(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	hasNewMsg := false
+
+	for {
+		select {
+		case <-l.idMapUpdateChan:
+			hasNewMsg = true
+
+		case <-ticker.C:
+			if hasNewMsg {
+				hasNewMsg = false // 重置标志
+				if err := l.broadcastNode2PeerIdMap(); err != nil {
+					slog.Error("failed to broadcast ID map", "error", err)
+				}
+			}
 		}
 	}
 }

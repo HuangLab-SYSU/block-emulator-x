@@ -68,8 +68,10 @@ func PrepareNetworkByCfg(cfg *config.Config, lp *config.LocalParams) (network.P2
 		}()
 
 		if err = waitForNodeMapperReady(nodeM, cfg.GlobalSys); err != nil {
-			return nil, nil, fmt.Errorf("wait for node mapper ready: %w", err)
+			return nil, nil, fmt.Errorf("wait for node mapper ready failed: %w", err)
 		}
+
+		slog.Info("node mapper ready, this node is to start")
 
 	default:
 		return nil, nil, fmt.Errorf("unknown communication Mode: %s", cfg.CommunicationMode)
@@ -185,13 +187,13 @@ func checkNodeMapperReady(nodeM nodetopo.NodeMapper, cfg config.SystemCfg) error
 			return fmt.Errorf("failed to get leader of shard %d: %w", shardID, err)
 		}
 
-		shardInfo, err := nodeM.GetNodesInShard(shardID)
+		nodeInfos, err := nodeM.GetNodesInShard(shardID)
 		if err != nil {
 			return fmt.Errorf("failed to get nodes in shard %d: %w", shardID, err)
 		}
 
-		if len(shardInfo) != int(cfg.NodeNum) {
-			return fmt.Errorf("actual node number %d in shard %d: %w", cfg.NodeNum, shardID, errNodeMapNotReady)
+		if len(nodeInfos) != int(cfg.NodeNum) {
+			return fmt.Errorf("actual node number %d in shard %d: %w", len(nodeInfos), shardID, errNodeMapNotReady)
 		}
 	}
 
