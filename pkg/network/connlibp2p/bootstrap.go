@@ -109,9 +109,6 @@ func (l *LibP2PConn) reportLibConn() {
 }
 
 func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
-	l.infoMapMux.Lock()
-	defer l.infoMapMux.Unlock()
-
 	defer func() { _ = s.Close() }()
 
 	data, err := io.ReadAll(s)
@@ -139,6 +136,8 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 	}
 
 	// store Node2PeerIdInfo
+	l.infoMapMux.Lock()
+	defer l.infoMapMux.Unlock()
 
 	if l.info2PeerID[info.ShardID] == nil {
 		l.info2PeerID[info.ShardID] = make(map[int64]string)
