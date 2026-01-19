@@ -86,7 +86,8 @@ func (c *CLPARelayCommittee) SendTxsAndConsensus(ctx context.Context) error {
 
 func (c *CLPARelayCommittee) HandleMsg(_ context.Context, msg *rpcserver.WrappedMsg) error {
 	if msg.GetMsgType() != message.RelayBlockInfoMessageType {
-		return fmt.Errorf("unexpected msg type: %s", msg.GetMsgType())
+		slog.Info("unknown expected msg type", "type", msg.GetMsgType())
+		return nil
 	}
 
 	var bInfo message.RelayBlockInfoMsg

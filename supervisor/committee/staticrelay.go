@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"log/slog"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/config"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
@@ -57,7 +58,8 @@ func (s *StaticRelayCommittee) SendTxsAndConsensus(ctx context.Context) error {
 
 func (s *StaticRelayCommittee) HandleMsg(_ context.Context, msg *rpcserver.WrappedMsg) error {
 	if msg.GetMsgType() != message.RelayBlockInfoMessageType {
-		return fmt.Errorf("unexpected msg type: %s", msg.GetMsgType())
+		slog.Info("unknown expected msg type", "type", msg.GetMsgType())
+		return nil
 	}
 
 	var bInfo message.RelayBlockInfoMsg
