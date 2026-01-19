@@ -107,7 +107,8 @@ func (c *CLPABrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.Wrap
 
 		c.handleTxSendAgainMsg(ctx, &tsa)
 	default:
-		return fmt.Errorf("unexpected msg type: %s", msg.GetMsgType())
+		slog.Info("unknown expected msg type", "type", msg.GetMsgType())
+		return nil
 	}
 
 	return nil

@@ -24,10 +24,11 @@ type Supervisor struct {
 	r    nodetopo.NodeMapper  // r give the information of other nodes.
 	conn *network.ConnHandler // conn is the p2p-connections among consensus nodes, i.e., network layer.
 
-	measure     measure.Measure            // measure is the stats' module.
-	committee   committee.Committee        // committee controls the message sending and some consensus algorithms.
-	wmBuffer    chan *rpcserver.WrappedMsg // wmBuffer is the buffer of wrapped messages.
-	measureDone chan struct{}              // measureDone is to make sure that the measure subroutine will quit.
+	committee committee.Committee // committee controls the message sending and some consensus algorithms.
+
+	measure       measure.Measure            // measure is the stats' module.
+	measureMsgBuf chan *rpcserver.WrappedMsg // measureMsgBuf is the buffer of wrapped messages.
+	measureDone   chan struct{}              // measureDone is to make sure that the measure subroutine will quit.
 
 	cfg config.SupervisorCfg
 }
@@ -93,10 +94,10 @@ func NewSupervisor(conn *network.ConnHandler, r nodetopo.NodeMapper, cfg config.
 		conn: conn,
 		r:    r,
 
-		measure:     ms,
-		committee:   com,
-		wmBuffer:    make(chan *rpcserver.WrappedMsg, wmBufferSize),
-		measureDone: make(chan struct{}),
+		measure:       ms,
+		committee:     com,
+		measureMsgBuf: make(chan *rpcserver.WrappedMsg, wmBufferSize),
+		measureDone:   make(chan struct{}),
 
 		cfg: cfg,
 	}, nil
@@ -122,9 +123,11 @@ func (s *Supervisor) Start() error {
 		msgList := s.conn.DrainMsgBuffer()
 
 		for _, msg := range msgList {
-			// handle messages in measure module, this is run in another routine (measure routine)
-			s.wmBuffer <- msg
-			// the messages should be handled by the committee
+			// Handle messages in the measure module which is run in another routine (measure routine)
+			s.measureMsgBuf <- msg
+			// Handle messages in the contract execution module which in run in another routine.
+
+			// The messages should be handled by the committee
 			if err := s.committee.HandleMsg(ctx, msg); err != nil {
 				slog.ErrorContext(ctx, "failed to handle msg", "err", err)
 			}
@@ -136,7 +139,7 @@ func (s *Supervisor) Start() error {
 	}
 
 	// close the wrapped message buffer, and wait all measures are handled.
-	close(s.wmBuffer)
+	close(s.measureMsgBuf)
 	<-s.measureDone
 
 	// output the measure result
@@ -174,7 +177,7 @@ func (s *Supervisor) Start() error {
 func (s *Supervisor) measureSubroutine() {
 	slog.Info("supervisor measure subroutine started")
 
-	for wm := range s.wmBuffer {
+	for wm := range s.measureMsgBuf {
 		if err := s.measure.UpdateMeasureRecord(wm); err != nil {
 			slog.Error("failed to update measure record", "err", err)
 		}

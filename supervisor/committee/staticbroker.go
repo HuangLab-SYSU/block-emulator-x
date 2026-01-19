@@ -67,7 +67,8 @@ func (s *StaticBrokerCommittee) SendTxsAndConsensus(ctx context.Context) error {
 
 func (s *StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.WrappedMsg) error {
 	if msg.GetMsgType() != message.BrokerBlockInfoMessageType {
-		return fmt.Errorf("unexpected msg type: %s", msg.GetMsgType())
+		slog.Info("unknown expected msg type", "type", msg.GetMsgType())
+		return nil
 	}
 
 	var bInfo message.BrokerBlockInfoMsg

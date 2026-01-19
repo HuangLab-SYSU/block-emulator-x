@@ -68,12 +68,12 @@ func (e *Executor) DeployContract(ctx gethvm.BlockContext, tx transaction.Transa
 	evm := gethvm.NewEVM(ctx, e.stateDB, e.vmChainCfg, e.evmCfg)
 	evm.SetTxContext(txCtx)
 	// Create(Deploy) a contract.
-	_, contractAddress, gasUsed, err := evm.Create(common.Address(tx.Sender), tx.Data, tx.GasLimit, uValue)
+	_, contractAddress, leftOverGas, err := evm.Create(common.Address(tx.Sender), tx.Data, tx.GasLimit, uValue)
 	if err != nil {
 		return common.Address{}, 0, fmt.Errorf("failed to create contract: %w", err)
 	}
 
-	return contractAddress, gasUsed, nil
+	return contractAddress, leftOverGas, nil
 }
 
 // CallContract calls the contract with the given `to` address.
