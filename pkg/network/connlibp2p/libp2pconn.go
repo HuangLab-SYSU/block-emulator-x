@@ -34,9 +34,10 @@ const (
 	consensusMsgProtocol   = "/blockemulator/consensus/0.0.1"
 	registerProtocol       = "/blockemulator/register/0.0.1"
 	broadcastIdMapProtocol = "/blockemulator/peer-id-map/0.0.1"
-	multiAddrSubstr        = "/p2p-circuit"
-	mdnsServerName         = "blockemulator.lib-p2p"
-	dhtProtocolPrefix      = "/blockemulator/kad/1.0.0"
+
+	multiAddrSubstr   = "/p2p-circuit"
+	mdnsServerName    = "blockemulator.lib-p2p"
+	dhtProtocolPrefix = "/blockemulator/kad/1.0.0"
 
 	// hostAddrFmt uses ip4 as default
 	hostAddrFmt = "/ip4/%s/tcp/%d/p2p/%s"
@@ -59,13 +60,9 @@ type LibP2PConn struct {
 	hostInst host.Host
 	kadInst  *dht.IpfsDHT
 
-	cfg config.NetworkCfg
-}
+	idMapUpdateChan chan struct{}
 
-type node2PeerIdInfo struct {
-	ShardID int64
-	NodeID  int64
-	PeerID  string
+	cfg config.NetworkCfg
 }
 
 func NewLibP2PConn(cfg config.NetworkCfg, me nodetopo.NodeInfo, nodeM nodetopo.NodeMapper) *LibP2PConn {
@@ -79,7 +76,10 @@ func NewLibP2PConn(cfg config.NetworkCfg, me nodetopo.NodeInfo, nodeM nodetopo.N
 		info2PeerID: info2Host,
 		msgBuffer:   make(chan *rpcserver.WrappedMsg, msgBufferSize),
 		nodeM:       nodeM,
-		cfg:         cfg,
+
+		idMapUpdateChan: make(chan struct{}),
+
+		cfg: cfg,
 	}
 
 	return l
@@ -259,13 +259,11 @@ func (l *LibP2PConn) registerNodeInfo(me nodetopo.NodeInfo) error {
 		return fmt.Errorf("invalid relay peer ID: %w", err)
 	}
 
-	node2Host := node2PeerIdInfo{
+	data, err := json.Marshal(NodeRegisterMsg{
 		ShardID: me.ShardID,
 		NodeID:  me.NodeID,
 		PeerID:  l.hostInst.ID().String(),
-	}
-
-	data, err := json.Marshal(node2Host)
+	})
 	if err != nil {
 		return fmt.Errorf("marshal node info failed: %w", err)
 	}
@@ -286,15 +284,8 @@ func (l *LibP2PConn) registerNodeInfo(me nodetopo.NodeInfo) error {
 	defer func() { _ = s.Close() }()
 
 	// Send data to supervisor.
-	_, err = s.Write(data)
-	if err != nil {
-		return fmt.Errorf("failed to send node info: %w", err)
-	}
-
-	if err = s.CloseWrite(); err != nil {
-		slog.Error("failed to close write", "to", relayPeerID, "error", err)
-
-		_ = s.Reset()
+	if err = writeStream(s, data); err != nil {
+		return fmt.Errorf("failed to write stream: %w", err)
 	}
 
 	// Read ACK from supervisor.
@@ -339,15 +330,15 @@ func (l *LibP2PConn) handleIdMapMessage(s network.Stream) {
 		return
 	}
 
-	var newMap map[int64]map[int64]string
-	if err = json.Unmarshal(data, &newMap); err != nil {
+	var npb NodePeerBroadcastMsg
+	if err = json.Unmarshal(data, &npb); err != nil {
 		slog.Error("failed to unmarshal id map from message stream", "error", err)
 		return
 	}
 
 	// Update the ID map.
 	l.infoMapMux.Lock()
-	l.info2PeerID = newMap
+	l.info2PeerID = npb.NodePeerMap
 	l.infoMapMux.Unlock()
 
 	// Update the nodetopo map.
@@ -386,14 +377,8 @@ func (l *LibP2PConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, ms
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
-	if _, err = s.Write(data); err != nil {
-		return fmt.Errorf("p2pDial write error to %s: %w", peerID, err)
-	}
-
-	if err = s.CloseWrite(); err != nil {
-		slog.Warn("failed to close write", "to", peerID, "error", err)
-
-		_ = s.Reset()
+	if err = writeStream(s, data); err != nil {
+		return fmt.Errorf("write message to stream failed: %w", err)
 	}
 
 	return nil
@@ -407,6 +392,19 @@ func (l *LibP2PConn) add2LocalBuffer(msg *rpcserver.WrappedMsg) error {
 	case l.msgBuffer <- msg:
 	default:
 		return fmt.Errorf("message buffer is full or closed")
+	}
+
+	return nil
+}
+
+func writeStream(s network.Stream, msg []byte) error {
+	if _, err := s.Write(msg); err != nil {
+		return fmt.Errorf("p2pDial write failed: %w", err)
+	}
+
+	if err := s.CloseWrite(); err != nil {
+		_ = s.Reset()
+		return fmt.Errorf("failed to close write failed: %w", err)
 	}
 
 	return nil
