@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -21,6 +22,13 @@ import (
 const (
 	secretKeyBitLen        = 256
 	reportConnTimeInterval = 30 * time.Second
+
+	broadcastMaxFreq = 2 * time.Second
+)
+
+var (
+	registerOKACK  = []byte("registered succeed")
+	registerErrACK = []byte("registered failed")
 )
 
 // initBootstrap inits the network settings for supervisor node.
@@ -82,6 +90,8 @@ func (l *LibP2PConn) initBootstrap() (rErr error) {
 
 	slog.Info("successfully start bootstrap & relay & DHT service")
 
+	go l.throttledSender(broadcastMaxFreq)
+
 	return nil
 }
 
@@ -112,20 +122,9 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 		return
 	}
 
-	var info node2PeerIdInfo
+	var info NodeRegisterMsg
 	if err = json.Unmarshal(data, &info); err != nil {
 		slog.Error("invalid node info JSON", "from", s.Conn().RemotePeer(), "error", err)
-
-		_, err = s.Write([]byte("invalid json"))
-		if err != nil {
-			slog.Error("failed to send ACK", "to", s.Conn().RemotePeer(), "error", err)
-		}
-
-		if err = s.CloseWrite(); err != nil {
-			slog.Error("failed to close write", "to", s.Conn().RemotePeer(), "error", err)
-			_ = s.Reset()
-		}
-
 		return
 	}
 
@@ -134,15 +133,8 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 	if info.PeerID != remotePeer {
 		slog.Error("failed to match peerID", "claimed is", info.PeerID, "actually is", remotePeer)
 
-		_, err = s.Write([]byte("ailed to match peerID"))
-		if err != nil {
-			slog.Error("failed to send ACK", "to", remotePeer, "error", err)
-		}
-
-		if err = s.CloseWrite(); err != nil {
-			slog.Error("failed to close write", "to", remotePeer, "error", err)
-
-			_ = s.Reset()
+		if err = writeStream(s, registerErrACK); err != nil {
+			slog.Error("failed to write to stream", "error", err)
 		}
 
 		return
@@ -167,42 +159,38 @@ func (l *LibP2PConn) handleRegisterStream(s network.Stream) {
 
 	slog.Info("registered node", "Shard", info.ShardID, "Node", info.NodeID, "Peer", info.PeerID)
 
-	_, err = s.Write([]byte("registered successfully"))
-	if err != nil {
-		slog.Error("failed to send ACK", "to", remotePeer, "error", err)
-	}
-
-	if err = s.CloseWrite(); err != nil {
-		slog.Error("failed to close write", "to", remotePeer, "error", err)
-
-		_ = s.Reset()
-
-		return
+	if err = writeStream(s, registerOKACK); err != nil {
+		slog.Error("failed to write registered stream", "error", err)
 	}
 
 	l.printRegisteredNodes()
 
-	if err = l.broadcastNode2PeerIdMap(); err != nil {
-		slog.Error("failed to broadcast ID map", "error", err)
-	}
+	l.idMapUpdateChan <- struct{}{}
 }
 
 // broadcastNode2PeerIdMap broadcasts the updated ID Map.
 func (l *LibP2PConn) broadcastNode2PeerIdMap() error {
-	data, err := json.Marshal(l.info2PeerID)
+	data, err := json.Marshal(NodePeerBroadcastMsg{l.info2PeerID})
 	if err != nil {
-		return fmt.Errorf("failed to marshal Node2PeerIdInfos: %w", err)
+		return fmt.Errorf("failed to marshal node-to-Peer Msg: %w", err)
 	}
 
 	// Get all connected peers.
 	conns := l.hostInst.Network().Conns()
+
+	wg := sync.WaitGroup{}
+
 	for _, conn := range conns {
 		peerID := conn.RemotePeer()
 		if peerID == l.hostInst.ID() {
 			continue
 		}
 
+		wg.Add(1)
+
 		go func(pid peer.ID) {
+			defer wg.Done()
+
 			ctx, cancel := context.WithTimeout(context.Background(), ctxTimeOut)
 			defer cancel()
 
@@ -214,30 +202,51 @@ func (l *LibP2PConn) broadcastNode2PeerIdMap() error {
 
 			defer func() { _ = s.Close() }()
 
-			if _, err = s.Write(data); err != nil {
-				slog.Error("failed to send id map data", "to", pid, "error", err)
-			} else {
-				slog.Info("synced id map", "to", pid)
+			if err = writeStream(s, data); err != nil {
+				slog.Error("failed to write stream", "to", pid, "error", err)
 			}
 
-			if err = s.CloseWrite(); err != nil {
-				slog.Error("failed to close write", "to", pid, "error", err)
-
-				_ = s.Reset()
-			}
+			slog.Info("broadcasted node to peer", "peer", pid, "to", pid)
 		}(peerID)
 	}
+
+	wg.Wait()
 
 	return nil
 }
 
 // printRegisteredNodes prints the registered nodes list.
 func (l *LibP2PConn) printRegisteredNodes() {
-	slog.Info("Total registered shards", "count", len(l.info2PeerID))
+	slog.Info("total registered shards", "count", len(l.info2PeerID))
 
 	for shardID, shardInfo := range l.info2PeerID {
 		for nodeID, nodeInfo := range shardInfo {
-			slog.Info("register node info", "Shard", shardID, "Node", nodeID, "Peer", nodeInfo)
+			slog.Info("register node info", "Shard", shardID, "Node", nodeID, "Peer ID", nodeInfo)
+		}
+	}
+}
+
+// throttledSender limits the broadcast msg.
+// It broadcasts the node-to-peer map periodically if this map is updated.
+func (l *LibP2PConn) throttledSender(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	hasNewMsg := false
+
+	for {
+		select {
+		case <-l.idMapUpdateChan:
+			hasNewMsg = true
+
+		case <-ticker.C:
+			if hasNewMsg {
+				hasNewMsg = false // 重置标志
+
+				if err := l.broadcastNode2PeerIdMap(); err != nil {
+					slog.Error("failed to broadcast ID map", "error", err)
+				}
+			}
 		}
 	}
 }
