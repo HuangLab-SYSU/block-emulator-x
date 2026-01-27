@@ -68,6 +68,7 @@ func (s *Manager) IsBroker(addr account.Address) bool {
 
 func (s *Manager) CreateRawTxsRandomBroker(txs []transaction.Transaction) ([]transaction.Transaction, error) {
 	rawTxs := make([]transaction.Transaction, len(txs))
+
 	for i, tx := range txs {
 		broker := s.brokers[rand.Intn(len(s.brokers))]
 

@@ -141,6 +141,7 @@ func (c *Chain) AddBlock(ctx context.Context, b *block.Block) error {
 		err                              error
 		blockHash, blockByte, headerByte []byte
 	)
+
 	if blockHash, err = b.Hash(); err != nil {
 		return fmt.Errorf("calc header hash err: %w", err)
 	}
@@ -434,14 +435,18 @@ func (c *Chain) txExecute(
 			return fmt.Errorf("execute broker tx failed: %w", err)
 		}
 	case transaction.CreateContractTxType:
-		contractAddr, _, err := v.DeployContract(bCtx, tx)
+		var ctx *ContractTx
+
+		contractAddr, _, err := ctx.CreateContractTxExecute(v, bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to deploy contract: %w", err)
 		}
 
 		slog.Info("deploy contract succeed", "contract addr", contractAddr)
 	case transaction.CallContractTxType:
-		ret, _, err := v.CallContract(bCtx, tx)
+		var ctx *ContractTx
+
+		ret, _, err := ctx.CallContractTxExecute(v, bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to call contract: %w", err)
 		}
@@ -590,6 +595,7 @@ func (c *Chain) calcStateModification(ctx context.Context, v *vm.Executor, b *bl
 	accountBytes := make([][]byte, len(b.MigratedAddrs))
 
 	locationBytes := make([][]byte, len(b.MigratedAddrs))
+
 	for i, acc := range b.MigratedAddrs {
 		state := b.MigratedStates[i]
 

@@ -30,6 +30,7 @@ type State struct {
 
 func NewState(addr Address, loc uint64) *State {
 	var b big.Int
+
 	b.SetString(InitBalanceStr, 10)
 
 	return &State{
