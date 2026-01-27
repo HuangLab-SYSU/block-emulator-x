@@ -140,13 +140,21 @@ supervisor:
     ### `random_source`: The supervisor generates random transactions and inject them to the system.
     ### `csv_source`: The supervisor reads transactions from a .csv file and inject them to the system.
     ### Else: The supervisor will not inject any transactions.
-    tx_source_type: "random_source" # [random_source, csv_source]
+    tx_source_type: "csv_source" # [random_source, csv_source]
     ### -----------------------------------------------------------------------------------
 
     ### -----------------------------------------------------------------------------------
     ### `tx_source_file` is the .csv source file of transactions.
     ### This variable is valid when `tx_source_file` is `csv_source`.
-    tx_source_file: "" # valid when tx_source_type = csv_source
+    tx_source_file: "./supervisor/txsource/csvsource/contracttestdata.csv" # valid when tx_source_type = csv_source
+    ### -----------------------------------------------------------------------------------
+
+    ### -----------------------------------------------------------------------------------
+    ### `filter_contract_txs` indicates whether to filter out transactions related to smart contracts when reading transactions from .csv source file of transactions.
+    ### `true`: The supervisor filters out transactions related to smart contracts when reading transactions.
+    ### `false`: The supervisor does not filter out transactions related to smart contracts when reading transactions.
+    ### Else: The supervisor will not inject any transactions.
+    filter_contract_txs: true # It is a bool value (["true", "false"]).
     ### -----------------------------------------------------------------------------------
 
     ### -----------------------------------------------------------------------------------
