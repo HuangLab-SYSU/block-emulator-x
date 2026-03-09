@@ -8,7 +8,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/vm"
 )
 
-type ContractExecutor interface {
+type ContractExecPort interface {
 	CreateContractTxExecute(
 		v *vm.Executor,
 		bCtx gethvm.BlockContext,

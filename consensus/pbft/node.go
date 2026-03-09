@@ -387,7 +387,11 @@ func (n *Node) step2NextStage(ctx context.Context) error {
 		switch newStage {
 		case stagePreprepare:
 			// deliver according to the last proposal
-			if err = n.iop.ProposalCommitAndDeliver(ctx, n.pbftMeta.leader == n.pbftMeta.lp.NodeID, n.pbftMeta.lastProposal); err != nil {
+			if err = n.iop.ProposalCommitAndDeliver(
+				ctx,
+				n.pbftMeta.leader == n.pbftMeta.lp.NodeID,
+				n.pbftMeta.lastProposal,
+			); err != nil {
 				return fmt.Errorf("commit and deliver a proposal failed: %w", err)
 			}
 

@@ -3,17 +3,14 @@ package chain
 import (
 	"github.com/ethereum/go-ethereum/common"
 	gethvm "github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/vm"
 )
 
-type ContractTx struct {
-	vmChainCfg *params.ChainConfig
-}
+type EVMContractExecutor struct{}
 
-func (ctx *ContractTx) CreateContractTxExecute(
+func (ctx *EVMContractExecutor) CreateContractTxExecute(
 	v *vm.Executor,
 	bCtx gethvm.BlockContext,
 	tx transaction.Transaction,
@@ -22,7 +19,7 @@ func (ctx *ContractTx) CreateContractTxExecute(
 	return contractAddr, leftOverGas, err
 }
 
-func (ctx *ContractTx) CallContractTxExecute(
+func (ctx *EVMContractExecutor) CallContractTxExecute(
 	v *vm.Executor,
 	bCtx gethvm.BlockContext,
 	tx transaction.Transaction,

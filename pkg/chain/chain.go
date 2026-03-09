@@ -36,10 +36,10 @@ type Chain struct {
 	shardID   int64
 	epochID   int64
 
-	cfg        config.BlockchainCfg
-	vmChainCfg *params.ChainConfig
-
-	mux sync.Mutex
+	cfg          config.BlockchainCfg
+	vmChainCfg   *params.ChainConfig
+	contractExec ContractExecPort
+	mux          sync.Mutex
 }
 
 // NewChain creates a new blockchain data structure with given components.
@@ -58,8 +58,9 @@ func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
 		epochID:   0,
 		shardID:   lp.ShardID,
 
-		cfg:        cfg,
-		vmChainCfg: &vmChainCfg,
+		cfg:          cfg,
+		vmChainCfg:   &vmChainCfg,
+		contractExec: &EVMContractExecutor{},
 	}
 
 	genesisBlock, err := chain.initWithGenesisBlock()
@@ -435,18 +436,14 @@ func (c *Chain) txExecute(
 			return fmt.Errorf("execute broker tx failed: %w", err)
 		}
 	case transaction.CreateContractTxType:
-		var ctx *ContractTx
-
-		contractAddr, _, err := ctx.CreateContractTxExecute(v, bCtx, tx)
+		contractAddr, _, err := c.contractExec.CreateContractTxExecute(v, bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to deploy contract: %w", err)
 		}
 
 		slog.Info("deploy contract succeed", "contract addr", contractAddr)
 	case transaction.CallContractTxType:
-		var ctx *ContractTx
-
-		ret, _, err := ctx.CallContractTxExecute(v, bCtx, tx)
+		ret, _, err := c.contractExec.CallContractTxExecute(v, bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to call contract: %w", err)
 		}
