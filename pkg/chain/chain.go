@@ -38,7 +38,7 @@ type Chain struct {
 
 	cfg          config.BlockchainCfg
 	vmChainCfg   *params.ChainConfig
-	contractExec ContractExecPort
+	contractExec ContractExec
 	mux          sync.Mutex
 }
 
@@ -60,7 +60,7 @@ func NewChain(cfg config.BlockchainCfg, lp config.LocalParams) (*Chain, error) {
 
 		cfg:          cfg,
 		vmChainCfg:   &vmChainCfg,
-		contractExec: &EVMContractExecutor{},
+		contractExec: NewEVMContractExecutor(),
 	}
 
 	genesisBlock, err := chain.initWithGenesisBlock()

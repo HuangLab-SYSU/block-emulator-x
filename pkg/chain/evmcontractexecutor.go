@@ -10,6 +10,10 @@ import (
 
 type EVMContractExecutor struct{}
 
+func NewEVMContractExecutor() *EVMContractExecutor {
+	return &EVMContractExecutor{}
+}
+
 func (ctx *EVMContractExecutor) CreateContractTxExecute(
 	v *vm.Executor,
 	bCtx gethvm.BlockContext,
