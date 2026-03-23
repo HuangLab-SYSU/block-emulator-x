@@ -75,6 +75,7 @@ func (cs *CLPAState) computeEdges2Shard() {
 	for v, lst := range cs.netGraph.EdgeSet {
 		// get the shard of vertex v
 		vShard := cs.getVertexLocation(v)
+
 		for _, u := range lst {
 			// get the shard of vertex u
 			uShard := cs.getVertexLocation(u)
@@ -105,6 +106,7 @@ func (cs *CLPAState) computeEdges2Shard() {
 // changeShardRecompute calculates each parameter when the locations of accounts are changed.
 func (cs *CLPAState) changeShardRecompute(v Vertex, old int) {
 	newShard := cs.getVertexLocation(v)
+
 	for _, u := range cs.netGraph.EdgeSet[v] {
 		uShard := cs.getVertexLocation(u)
 		if uShard != newShard && uShard != old {
@@ -143,6 +145,7 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 			maxScore := -9999.0
 
 			vNowShard, maxScoreShard := cs.getVertexLocation(v), cs.getVertexLocation(v)
+
 			for _, u := range cs.netGraph.EdgeSet[v] {
 				uShard := cs.getVertexLocation(u)
 				if uShard == vNowShard {

@@ -117,6 +117,7 @@ func (m *MigrationBlockOp) MigrateAccounts(ctx context.Context) error {
 	}
 
 	sendMsgMap := make(map[nodetopo.NodeInfo]*rpcserver.WrappedMsg, len(atMsgList))
+
 	for i := range atMsgList {
 		l, err := m.resolver.GetLeader(int64(i))
 		if err != nil {

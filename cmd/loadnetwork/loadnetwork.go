@@ -89,6 +89,7 @@ func loadDirectNetwork(cfg config.SystemCfg, lp *config.LocalParams) (network.P2
 	slog.Info("local params is loaded successfully",
 		"shard id", lp.ShardID, "node id", lp.NodeID, "wallet addr", lp.WalletAddr, "ip addr",
 		info2Host[nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}])
+
 	meNode := nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}
 
 	// Set an RPC Connection as the P2P Connection.
@@ -100,6 +101,7 @@ func loadDirectNetwork(cfg config.SystemCfg, lp *config.LocalParams) (network.P2
 		shardID := node.ShardID
 
 		shardNodeInfo[shardID] = append(shardNodeInfo[shardID], node)
+
 		if node.NodeID == 0 {
 			shardLeader[shardID] = node
 		}
@@ -113,6 +115,7 @@ func loadDirectNetwork(cfg config.SystemCfg, lp *config.LocalParams) (network.P2
 func initLibP2PNetwork(cfg config.NetworkCfg, lp *config.LocalParams) (network.P2PConn, nodetopo.NodeMapper) {
 	slog.Info("local params is loaded successfully",
 		"shard id", lp.ShardID, "node id", lp.NodeID, "wallet addr", lp.WalletAddr)
+
 	meNode := nodetopo.NodeInfo{ShardID: lp.ShardID, NodeID: lp.NodeID}
 
 	m := nodetopo.NewTopoGetter(make(map[int64]nodetopo.NodeInfo), make(map[int64][]nodetopo.NodeInfo))

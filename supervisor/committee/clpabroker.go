@@ -190,6 +190,7 @@ func (c *CLPABrokerCommittee) classifyTxs(
 		0,
 		len(txs),
 	)
+
 	for _, tx := range txs {
 		senderAddr, receiverAddr := tx.Sender, tx.Recipient
 		senderShard := c.state.GetVertexLocation(partition.Vertex{Addr: senderAddr})

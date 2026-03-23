@@ -17,4 +17,6 @@ exp
 **/*.zip
 **/*.out
 **/*.csv
-!supervisor/txsource/csvsource/testdata.csv
+
+# 不要上传 macOS 自动生成的隐藏文件
+.DS_Store
