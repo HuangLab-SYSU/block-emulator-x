@@ -142,6 +142,7 @@ func (s *StaticBrokerCommittee) classifyTxs(
 		0,
 		len(txs),
 	)
+
 	for _, tx := range txs {
 		senderAddr, receiverAddr := tx.Sender, tx.Recipient
 		senderShard := partition.DefaultAccountLoc(senderAddr, s.cfg.ShardNum)

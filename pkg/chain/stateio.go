@@ -30,6 +30,7 @@ func readStateFromVMExecutor(address account.Address, e *vm.Executor, location u
 	nonce := e.StateDB().GetNonce(addr)
 
 	var bInt *big.Int
+
 	balance.IntoBig(&bInt)
 
 	return &account.State{

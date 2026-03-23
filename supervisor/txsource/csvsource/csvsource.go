@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/account"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/utils"
 )
@@ -84,8 +86,18 @@ func (ds *CSVSource) close() {
 }
 
 func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
-	if line[6] != "0" || line[7] != "0" || line[3] == line[4] {
-		return nil, fmt.Errorf("the line format is not matched")
+	fromAddrStr := line[3]
+	toAddrStr := line[4]
+	toCreateStr := line[5]
+	callingFuncStr := line[12]
+
+	hasCallData := callingFuncStr != "" && !strings.EqualFold(callingFuncStr, "none") &&
+		!strings.EqualFold(callingFuncStr, "0x")
+	hasToCreate := toCreateStr != "" && !strings.EqualFold(toCreateStr, "none")
+	hasToAddr := toAddrStr != "" && !strings.EqualFold(toAddrStr, "none")
+
+	if hasToAddr && fromAddrStr == toAddrStr {
+		return nil, fmt.Errorf("sender and recipient are the same")
 	}
 
 	val := new(big.Int)
@@ -93,17 +105,31 @@ func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 		return nil, fmt.Errorf("failed to parse value, val=%s", line[8])
 	}
 
-	senderAddr, err := utils.Hex2Addr(line[3])
+	senderAddr, err := utils.Hex2Addr(fromAddrStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sender address: %w", err)
 	}
 
-	receiverAddr, err := utils.Hex2Addr(line[4])
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse receiver address: %w", err)
+	receiverAddr := account.EmptyAccountAddr
+	if hasToAddr {
+		receiverAddr, err = utils.Hex2Addr(toAddrStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse receiver address: %w", err)
+		}
+	} else if !hasToCreate {
+		return nil, fmt.Errorf("missing account address")
 	}
 
 	tx := transaction.NewTransaction(senderAddr, receiverAddr, val, big.NewInt(0), uint64(count), time.Now())
+
+	if hasCallData {
+		data, err := utils.Hex2Bytes(callingFuncStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse calling function: %w", err)
+		}
+
+		tx.Data = data
+	}
 
 	return tx, nil
 }
