@@ -21,13 +21,14 @@ const Key = "csv_source"
 // CSVSource implements TxSourceType.
 // The csv file format supported by this implementation is like those from XBlock (https://xblock.pro/xblock-eth.html).
 type CSVSource struct {
-	count int64
-	cr    *csv.Reader
-	file  *os.File
-	done  bool
+	count             int64
+	cr                *csv.Reader
+	file              *os.File
+	done              bool
+	filterContractTxs bool
 }
 
-func NewCSVSource(filename string) (*CSVSource, error) {
+func NewCSVSource(filename string, filterContractTxs bool) (*CSVSource, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open dataset file: %w", err)
@@ -42,9 +43,10 @@ func NewCSVSource(filename string) (*CSVSource, error) {
 	}
 
 	return &CSVSource{
-		count: 1,
-		cr:    r,
-		file:  f,
+		count:             1,
+		cr:                r,
+		file:              f,
+		filterContractTxs: filterContractTxs,
 	}, nil
 }
 
@@ -66,7 +68,7 @@ func (ds *CSVSource) ReadTxs(size int64) ([]transaction.Transaction, error) {
 			return nil, fmt.Errorf("failed to read dataset file: %w", err)
 		}
 
-		tx, err := line2Tx(txLine, ds.count)
+		tx, err := line2Tx(txLine, ds.count, ds.filterContractTxs)
 		if err != nil {
 			slog.Debug("line2Tx failed", "line", txLine, "err", err)
 			continue
@@ -85,7 +87,7 @@ func (ds *CSVSource) close() {
 	_ = ds.file.Close()
 }
 
-func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
+func line2Tx(line []string, count int64, filterContractTxs bool) (*transaction.Transaction, error) {
 	fromAddrStr := line[3]
 	toAddrStr := line[4]
 	toCreateStr := line[5]
@@ -95,6 +97,14 @@ func line2Tx(line []string, count int64) (*transaction.Transaction, error) {
 		!strings.EqualFold(callingFuncStr, "0x")
 	hasToCreate := toCreateStr != "" && !strings.EqualFold(toCreateStr, "none")
 	hasToAddr := toAddrStr != "" && !strings.EqualFold(toAddrStr, "none")
+	fromIsContract := line[6] == "1"
+	toIsContract := line[7] == "1"
+
+	isContractRelated := (!hasToAddr && hasToCreate) || fromIsContract || toIsContract
+
+	if isContractRelated && filterContractTxs {
+		return nil, fmt.Errorf("contract transactions have been filtered")
+	}
 
 	if hasToAddr && fromAddrStr == toAddrStr {
 		return nil, fmt.Errorf("sender and recipient are the same")

@@ -51,8 +51,9 @@ var expectedCfg = Config{
 		ResultOutputDir:  "./exp_test/results/",
 		EpochDuration:    50.0,
 		TxSourceCfg: TxSourceCfg{
-			TxSourceType: "random_source",
-			TxSourceFile: "",
+			TxSourceType:      "random_source",
+			TxSourceFile:      "",
+			FilterContractTxs: true,
 		},
 		BrokerModuleCfg: BrokerModuleCfg{
 			BrokerFilePath: "./pkg/broker/broker",
