@@ -33,8 +33,8 @@ type ConsensusNodeCfg struct {
 }
 
 type TxSourceCfg struct {
-	TxSourceType      string `json:"tx_source_type" yaml:"tx_source_type"`
-	TxSourceFile      string `json:"tx_source_file" yaml:"tx_source_file"`
+	TxSourceType      string `json:"tx_source_type"      yaml:"tx_source_type"`
+	TxSourceFile      string `json:"tx_source_file"      yaml:"tx_source_file"`
 	FilterContractTxs bool   `json:"filter_contract_txs" yaml:"filter_contract_txs"`
 }
 

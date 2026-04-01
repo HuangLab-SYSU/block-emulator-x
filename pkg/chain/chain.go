@@ -446,6 +446,7 @@ func (c *Chain) txExecute(
 		code := v.StateDB().GetCode(common.Address(tx.Recipient))
 		slog.Info("before call", "to", tx.Recipient, "code_len", len(code), "data_len", len(tx.Data))
 		slog.Info("before call", "data_hex", fmt.Sprintf("0x%x", tx.Data), "data_len", len(tx.Data))
+
 		ret, _, err := c.contractExec.CallContractTxExecute(v, bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to call contract: %w", err)
