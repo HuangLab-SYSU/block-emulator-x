@@ -73,6 +73,10 @@ func LoadLocalParams() (*LocalParams, error) {
 		return nil, fmt.Errorf("load wallet address: %w", err)
 	}
 
+	if *localNodeID < 0 || *localShardID < 0 {
+		return nil, fmt.Errorf("invalid local params, node id: %d, shard id: %d", *localNodeID, *localShardID)
+	}
+
 	return &LocalParams{
 		NodeID:     *localNodeID,
 		ShardID:    *localShardID,

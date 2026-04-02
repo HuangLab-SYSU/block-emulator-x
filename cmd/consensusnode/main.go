@@ -36,7 +36,7 @@ func main() {
 
 	lp, err := config.LoadLocalParams()
 	if err != nil {
-		log.Fatal(fmt.Errorf("config.LoadLocalParams: %w", err))
+		log.Fatal(fmt.Errorf("load local parameters failed: %w", err))
 	}
 
 	cfg, err := config.LoadConfig(*configPath)

@@ -12,23 +12,65 @@ $:
         - name: ls
           script: ls -al
 
-main:
-  pull_request: &pr-lint
-    - name: pipeline-golint
+"v*":
+  tag_push:
+    - name: release
       docker:
         build: .ide/Dockerfile
         volumes:
           - /go/pkg/mod
           - /root/.cache/go-build
       stages:
-        - name: stage-version
+        - name: echo tag
+          script: echo $CNB_BRANCH
+        - name: changelog
+          image: cnbcool/changelog
+          exports:
+            latestChangeLog: LATEST_CHANGE_LOG
+        - name: create release
+          type: git:release
+          options:
+            title: $CNB_BRANCH
+            description: ${LATEST_CHANGE_LOG}
+        - name: build-binaries
+          script: bash scripts/ci/release.sh
+        - name: package-archives
+          script: bash scripts/ci/package.sh
+        - name: release 上传附件
+          image: cnbcool/attachments:latest
+          settings:
+            attachments:
+              - dist/**
+
+main:
+  pull_request: &pr-ci
+    - name: go-ci
+      docker:
+        build: .ide/Dockerfile
+        volumes:
+          - /go/pkg/mod
+          - /root/.cache/go-build
+      ifModify:
+        - "**/*.go"
+        - "**/go.mod"
+        - "**/go.sum"
+      stages:
+        - name: setup-go
           script: go version
-        - name: stage-mod
+        - name: download-modules
           script: go mod download
-        - name: stage-test
-          script: go test -gcflags=all='-N -l' ./...
-        - name: stage-lint
-          script: golangci-lint run ./...
+        - name: tidy-diff
+          script: go mod tidy -diff
+        - name: run-lint
+          script: golangci-lint run --timeout 5m ./...
+        - name: run-tests
+          script: |
+            mkdir -p test-coverage
+            go test -v -covermode=atomic -coverprofile=test-coverage/coverage.out -gcflags=all='-N -l' ./...
+        - name: build-binaries
+          script: go build -v ./...
+          env:
+            CGO_ENABLED: 0
 
     - name: commit-lint
       stages:
@@ -36,7 +78,7 @@ main:
           image: cnbcool/commitlint
 
   push:
-    - <<: *pr-lint
+    - <<: *pr-ci
 
   pull_request.mergeable:
     - name: auto-merge
