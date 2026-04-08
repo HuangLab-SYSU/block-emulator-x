@@ -34,7 +34,7 @@ supervisor:
   tx_source:
     tx_source_type: "random_source" # [random_source, csv_source]
     tx_source_file: "" # valid when tx_source_type = csv_source
-    filter_contract_txs : true
+    filter_contract_txs: true
   broker_module:
     broker_file_path: "./pkg/broker/broker"
     broker_num: 50
