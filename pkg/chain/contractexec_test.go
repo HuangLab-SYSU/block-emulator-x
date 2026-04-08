@@ -13,7 +13,7 @@ import (
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/vm"
 )
 
-type mockContractExecPort struct {
+type mockContractExec struct {
 	deployFn func(v *vm.Executor, bCtx gethvm.BlockContext, tx transaction.Transaction) (common.Address, uint64, error)
 	callFn   func(v *vm.Executor, bCtx gethvm.BlockContext, tx transaction.Transaction) ([]byte, uint64, error)
 
@@ -21,7 +21,7 @@ type mockContractExecPort struct {
 	callCalled   int
 }
 
-func (m *mockContractExecPort) CreateContractTxExecute(
+func (m *mockContractExec) CreateContractTxExecute(
 	v *vm.Executor,
 	bCtx gethvm.BlockContext,
 	tx transaction.Transaction,
@@ -34,7 +34,7 @@ func (m *mockContractExecPort) CreateContractTxExecute(
 	return m.deployFn(v, bCtx, tx)
 }
 
-func (m *mockContractExecPort) CallContractTxExecute(
+func (m *mockContractExec) CallContractTxExecute(
 	v *vm.Executor,
 	bCtx gethvm.BlockContext,
 	tx transaction.Transaction,
@@ -47,12 +47,12 @@ func (m *mockContractExecPort) CallContractTxExecute(
 	return m.callFn(v, bCtx, tx)
 }
 
-func TestTxExecute_ContractExecPort(t *testing.T) {
+func TestTxExecute_ContractExec(t *testing.T) {
 	var v vm.Executor
 	bCtx := gethvm.BlockContext{}
 
 	t.Run("create contract tx dispatched to deploy", func(t *testing.T) {
-		mockPort := &mockContractExecPort{
+		mockPort := &mockContractExec{
 			deployFn: func(_ *vm.Executor, _ gethvm.BlockContext, tx transaction.Transaction) (common.Address, uint64, error) {
 				require.Equal(t, transaction.CreateContractTxType, tx.TxType())
 				return common.HexToAddress("0x87e9100fe2b300c290cf0079a058c3450fd86752"), 100, nil
@@ -72,7 +72,7 @@ func TestTxExecute_ContractExecPort(t *testing.T) {
 	})
 
 	t.Run("create contract tx wraps deploy error", func(t *testing.T) {
-		mockPort := &mockContractExecPort{
+		mockPort := &mockContractExec{
 			deployFn: func(_ *vm.Executor, _ gethvm.BlockContext, _ transaction.Transaction) (common.Address, uint64, error) {
 				return common.Address{}, 0, errors.New("deploy failed")
 			},
@@ -90,10 +90,10 @@ func TestTxExecute_ContractExecPort(t *testing.T) {
 	})
 
 	t.Run("call contract tx dispatched to call", func(t *testing.T) {
-		mockPort := &mockContractExecPort{
+		mockPort := &mockContractExec{
 			callFn: func(_ *vm.Executor, _ gethvm.BlockContext, tx transaction.Transaction) ([]byte, uint64, error) {
 				require.Equal(t, transaction.CallContractTxType, tx.TxType())
-				return []byte{0x1}, 99, nil
+				return []byte{0x0}, 99, nil
 			},
 		}
 		c := &Chain{contractExec: mockPort}
@@ -110,7 +110,7 @@ func TestTxExecute_ContractExecPort(t *testing.T) {
 	})
 
 	t.Run("call contract tx wraps call error", func(t *testing.T) {
-		mockPort := &mockContractExecPort{
+		mockPort := &mockContractExec{
 			callFn: func(_ *vm.Executor, _ gethvm.BlockContext, _ transaction.Transaction) ([]byte, uint64, error) {
 				return nil, 0, errors.New("call failed")
 			},

@@ -101,5 +101,5 @@ func (e *Executor) CallContract(ctx gethvm.BlockContext, tx transaction.Transact
 // Commit commits the stateDB in the executor.
 // Since the executor is committed, it should be aborted or re-created with a new blockCtx.
 func (e *Executor) Commit(blockNumber uint64) (common.Hash, error) {
-	return e.stateDB.Commit(blockNumber, false, false)
+	return e.stateDB.Commit(blockNumber, true, false)
 }

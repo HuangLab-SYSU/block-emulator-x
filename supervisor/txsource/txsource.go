@@ -28,7 +28,7 @@ func NewTxSource(cfg config.TxSourceCfg) (TxSource, error) {
 
 	switch cfg.TxSourceType {
 	case csvsource.Key:
-		cs, err := csvsource.NewCSVSource(cfg.TxSourceFile)
+		cs, err := csvsource.NewCSVSource(cfg.TxSourceFile, cfg.FilterContractTxs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create CSV source: %w", err)
 		}
