@@ -21,7 +21,7 @@ func main() {
 	flag.Parse()
 
 	if *inPath == "" {
-		log.Fatal("usage: go run cmd/fillcontractaddr/main.go -in input.csv [-out output.csv] [--in-place]")
+		log.Fatal("usage: go run cmd/getcontractaddr/main.go -in input.csv [-out output.csv] [--in-place]")
 	}
 
 	if !*inPlace && *outPath == "" {
