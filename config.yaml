@@ -153,17 +153,9 @@ supervisor:
     ### `filter_contract_txs` indicates whether to filter out transactions related to smart contracts when reading transactions from .csv source file of transactions.
     ### `true`: The supervisor filters out transactions related to smart contracts when reading transactions.
     ### `false`: The supervisor does not filter out transactions related to smart contracts when reading transactions.
-    ### Else: The supervisor will not inject any transactions.
     filter_contract_txs: true # It is a bool value (["true", "false"]).
     ### -----------------------------------------------------------------------------------
 
-    ### -----------------------------------------------------------------------------------
-    ### `filter_contract_txs` indicates whether to filter out transactions related to smart contracts when reading transactions from .csv source file of transactions.
-    ### `true`: The supervisor filters out transactions related to smart contracts when reading transactions.
-    ### `false`: The supervisor does not filter out transactions related to smart contracts when reading transactions.
-    ### Else: The supervisor will not inject any transactions.
-    filter_contract_txs: true # It is a bool value (["true", "false"]).
-    ### -----------------------------------------------------------------------------------
 
   broker_module:
     ### -----------------------------------------------------------------------------------

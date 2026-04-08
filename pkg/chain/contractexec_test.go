@@ -58,14 +58,14 @@ func TestTxExecute_ContractExec(t *testing.T) {
 				return common.HexToAddress("0x87e9100fe2b300c290cf0079a058c3450fd86752"), 100, nil
 			},
 		}
-		c := &Chain{contractExec: mockPort}
+		var ce ContractExec = mockPort
 		tx := transaction.Transaction{
 			Sender:    account.Address(common.HexToAddress("0x8bc3d2a374df5e0b9abc0be98210751c0a8df04e")),
 			Recipient: account.EmptyAccountAddr,
 			Data:      common.Hex2Bytes("6000"),
 		}
 
-		err := c.txExecute(&v, bCtx, nil, tx)
+		_, _, err := ce.CreateContractTxExecute(&v, bCtx, tx)
 		require.NoError(t, err)
 		require.Equal(t, 1, mockPort.deployCalled)
 		require.Equal(t, 0, mockPort.callCalled)
@@ -77,16 +77,16 @@ func TestTxExecute_ContractExec(t *testing.T) {
 				return common.Address{}, 0, errors.New("deploy failed")
 			},
 		}
-		c := &Chain{contractExec: mockPort}
+		var ce ContractExec = mockPort
 		tx := transaction.Transaction{
 			Sender:    account.Address(common.HexToAddress("0x8bc3d2a374df5e0b9abc0be98210751c0a8df04e")),
 			Recipient: account.EmptyAccountAddr,
 			Data:      common.Hex2Bytes("6000"),
 		}
 
-		err := c.txExecute(&v, bCtx, nil, tx)
+		_, _, err := ce.CreateContractTxExecute(&v, bCtx, tx)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to deploy contract")
+		require.ErrorContains(t, err, "deploy failed")
 	})
 
 	t.Run("call contract tx dispatched to call", func(t *testing.T) {
@@ -96,14 +96,14 @@ func TestTxExecute_ContractExec(t *testing.T) {
 				return []byte{0x0}, 99, nil
 			},
 		}
-		c := &Chain{contractExec: mockPort}
+		var ce ContractExec = mockPort
 		tx := transaction.Transaction{
 			Sender:    account.Address(common.HexToAddress("0x8bc3d2a374df5e0b9abc0be98210751c0a8df04e")),
 			Recipient: account.Address(common.HexToAddress("0x87e9100fe2b300c290cf0079a058c3450fd86752")),
 			Data:      common.Hex2Bytes("6d4ce63c"),
 		}
 
-		err := c.txExecute(&v, bCtx, nil, tx)
+		_, _, err := ce.CallContractTxExecute(&v, bCtx, tx)
 		require.NoError(t, err)
 		require.Equal(t, 0, mockPort.deployCalled)
 		require.Equal(t, 1, mockPort.callCalled)
@@ -115,15 +115,15 @@ func TestTxExecute_ContractExec(t *testing.T) {
 				return nil, 0, errors.New("call failed")
 			},
 		}
-		c := &Chain{contractExec: mockPort}
+		var ce ContractExec = mockPort
 		tx := transaction.Transaction{
 			Sender:    account.Address(common.HexToAddress("0x8bc3d2a374df5e0b9abc0be98210751c0a8df04e")),
 			Recipient: account.Address(common.HexToAddress("0x87e9100fe2b300c290cf0079a058c3450fd86752")),
 			Data:      common.Hex2Bytes("6d4ce63c"),
 		}
 
-		err := c.txExecute(&v, bCtx, nil, tx)
+		_, _, err := ce.CallContractTxExecute(&v, bCtx, tx)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to call contract")
+		require.ErrorContains(t, err, "call failed")
 	})
 }
