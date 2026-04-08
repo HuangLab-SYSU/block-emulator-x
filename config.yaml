@@ -164,7 +164,6 @@ supervisor:
     exclude_contract_txs: true # It is a bool value (["true", "false"]).
     ### -----------------------------------------------------------------------------------
 
-
   broker_module:
     ### -----------------------------------------------------------------------------------
     ### `broker_file_path` is the file path of the broker file.
