@@ -7,10 +7,10 @@ import (
 )
 
 const testdataPath = "testdata.csv"
-const filterContractTxs = true
+const excludeContractTxs = true
 
 func TestCSVSource_ReadTxs(t *testing.T) {
-	cs, err := NewCSVSource(testdataPath, filterContractTxs)
+	cs, err := NewCSVSource(testdataPath, excludeContractTxs)
 	require.NoError(t, err)
 
 	txs, err := cs.ReadTxs(10)

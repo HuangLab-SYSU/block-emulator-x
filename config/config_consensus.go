@@ -33,9 +33,9 @@ type ConsensusNodeCfg struct {
 }
 
 type TxSourceCfg struct {
-	TxSourceType      string `json:"tx_source_type"      yaml:"tx_source_type"`
-	TxSourceFile      string `json:"tx_source_file"      yaml:"tx_source_file"`
-	FilterContractTxs bool   `json:"filter_contract_txs" yaml:"filter_contract_txs"`
+	TxSourceType       string `json:"tx_source_type"       yaml:"tx_source_type"`
+	TxSourceFile       string `json:"tx_source_file"       yaml:"tx_source_file"`
+	ExcludeContractTxs bool   `json:"exclude_contract_txs" yaml:"exclude_contract_txs"`
 }
 
 type BrokerModuleCfg struct {
