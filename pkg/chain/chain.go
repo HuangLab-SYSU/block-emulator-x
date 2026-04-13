@@ -443,6 +443,8 @@ func (c *Chain) txExecute(
 
 		slog.Info("deploy contract succeed", "contract addr", contractAddr)
 	case transaction.CallContractTxType:
+		slog.Info("before call", "data_hex", fmt.Sprintf("0x%x", tx.Data), "to", tx.Recipient)
+
 		ret, _, err := c.contractExec.CallContractTxExecute(v, bCtx, tx)
 		if err != nil {
 			return fmt.Errorf("failed to call contract: %w", err)

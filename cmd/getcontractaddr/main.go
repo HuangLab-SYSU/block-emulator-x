@@ -15,13 +15,13 @@ import (
 func main() {
 	inPath := flag.String("in", "", "input csv path")
 	outPath := flag.String("out", "", "output csv path")
-	overwrite := flag.Bool("overwrite", true, "overwrite existing toCreate value")
+	overwrite := flag.Bool("overwrite", true, "overwrite existing toCreate/to")
 	inPlace := flag.Bool("in-place", false, "modify input file in place")
 
 	flag.Parse()
 
 	if *inPath == "" {
-		log.Fatal("usage: go run cmd/getcontractaddr/main.go -in input.csv [-out output.csv] [--in-place]")
+		log.Fatal("usage: go run cmd/getcontractaddr/main.go -in input.csv [-out output.csv] [-in-place=true]")
 	}
 
 	if !*inPlace && *outPath == "" {
@@ -65,9 +65,13 @@ func main() {
 		}
 	}
 
-	// sender -> deploy count as nonce
+	// sender2nonce tracks CREATE nonce progression per sender address.
 	sender2nonce := map[string]uint64{}
-	filled := 0
+	// placeholder2real maps original placeholder address to computed contract address.
+	placeholder2real := map[string]string{}
+
+	deployFilled := 0
+	callToFilled := 0
 
 	for i := 1; i < len(rows); i++ {
 		row := rows[i]
@@ -77,12 +81,21 @@ func main() {
 		toCreate := strings.TrimSpace(row[idx["tocreate"]])
 		data := strings.TrimSpace(row[idx["callingfunction"]])
 
-		isDeploy := isEmptyLike(to) && !isEmptyLike(data) && !strings.EqualFold(data, "0x")
-		if !isDeploy {
-			continue
+		// First pass in this row: if it's a call tx and its "to" matches a known placeholder,
+		// replace it with the computed real contract address.
+		toKey := normAddrKey(to)
+		if toKey != "" {
+			if realAddr, ok := placeholder2real[toKey]; ok {
+				if *overwrite || isEmptyLike(to) || strings.EqualFold(to, toKey) {
+					row[idx["to"]] = realAddr
+					callToFilled++
+				}
+			}
 		}
 
-		if !*overwrite && !isEmptyLike(toCreate) {
+		// A deployment tx is identified by empty "to" + non-empty bytecode in callingFunction.
+		isDeploy := isEmptyLike(to) && !isEmptyLike(data) && !strings.EqualFold(data, "0x")
+		if !isDeploy {
 			continue
 		}
 
@@ -92,11 +105,22 @@ func main() {
 
 		key := strings.ToLower(from)
 		nonce := sender2nonce[key]
-		addr := crypto.CreateAddress(common.HexToAddress(from), nonce)
+		addr := strings.ToLower(crypto.CreateAddress(common.HexToAddress(from), nonce).Hex())
 
-		row[idx["tocreate"]] = strings.ToLower(addr.Hex())
+		// Record mapping from original toCreate placeholder to the real deployed address.
+		placeholderKey := normAddrKey(toCreate)
+		if placeholderKey != "" {
+			placeholder2real[placeholderKey] = addr
+		}
+
+		// Fill deploy tx "toCreate" with computed address.
+		if *overwrite || isEmptyLike(toCreate) || !common.IsHexAddress(toCreate) {
+			row[idx["tocreate"]] = addr
+		}
+
+		deployFilled++
+
 		sender2nonce[key] = nonce + 1
-		filled++
 	}
 
 	targetPath := *outPath
@@ -123,10 +147,23 @@ func main() {
 		log.Fatalf("flush csv failed: %v", err)
 	}
 
-	fmt.Printf("done, filled toCreate for %d deploy txs\n", filled)
+	fmt.Printf("done, deploy filled: %d, call.to filled: %d\n", deployFilled, callToFilled)
 }
 
 func isEmptyLike(s string) bool {
 	s = strings.TrimSpace(s)
 	return s == "" || strings.EqualFold(s, "none")
+}
+
+func normAddrKey(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if isEmptyLike(s) {
+		return ""
+	}
+	// Keep non-0x placeholders as valid map keys as well.
+	if strings.HasPrefix(s, "0x") {
+		return s
+	}
+
+	return s
 }
