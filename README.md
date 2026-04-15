@@ -5,13 +5,15 @@
 > **To provide more standardized code, facilitate more efficient user-side secondary development, and reduce potential bugs,
 we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-X: an advanced version of BlockEmulator.**
 
+> **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him.**
+
 > **This document outlines the getting-started guideline, design principles, and major updates of the new version of BlockEmulator (i.e., BlockEmulator-X).**
 
 > **The original version of BlockEmulator is reffered to BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.**
 
 > **The document of BlockEmulator v1.0 can be found from [https://github.com/HuangLab-SYSU/block-emulator](https://github.com/HuangLab-SYSU/block-emulator).**
 
-### Background
+### Background of BlockEmulator
 
 Initiated by **[HuangLab](http://xintelligence.pro/)**(a research group in the School of Software Engineering, Sun Yat-sen University, China),
 **BlockEmulator** is a blockchain testbed that enables researchers to verify their proposed new protocols and mechanisms.
@@ -26,7 +28,7 @@ In particular, BlockEmulator offers the system-level design and implementation f
 BlockEmulator is oriented toward blockchain researchers. It offers a blockchain experimental platform for quickly implementing their own algorithms, protocols, and mechanisms. It also offers very helpful functions for collecting experimental data, facilitating the plotting of experimental figures.
 
 
-### Official Technical Paper & Citation
+### BlockEmulator's Official Technical Paper & Citation Method
 
 To provide an official handbook for BlockEmulator, we have written a technical paper titled "BlockEmulator: An Emulator Enabling to Test Blockchain Sharding Protocols" [arXiv page](https://arxiv.org/abs/2311.03612).
 **Please cite our TSC-version paper** if you use BlockEmulator as an experiment tool in your own paper, using the following **bib data**:
@@ -43,7 +45,7 @@ To provide an official handbook for BlockEmulator, we have written a technical p
    }
 ```
 
-### Related Work
+### Published Papers by using BlockEmulator
 
 The following papers from HuangLab's publications have adopted **BlockEmulator** as an experimental tool.
 
@@ -72,7 +74,7 @@ The following papers from HuangLab's publications have adopted **BlockEmulator**
 
 
 ## ========================
-## Get Started
+## Let Us Get Started to use BlockEmulator-X
 
 ### Running Basic-Scale Experiments
 
@@ -296,7 +298,7 @@ When running `cmd/consensusnode/main.go`, the ConsensusNode follows the executio
 
 
 ## ========================
-## BlockEmulator v2.0 Updates
+## Updates of BlockEmulator-X
 
 ### Configuration Items
 
