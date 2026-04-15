@@ -5,23 +5,23 @@
 > **To provide more standardized code, facilitate more efficient user-side secondary development, and reduce potential bugs,
 we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-X: an advanced version of BlockEmulator.**
 
-> **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him.**
+> **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him!**
 
 > **This document outlines the getting-started guideline, design principles, and major updates of the new version of BlockEmulator (i.e., BlockEmulator-X).**
 
 > **The original version of BlockEmulator is reffered to BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.**
 
-> **The document of BlockEmulator v1.0 can be found from [https://github.com/HuangLab-SYSU/block-emulator](https://github.com/HuangLab-SYSU/block-emulator).**
+> **BlockEmulator v1.0 is here: [https://github.com/HuangLab-SYSU/block-emulator](https://github.com/HuangLab-SYSU/block-emulator).**
 
 ### Background of BlockEmulator
 
-Initiated by **[HuangLab](http://xintelligence.pro/)**(a research group in the School of Software Engineering, Sun Yat-sen University, China),
+Initiated by **[HuangLab](http://xintelligence.pro/)** (a blockchain research group at Sun Yat-sen University, China),
 **BlockEmulator** is a blockchain testbed that enables researchers to verify their proposed new protocols and mechanisms.
 It supports multiple consensus protocols, particularly the blockchain sharding mechanism.
 
-The main purpose of this testbed is to help users (researchers, students, etc.) quickly verify their own blockchain consensus protocols and blockchain-sharding protocols.
+The purpose of this testbed is to help users (researchers, students, etc.) quickly verify their own blockchain consensus protocols and blockchain-sharding protocols.
 
-**BlockEmulator** is designed as an experimental platform that adopts a lightweight system architecture. It simplifies the implementation of industrial-grade blockchains because **BlockEmulator** implements only the core functions of a blockchain, including the transaction pool, block packaging, consensus protocols, and on-chain transaction storage. It also supports common consensus protocols, such as Practical Byzantine Fault Tolerance (PBFT).
+**BlockEmulator** is designed as an experimental platform that adopts a lightweight system architecture. It simplifies the implementation of industrial-grade blockchains by implementing only the core functions of a blockchain, including the transaction pool, block packaging, consensus protocols, and on-chain transaction storage. It also supports common consensus protocols, such as Practical Byzantine Fault Tolerance (PBFT).
 
 In particular, BlockEmulator offers the system-level design and implementation for blockchain-sharding mechanisms. For example, the cross-shard transaction mechanisms implemented by BlockEmulator include the following two representative solutions: i) **Relay transaction mechanism** proposed by **Monoxide** (NSDI'2019), and ii) the **BrokerChain** protocol (INFOCOM'2022) [PDF](https://www.researchgate.net/publication/356789473_BrokerChain_A_Cross-Shard_Blockchain_Protocol_for_AccountBalance-based_State_Sharding).
 
@@ -74,13 +74,13 @@ The following papers from HuangLab's publications have adopted **BlockEmulator**
 
 
 ## ========================
-## Let Us Get Started to use BlockEmulator-X
+## Let us Get Started to use BlockEmulator-X
 
-### Running Basic-Scale Experiments
+### Running a built-in small-scale Experiment
 
-BlockEmulator v2.0 includes a startup script for basic-scale experiments (`example_run.sh`), which launches a setup with 4 shards, 4 nodes per shard, plus one Supervisor. This script can also automatically download dependencies, remove historical data, and compile the code.
+BlockEmulator v2.0 includes a startup script for built-in small-scale experiments (`example_run.sh`), which launches a default set of settings with 4 shards, 4 nodes per shard, plus one Supervisor. This script can also automatically download dependencies, remove historical data, and compile the code.
 
-The basic-scale script is:
+The default small-scale script is:
 
 ```sh
 #!/bin/bash
@@ -202,9 +202,9 @@ In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (call
 
 
 ## ========================
-## Node Execution Flow
+## Node-Execution Flow
 
-### Supervisor Execution Flow
+### Supervisor Node's Execution Flow
 
 When running `cmd/supervisor/main.go`, the Supervisor follows the execution flow below:
 
@@ -256,7 +256,7 @@ When running `cmd/supervisor/main.go`, the Supervisor follows the execution flow
 **Figure: The execution flow of the supervisor.**
 
 
-### ConsensusNode Execution Flow
+### ConsensusNode's Execution Flow
 
 When running `cmd/consensusnode/main.go`, the ConsensusNode follows the execution flow below:
 
@@ -298,7 +298,7 @@ When running `cmd/consensusnode/main.go`, the ConsensusNode follows the executio
 
 
 ## ========================
-## Updates of BlockEmulator-X
+## Updates of BlockEmulator-X comparing with BlockEmulator v1.0
 
 ### Configuration Items
 
