@@ -1,51 +1,35 @@
-# BlockEmulator
+# BlockEmulator-X
 
-## Introduction
+## Introduction to BlockEmulator and BlockEmulator-X
 
-> **To provide more standardized code, facilitate user-side secondary development, and reduce potential bugs,
-BlockEmulator underwent a refactoring in 2025: BlockEmulator-X.**
+> **To provide more standardized code, facilitate more efficient user-side secondary development, and reduce potential bugs,
+we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-X: an advanced version of BlockEmulator.**
 
-> **This document outlines the startup method, design principles,
-and major updates of the new version of BlockEmulator (BlockEmulator-X).**
+> **This document outlines the startup method, design principles, and major updates of the new version of BlockEmulator (i.e., BlockEmulator-X).**
 
-> **The document of BlockEmulator v1.0 can be found in https://github.com/HuangLab-SYSU/block-emulator.**
+> **The original version of BlockEmulator is also reffered to BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.**
+
+> **The document of BlockEmulator v1.0 can be found from [https://github.com/HuangLab-SYSU/block-emulator](https://github.com/HuangLab-SYSU/block-emulator).**
 
 ### Background
 
-Initiated by **[HuangLab](http://xintelligence.pro/)**(a research group
-in the School of Software Engineering, Sun Yat-sen University, China),
-**BlockEmulator** is a blockchain testbed that enables researchers to
-verify their proposed new protocols and mechanisms.
+Initiated by **[HuangLab](http://xintelligence.pro/)**(a research group in the School of Software Engineering, Sun Yat-sen University, China),
+**BlockEmulator** is a blockchain testbed that enables researchers to verify their proposed new protocols and mechanisms.
 It supports multiple consensus protocols, particularly the blockchain sharding mechanism.
 
-The main purpose of this testbed is to help users (researchers, students, etc.)
-quickly verify their own blockchain consensus protocols and blockchain-sharding protocols.
+The main purpose of this testbed is to help users (researchers, students, etc.) quickly verify their own blockchain consensus protocols and blockchain-sharding protocols.
 
-**BlockEmulator** is designed as an experimental platform that adopts a lightweight system architecture.
-It simplifies the implementation of industrial-class blockchains
-since **BlockEmulator** only implements the core functions of a blockchain,
-including the transaction pool, block packaging, consensus protocols, and on-chain transaction storage.
-It also supports common consensus protocols, such as Practical Byzantine Fault Tolerance (PBFT).
+**BlockEmulator** is designed as an experimental platform that adopts a lightweight system architecture. It simplifies the implementation of industrial-grade blockchains because **BlockEmulator** implements only the core functions of a blockchain, including the transaction pool, block packaging, consensus protocols, and on-chain transaction storage. It also supports common consensus protocols, such as Practical Byzantine Fault Tolerance (PBFT).
 
-In particular, BlockEmulator offers the system-level design and implementation for blockchain-sharding mechanisms.
-For example, the cross-shard transaction mechanisms implemented by BlockEmulator
-include the following two representative solutions:
-i) **Relay transaction mechanism** proposed by **Monoxide** (NSDI'2019), and
-ii) the **BrokerChain** protocol (INFOCOM'2022)
-[PDF](https://www.researchgate.net/publication/356789473_BrokerChain_A_Cross-Shard_Blockchain_Protocol_for_AccountBalance-based_State_Sharding).
+In particular, BlockEmulator offers the system-level design and implementation for blockchain-sharding mechanisms. For example, the cross-shard transaction mechanisms implemented by BlockEmulator include the following two representative solutions: i) **Relay transaction mechanism** proposed by **Monoxide** (NSDI'2019), and ii) the **BrokerChain** protocol (INFOCOM'2022) [PDF](https://www.researchgate.net/publication/356789473_BrokerChain_A_Cross-Shard_Blockchain_Protocol_for_AccountBalance-based_State_Sharding).
 
-BlockEmulator is oriented toward blockchain researchers.
-It provides a blockchain experimental platform for quickly implementing their own algorithms,
-protocols, and mechanisms. It also offers very helpful functions to help researchers collect
-experimental data, facilitating their plotting experimental figures.
+BlockEmulator is oriented toward blockchain researchers. It offers a blockchain experimental platform for quickly implementing their own algorithms, protocols, and mechanisms. It also offers very helpful functions for collecting experimental data, facilitating the plotting of experimental figures.
+
 
 ### Official Technical Paper & Citation
 
-To provide an official handbook for BlockEmulator,
-we have written a technical paper titled
-"BlockEmulator: An Emulator Enabling to Test Blockchain Sharding Protocols"
-[arXiv page](https://arxiv.org/abs/2311.03612).
-Please cite our paper if you use BlockEmulator as an experiment tool in your own paper.
+To provide an official handbook for BlockEmulator, we have written a technical paper titled "BlockEmulator: An Emulator Enabling to Test Blockchain Sharding Protocols" [arXiv page](https://arxiv.org/abs/2311.03612).
+**Please cite our TSC-version paper** if you use BlockEmulator as an experiment tool in your own paper, using the following **bib data**:
 
 ```
 @article{huang2025blockemulator,
@@ -63,55 +47,36 @@ Please cite our paper if you use BlockEmulator as an experiment tool in your own
 
 The following papers from HuangLab's publications have adopted **BlockEmulator** as an experimental tool.
 
-1. **BrokerChain**: A Cross-Shard Blockchain Protocol for Account/Balance-based State Sharding **(INFOCOM 2022)**
-   [PDF](https://www.researchgate.net/publication/356789473_BrokerChain_A_Cross-Shard_Blockchain_Protocol_for_AccountBalance-based_State_Sharding)
+1. **BrokerChain**: A Cross-Shard Blockchain Protocol for Account/Balance-based State Sharding **(INFOCOM 2022)** 【[PDF](https://www.researchgate.net/publication/356789473_BrokerChain_A_Cross-Shard_Blockchain_Protocol_for_AccountBalance-based_State_Sharding)】
+2. **BrokerChain-ToN**: BrokerChain: A Blockchain Sharding Protocol by Exploiting Broker Accounts **(ToN 2025)** 【[PDF](https://www.researchgate.net/publication/390218703_BrokerChain_A_Blockchain_Sharding_Protocol_by_Exploiting_Broker_Accounts)】
+3. **ShardCutter**: ShardCutter: A Blockchain Sharding Protocol Achieving Transaction Workload Balance Across State Shards **(ToN 2026)** 【[PDF](https://www.researchgate.net/publication/400699615_ShardCutter_A_Blockchain_Sharding_Protocol_achieving_Transaction_Workload_Balance_across_State_Shards)】
+4. **Broker2Earn**: Towards Maximizing Broker Revenue and System Liquidity for Sharded Blockchains **(INFOCOM 2024)** 【[PDF](https://www.researchgate.net/publication/379213048_Broker2Earn_Towards_Maximizing_Broker_Revenue_and_System_Liquidity_for_Sharded_Blockchains)】
+5. **LiquidityPool**: LiquidityPool: Game-Theoretic Analysis of Stakeholder Revenue in Ranking-Dependent DeFi **(WWW 2026)** 【[PDF](https://www.researchgate.net/publication/400068018_LiquidityPool_Game-Theoretic_Analysis_of_Stakeholder_Revenue_in_Ranking-Dependent_DeFi)】
+6. **Fine-tuned Lock (FTL)**: Account Migration across Blockchain Shards using Fine-tuned Lock Mechanism **(INFOCOM 2024)** 【[PDF](https://www.researchgate.net/publication/379210418_Account_Migration_across_Blockchain_Shards_using_Fine-tuned_Lock_Mechanism)】
+7. **Justitia**: An Incentive Mechanism towards the Fairness of Cross-shard Transactions **(INFOCOM 2025)** 【[PDF](http://xintelligence.pro/archives/1371)】
+8. **MVCom-ToN**: Scheduling Most Valuable Committees for the Sharded Blockchain **(ToN 2023)** 【[PDF](https://www.researchgate.net/publication/370671128_Scheduling_Most_Valuable_Committees_for_the_Sharded_Blockchain)】
+9. **CLPA**: Achieving Scalability and Load Balance across Blockchain Shards for State Sharding (published at SRDS 2022) [PDF](https://ieeexplore.ieee.org/document/9996899)
+10. **tMPT**: Reconfiguration across Blockchain Shards via Trimmed Merkle Patricia Trie (published at IWQoS 2023) [PDF](https://www.researchgate.net/publication/370633426_tMPT_Reconfiguration_across_Blockchain_Shards_via_Trimmed_Merkle_Patricia_Trie)
 
-2. **Broker2Earn**: Towards Maximizing Broker Revenue and System Liquidity for Sharded Blockchains **(INFOCOM 2024)**
-   [PDF](https://www.researchgate.net/publication/379213048_Broker2Earn_Towards_Maximizing_Broker_Revenue_and_System_Liquidity_for_Sharded_Blockchains)
 
-3. Account Migration across Blockchain Shards using Fine-tuned Lock Mechanism **(INFOCOM 2024)**
-   [PDF](https://www.researchgate.net/publication/379210418_Account_Migration_across_Blockchain_Shards_using_Fine-tuned_Lock_Mechanism)
-
-4. **Justitia**: An Incentive Mechanism towards the Fairness of Cross-shard Transactions **(INFOCOM 2025)**
-   [PDF](http://xintelligence.pro/archives/1371)
-
-5. Scheduling Most Valuable Committees for the Sharded Blockchain **(ToN 2023)**
-   [PDF](https://www.researchgate.net/publication/370671128_Scheduling_Most_Valuable_Committees_for_the_Sharded_Blockchain)
-
-6. Achieving Scalability and Load Balance across Blockchain Shards for State Sharding (published at SRDS 2022)
-   [PDF](https://ieeexplore.ieee.org/document/9996899)
-
-7. **tMPT**: Reconfiguration across Blockchain Shards via Trimmed Merkle Patricia Trie (published at IWQoS 2023)
-   [PDF](https://www.researchgate.net/publication/370633426_tMPT_Reconfiguration_across_Blockchain_Shards_via_Trimmed_Merkle_Patricia_Trie)
-
-8. **MVCom**: Scheduling Most Valuable Committees for the Large-Scale Sharded Blockchain (published at ICDCS 2021)
-   [PDF](https://ieeexplore.ieee.org/document/9546408)
 
 ### Highlights of BlockEmulator
 
 1. **Lightweight**. BlockEmulator is a lightweight testbed platform for blockchain experiments.
 
-2. **Fast Configuration**. BlockEmulator enables users to set up their environments quickly
-   and supports remote deployment on the Cloud.
+2. **Fast Configuration**. BlockEmulator enables users to quickly set up their environments and supports remote deployment in the Cloud.
 
-3. **Customization**. BlockEmulator is implemented using the GoLand language,
-   which supports users' customization and modification.
+3. **Customization**. BlockEmulator is implemented in GoLand, a language that supports user customization and modification.
 
-4. **Easy to Conduct Experiments**. BlockEmulator supports the replay of historical
-   transactions of mainstream blockchains (such as Ethereum).
-   It can automatically yield experimental log files. Using those log files,
-   researchers can interpret plenty of metrics such as system throughput,
-   confirmation latency of transactions, the queueing of the transaction pool, etc.
-   This function is very useful for researchers and students to
-   facilitate their experimental data collection and plotting of experimental charts.
+4. **Easy to Conduct Experiments**. BlockEmulator supports replaying historical transactions from mainstream blockchains (such as Ethereum). It can automatically yield experimental log files. Using those log files, researchers can interpret metrics such as system throughput, transaction confirmation latency, and queueing in the transaction pool. This function is very useful for researchers and students to facilitate their experimental data collection and plotting of experimental charts.
 
-## Start
+
+
+## Get Started
 
 ### Running Basic-Scale Experiments
 
-BlockEmulator v2.0 includes a startup script for basic-scale experiments (`example_run.sh`),
-which launches a setup with 4 shards, 4 nodes per shard, plus one Supervisor.
-This script can also automatically download dependencies, remove historical data, and compile the code.
+BlockEmulator v2.0 includes a startup script for basic-scale experiments (`example_run.sh`), which launches a setup with 4 shards, 4 nodes per shard, plus one Supervisor. This script can also automatically download dependencies, remove historical data, and compile the code.
 
 The basic-scale script is:
 
@@ -144,7 +109,7 @@ go run cmd/supervisor/main.go -shard_id=0x7fffffff -node_id=0 &
 wait
 ```
 
-This script can be start by using `bash`:
+This script can be started by using `bash`:
 
 ```sh
 bash example_run.sh
@@ -176,14 +141,12 @@ Configurable parameters include, but are not limited to:
 
 After modifying the configuration, the settings will take effect the next time the nodes are launched.
 
-When performing secondary development,
-if users add new features, they can also add corresponding configuration entries to `config.yaml`.
+When performing secondary development, users can add new features and corresponding configuration entries to `config.yaml`.
+
 
 #### Configuring the IP Table
 
-If the user modifies the default number of shards (`system.shard_num`) or
-the number of nodes per shard (`system.node_num`),
-they must ensure that the `ip_table.json` file in the root directory contains the IP addresses for all nodes.
+If the user modifies the default number of shards (`system.shard_num`) or the number of nodes per shard (`system.node_num`), they must ensure that the `ip_table.json` file in the root directory contains the IP addresses for all nodes.
 
 Below is an example of `ip_table.json` for a system with 2 shards and 2 nodes per shard:
 
@@ -205,17 +168,15 @@ Below is an example of `ip_table.json` for a system with 2 shards and 2 nodes pe
 
 #### Modifying example_run.sh
 
-If the user changes the default number of shards (`system.shard_num`) or
-the number of nodes per shard (`system.node_num`),
-they must also update the variables `SHARD_NUM` and `NODE_NUM` in `example_run.sh.`
+If the user changes the default number of shards (`system.shard_num`) or the number of nodes per shard (`system.node_num`), they must also update the variables `SHARD_NUM` and `NODE_NUM` in `example_run.sh.`
 After making the changes, simply run the script.
 
-For secondary development or for integrating BlockEmulator into other systems,
-users may also write their own custom startup scripts according to their needs.
+For secondary development or to integrate BlockEmulator into other systems, users may also write their own custom startup scripts tailored to their needs.
+
 
 ## System Architecture
 
-In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (called Worker in v1.0)_**.
+In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (called Worker in BlockEmulator v1.0)_**.
 
 1. **Supervisor**:
    Responsible for **sending transactions**, **functioning as the committee**,
@@ -236,6 +197,7 @@ In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (call
 
 **Figure: The system architecture of BlockEmulator, with the example deployment scale being 4×4+1 (4 shards,
 4 nodes per shard, plus one Supervisor).**
+
 
 ## Node Execution Flow
 
@@ -290,6 +252,7 @@ When running `cmd/supervisor/main.go`, the Supervisor follows the execution flow
 
 **Figure: The execution flow of the supervisor.**
 
+
 ### ConsensusNode Execution Flow
 
 When running `cmd/consensusnode/main.go`, the ConsensusNode follows the execution flow below:
@@ -330,6 +293,7 @@ When running `cmd/consensusnode/main.go`, the ConsensusNode follows the executio
 
 **Figure: The execution flow of the consensus nodes.**
 
+
 ## BlockEmulator v2.0 Updates
 
 ### Configuration Items
@@ -357,7 +321,7 @@ rather than fetching them from global variables at runtime.**
 > Global configuration was loaded from a JSON file, but JSON does not support comments.
 > As a result, users often **had difficulty understanding the meanings of specific configuration items**.
 
-In v2.0, BlockEmulator reads global configuration from a YAML file, which does support comments.
+In v2.0, BlockEmulator reads the global configuration from a YAML file, which supports comments.
 Users can freely modify the configuration according to their needs.
 
 BlockEmulator v2.0 provides a **default configuration file, `config.yaml`**,
@@ -488,9 +452,7 @@ type Store interface {
 #### Basic Account State Storage
 
 The basic account state storage reuses [Geth’s `StateDB`](github.com/ethereum/go-ethereum/core/state).
-In BlockEmulator, the files `pkg/storage/vmstate/vmstate.go` and `pkg/vm/vm.go`
-provide the wrapper logic to initialize and manage the underlying database for `StateDB`,
-as well as to create and configure the `StateDB` instance itself.
+In BlockEmulator, the files `pkg/storage/vmstate/vmstate.go` and `pkg/vm/vm.go` provide the wrapper logic to initialize and manage the underlying database for `StateDB`, as well as to create and configure the `StateDB` instance itself.
 
 ```go
 // pkg/storage/vmstate/vmstate.go
@@ -519,13 +481,10 @@ func NewExecutor(stateStore state.Database, root common.Hash, vmChainCfg *params
 }
 ```
 
-It should be noted that in the code above, `State.Database` should be created only once,
-because it corresponds to the underlying database and snapshot layer.
+It should be noted that in the code above, `State.Database` should be created only once, because it corresponds to the underlying database and snapshot layer.
 
 In contrast, `StateDB` is **not reusable** after calling `Commit()`; **it must be recreated for subsequent operations**.
-Typically, a new `StateDB` is instantiated for processing each block:
-once the block execution is complete, the `StateDB.Commit()` is called,
-and when processing the next block begins, another new `StateDB` should be created based on the updated root hash.
+Typically, a new `StateDB` is instantiated for each block: once the block execution completes, `StateDB.Commit()` is called, and when processing the next block begins, another new `StateDB` should be created based on the updated root hash.
 
 #### Account Location Storage
 
@@ -564,14 +523,12 @@ type Store interface {
 
 ### Data Structures
 
-BlockEmulator implements the fundamental data structures of a blockchain system in `pkg/core`,
-and builds the blockchain layer (`pkg/chain`) on top of them.
+BlockEmulator implements the fundamental data structures of a blockchain system in `pkg/core`, and builds the blockchain layer (`pkg/chain`) on top of them.
 
 ### Account State
 
 The account state structure in BlockEmulator v2.0 is adapted for a sharded blockchain system.
-Compared with Ethereum, it introduces an additional field, `ShardLocation`, which indicates the shard to which an
-account belongs.
+Compared with Ethereum, it introduces an additional field, `ShardLocation`, that indicates the shard an account belongs to.
 
 > Q: How is the shard of an account determined?  
 > A:   
@@ -602,8 +559,7 @@ type Transaction struct {
 ```
 
 - **RelayTxOpt**:
-  This structure becomes active when the system uses the Relay mechanism to process cross-shard transactions. It
-  includes:
+  This structure becomes active when the system uses the Relay mechanism to process cross-shard transactions. It includes:
 
     - `RelayStage`: The stage of the relay transaction, including undefined, processing first half, and processing
       second half.
@@ -611,8 +567,7 @@ type Transaction struct {
     - `ROriginalHash`: The original hash of the relay transaction; empty if it is not a cross-shard transaction.
 
 - **BrokerTxOpt**:
-  This structure becomes active when the system uses a Broker-account-based approach to process cross-shard
-  transactions. It includes:
+  This structure becomes active when the system uses a Broker-account-based approach to process cross-shard transactions. It includes:
 
     - `BrokerStage`: The stage of the broker transaction, including non-broker transaction, broker1 transaction, and
       broker2 transaction.
@@ -636,10 +591,7 @@ BlockEmulator v2.0 modifies the conventional block structure and divides blocks 
 - **Migration Block (MigrationBlock)**:
   Contains account-state information and is specifically used during the account-migration phase.
 
-Moreover, to support **locating the shard to which an account belongs**,
-BlockEmulator v2.0 introduces `LocStorage` for record account locations.
-To enable **recording**, **querying**, and **rolling back** this storage, a new field called `LocationRoot`
-has been added to the block header, serving as the Merkle root of the MPT for `LocStorage`.
+Moreover, to support **locating the shard to which an account belongs**, BlockEmulator v2.0 introduces `LocStorage` for record account locations. To enable **recording**, **querying**, and **rolling back** this storage, a new field called `LocationRoot` has been added to the block header, serving as the Merkle root of the MPT for `LocStorage`.
 
 The structure of `Block`:
 
@@ -785,13 +737,11 @@ type P2PConn interface {
 The execution flow of `P2PConn` is as follows:
 
 1. The program launches a **sub-thread** to run `ListenStart`, which listens for incoming messages from other nodes.
-   `ListenStart` adds all received messages into the internal message buffer.
+   `ListenStart` adds all received messages to the internal message buffer.
 
-2. When the upper-layer code needs to read messages from the buffer, it calls `DrainMsgBuffer`,
-   which retrieves all messages currently stored in the buffer.
+2. When the upper-layer code needs to read messages from the buffer, it calls `DrainMsgBuffer`, which retrieves all messages currently stored in the buffer.
 
-3. When a message needs to be sent to a specific node, the program calls `SendMsg2Dest`,
-   which sends the message to the target node based on the given `NodeInfo`.
+3. When a message needs to be sent to a specific node, the program calls `SendMsg2Dest`, which sends the message to the target node based on the given `NodeInfo`.
 
 ![The workflow of P2PConn](docs/figures/svgs/workflow-p2pconn.svg)
 
@@ -834,21 +784,18 @@ The two key fields are:
   The message type, which tells the upper-layer program how to decode this `WrappedMsg`.
 
 - `Payload`:
-  The message payload, containing the encoded byte sequence of various message types.
+  The message payload contains the encoded byte sequence of various message types.
 
-When a node processes an incoming message, it must first decode the `Payload` into
-the correct message type based on `MsgType`, and then handle it.
+When a node processes an incoming message, it must first decode the `Payload` into the correct message type based on `MsgType`, and then handle it.
 
-When a node sends a message, it must encode the message into a byte sequence (`Payload`),
-fill in the appropriate `MsgType`, and then send it.
+When a node sends a message, it must encode the message into a byte sequence (`Payload`), fill in the appropriate `MsgType`, and then send it.
 
 ![The transfer logic between `Payload` and `WrappedMsg`](docs/figures/svgs/msg-payload-transfer.svg)
 
 **Figure: The transfer logic between `Payload` and `WrappedMsg`.**
 
 In BlockEmulator v2.0, **decoding a `WrappedMsg` back into its corresponding message type is not supported**.
-This is because implementing such an interface in Go requires extensive use of type assertions, which is considered
-inelegant.
+This is because implementing such an interface in Go requires extensive use of type assertions, which is considered inelegant.
 
 However, the file `pkg/message/message.go` does **provide the functionality for packing a message into a `WrappedMsg`**.
 
@@ -884,13 +831,11 @@ func getMsgType(msg any) (string, error)
 > If the program determines that it is not the appropriate time to handle the message,
 > the goroutine will sleep and wait to be awakened later.
 
-In BlockEmulator v2.0, when a node receives a message,
-it first places the message into a **message buffer**.
+In BlockEmulator v2.0, when a node receives a message, it first places it in a **message buffer**.
 The node then continuously fetches messages from the buffer and processes them in order.
-Details of the execution workflow for each type of node in v2.0 can be found
-in [Node Execution Flow](#Node-Execution-Flow).
+Details of the execution workflow for each node type in BlockEmulator v2.0 are available in [Node Execution Flow](#Node-Execution-Flow).
 
-Compared to v1.0, BlockEmulator v2.0 uses only a single goroutine to **pop messages from the buffer and process them
+Compared to BlockEmulator v1.0, BlockEmulator v2.0 uses only a single goroutine to **pop messages from the buffer and process them
 sequentially**.
 This ensures that **messages are handled in a strictly serialized manner,
 preventing data races and other concurrency issues caused by multithreaded competition**.
@@ -910,8 +855,7 @@ preventing data races and other concurrency issues caused by multithreaded compe
 > which could cause experiments to stop unexpectedly due to non-critical issues.
 
 BlockEmulator v2.0 uses Go’s official standard library `log/slog` for logging.
-It defines four log levels (Debug, Info, Warn, Error), allowing the system to print messages with different severity
-levels depending on the nature of the error or exception.
+It defines four log levels (Debug, Info, Warn, and Error), allowing the system to print messages with varying severities based on the nature of the error or exception.
 
 **The logging mechanisms—such as printing rules and output destinations—are defined in `pkg/logger`**.
 Detailed usage guidelines can be found in the comments of the `config.yaml` configuration file.
