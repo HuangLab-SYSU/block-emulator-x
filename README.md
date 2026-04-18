@@ -1,27 +1,23 @@
-# BlockEmulator-X
+# BlockEmulator-X (advanced version of BlockEmulator)
 
-## Introduction to BlockEmulator and BlockEmulator-X
+## Introduction to both BlockEmulator and BlockEmulator-X
 
 > **To provide more standardized code, facilitate more efficient user-side secondary development, and reduce potential bugs,
-we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-X: an advanced version of BlockEmulator.**
-
-> **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him!**
+we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-X: an advanced version of BlockEmulator.** **BlockEmulator v1.0 is here: [https://github.com/HuangLab-SYSU/block-emulator](https://github.com/HuangLab-SYSU/block-emulator).**
 
 > **This document outlines the getting-started guideline, design principles, and major updates of the new version of BlockEmulator (i.e., BlockEmulator-X).**
 
-> **The original version of BlockEmulator is reffered to BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.**
+> **The original version of BlockEmulator is referred to as BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.** **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him!**
 
-> **BlockEmulator v1.0 is here: [https://github.com/HuangLab-SYSU/block-emulator](https://github.com/HuangLab-SYSU/block-emulator).**
+> -----------------------------------------------------
 
 ### Background of BlockEmulator
 
-Initiated by **[HuangLab](http://xintelligence.pro/)** (a blockchain research group at Sun Yat-sen University, China),
-**BlockEmulator** is a blockchain testbed that enables researchers to verify their proposed new protocols and mechanisms.
-It supports multiple consensus protocols, particularly the blockchain sharding mechanism.
+Initiated by **[HuangLab](http://xintelligence.pro/)** (a blockchain research group at Sun Yat-sen University, China), **BlockEmulator** is a blockchain testbed that enables researchers to verify their proposed new protocols and mechanisms. It supports popular consensus protocols, such as Practical Byzantine Fault Tolerance (PBFT) and Proof-of-work (PoW), particularly the **blockchain sharding** mechanism.
 
 The purpose of this testbed is to help users (researchers, students, etc.) quickly verify their own blockchain consensus protocols and blockchain-sharding protocols.
 
-**BlockEmulator** is designed as an experimental platform that adopts a lightweight system architecture. It simplifies the implementation of industrial-grade blockchains by implementing only the core functions of a blockchain, including the transaction pool, block packaging, consensus protocols, and on-chain transaction storage. It also supports common consensus protocols, such as Practical Byzantine Fault Tolerance (PBFT).
+**BlockEmulator** is designed as an experimental platform that adopts a lightweight system architecture. It simplifies the implementation of industrial-grade blockchains by focusing only on the core functions: the transaction pool, block packaging, consensus protocols, and on-chain transaction storage.
 
 In particular, BlockEmulator offers the system-level design and implementation for blockchain-sharding mechanisms. For example, the cross-shard transaction mechanisms implemented by BlockEmulator include the following two representative solutions: i) **Relay transaction mechanism** proposed by **Monoxide** (NSDI'2019), and ii) the **BrokerChain** protocol (INFOCOM'2022) [PDF](https://www.researchgate.net/publication/356789473_BrokerChain_A_Cross-Shard_Blockchain_Protocol_for_AccountBalance-based_State_Sharding).
 
@@ -45,9 +41,10 @@ To provide an official handbook for BlockEmulator, we have written a technical p
    }
 ```
 
+
 ### Published Papers by using BlockEmulator
 
-The following papers from HuangLab's publications have adopted **BlockEmulator** as an experimental tool.
+The following HuangLab publications adopted **BlockEmulator** as their experimental tool.
 
 1. **BrokerChain**: A Cross-Shard Blockchain Protocol for Account/Balance-based State Sharding **(INFOCOM 2022)** 【[PDF](https://www.researchgate.net/publication/356789473_BrokerChain_A_Cross-Shard_Blockchain_Protocol_for_AccountBalance-based_State_Sharding)】
 2. **BrokerChain-ToN**: BrokerChain: A Blockchain Sharding Protocol by Exploiting Broker Accounts **(ToN 2025)** 【[PDF](https://www.researchgate.net/publication/390218703_BrokerChain_A_Blockchain_Sharding_Protocol_by_Exploiting_Broker_Accounts)】
@@ -801,7 +798,7 @@ When a node sends a message, it must encode the message into a byte sequence (`P
 In BlockEmulator v2.0, **decoding a `WrappedMsg` back into its corresponding message type is not supported**.
 This is because implementing such an interface in Go requires extensive use of type assertions, which is considered inelegant.
 
-However, the file `pkg/message/message.go` does **provide the functionality for packing a message into a `WrappedMsg`**.
+However, the file `pkg/message/message.go` does **provide the functionality to pack a message into a `WrappedMsg`**.
 
 ```go
 // WrapMsg encodes different types of messages.
@@ -828,16 +825,17 @@ func WrapMsg(msg any) (*rpcserver.WrappedMsg, error) {
 func getMsgType(msg any) (string, error)
 ```
 
+
 ### Node Execution
 
-> BlockEmulator v1.0 adopts a message-driven model for consensus.
+> BlockEmulator v1.0 adopts a message-driven model in its consensus module.
 > Whenever a node receives a message, it immediately spawns a new goroutine to process it.
 > If the program determines that it is not the appropriate time to handle the message,
 > the goroutine will sleep and wait to be awakened later.
 
 In BlockEmulator v2.0, when a node receives a message, it first places it in a **message buffer**.
 The node then continuously fetches messages from the buffer and processes them in order.
-Details of the execution workflow for each node type in BlockEmulator v2.0 are available in [Node Execution Flow](#Node-Execution-Flow).
+Details of the execution workflow for each node type in BlockEmulator v2.0 are available in the [Node Execution Flow](#Node-Execution-Flow) section.
 
 Compared to BlockEmulator v1.0, BlockEmulator v2.0 uses only a single goroutine to **pop messages from the buffer and process them
 sequentially**.
