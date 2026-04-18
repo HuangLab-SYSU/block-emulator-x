@@ -2,6 +2,7 @@
 
 ## Introduction to both BlockEmulator and BlockEmulator-X
 
+> -----------------------------------------------------
 > **To provide more standardized code, facilitate more efficient user-side secondary development, and reduce potential bugs,
 we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-X: an advanced version of BlockEmulator.** **BlockEmulator v1.0 is here: [https://github.com/HuangLab-SYSU/block-emulator](https://github.com/HuangLab-SYSU/block-emulator).**
 
@@ -70,7 +71,7 @@ The following HuangLab publications adopted **BlockEmulator** as their experimen
 4. **Easy to Conduct Experiments**. BlockEmulator supports replaying historical transactions from mainstream blockchains (such as Ethereum). It can automatically yield experimental log files. Using those log files, researchers can interpret metrics such as system throughput, transaction confirmation latency, and queueing in the transaction pool. This function is very useful for researchers and students to facilitate their experimental data collection and plotting of experimental charts.
 
 
-## ========================
+> -----------------------------------------------------
 ## Let us Get Started to use BlockEmulator-X
 
 ### Running a built-in small-scale Experiment
@@ -172,7 +173,7 @@ After making the changes, simply run the script.
 
 For secondary development or to integrate BlockEmulator into other systems, users may also write their own custom startup scripts tailored to their needs.
 
-## ========================
+> -----------------------------------------------------
 ## System Architecture
 
 In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (called Worker in BlockEmulator v1.0)_**.
@@ -195,10 +196,10 @@ In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (call
 ![The system architecture of BlockEmulator](docs/figures/svgs/system-architecture.svg)
 
 **Figure: The system architecture of BlockEmulator, with the example deployment scale being 4×4+1 (4 shards,
-4 nodes per shard, plus one Supervisor).**
+4 nodes per shard, plus one Supervisor node).**
 
 
-## ========================
+> -----------------------------------------------------
 ## Node-Execution Flow
 
 ### Supervisor Node's Execution Flow
@@ -294,8 +295,8 @@ When running `cmd/consensusnode/main.go`, the ConsensusNode follows the executio
 **Figure: The execution flow of the consensus nodes.**
 
 
-## ========================
-## Updates of BlockEmulator-X comparing with BlockEmulator v1.0
+> -----------------------------------------------------
+## Updates of BlockEmulator-X compared with BlockEmulator v1.0
 
 ### Configuration Items
 
