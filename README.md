@@ -1,6 +1,6 @@
 # BlockEmulator-X (advanced version of BlockEmulator)
 
-## Introduction to both BlockEmulator and BlockEmulator-X
+## 1. Introduction to both BlockEmulator and BlockEmulator-X
 
 > -----------------------------------------------------
 > **To provide more standardized code, facilitate more efficient user-side secondary development, and reduce potential bugs,
@@ -9,8 +9,8 @@ we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-
 > **This document outlines the getting-started guideline, design principles, and major updates of the new version of BlockEmulator (i.e., BlockEmulator-X).**
 
 > **The original version of BlockEmulator is referred to as BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.** **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him!**
-
 > -----------------------------------------------------
+
 
 ### Background of BlockEmulator
 
@@ -72,7 +72,7 @@ The following HuangLab publications adopted **BlockEmulator** as their experimen
 
 
 > -----------------------------------------------------
-## Let us Get Started to use BlockEmulator-X
+## 2. Let us Get Started to use BlockEmulator-X
 
 ### Running a built-in small-scale Experiment
 
@@ -174,7 +174,7 @@ After making the changes, simply run the script.
 For secondary development or to integrate BlockEmulator into other systems, users may also write their own custom startup scripts tailored to their needs.
 
 > -----------------------------------------------------
-## System Architecture
+## 3. System Architecture Design
 
 In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (called Worker in BlockEmulator v1.0)_**.
 
@@ -200,7 +200,7 @@ In BlockEmulator, **nodes are divided into _Supervisor_ and _ConsensusNode (call
 
 
 > -----------------------------------------------------
-## Node-Execution Flow
+## 4. Node-Execution Flow
 
 ### Supervisor Node's Execution Flow
 
@@ -296,7 +296,7 @@ When running `cmd/consensusnode/main.go`, the ConsensusNode follows the executio
 
 
 > -----------------------------------------------------
-## Updates of BlockEmulator-X compared with BlockEmulator v1.0
+## 5. Updates of BlockEmulator-X compared with BlockEmulator v1.0
 
 ### Configuration Items
 
