@@ -9,6 +9,7 @@ we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-
 > **This document outlines the getting-started guideline, design principles, and major updates of the new version of BlockEmulator (i.e., BlockEmulator-X).**
 
 > **The original version of BlockEmulator is referred to as BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.** **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him!**
+
 > -----------------------------------------------------
 
 
