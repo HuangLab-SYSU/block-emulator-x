@@ -26,6 +26,8 @@ var csvHeader = []string{
 	"callingFunction", "isError", "eip2718type", "baseFeePerGas", "maxFeePerGas", "maxPriorityFeePerGas",
 }
 
+const none = "None"
+
 type Config struct {
 	Seed      int64                   `json:"seed"`
 	Output    OutputConfig            `json:"output"`
@@ -95,6 +97,7 @@ type generator struct {
 func main() {
 	configPath := flag.String("config", "", "path to scenario json")
 	outPath := flag.String("out", "", "override output csv path")
+
 	flag.Parse()
 
 	if *configPath == "" {
@@ -109,6 +112,7 @@ func main() {
 	if *outPath != "" {
 		cfg.Output.CSVPath = *outPath
 	}
+
 	if strings.TrimSpace(cfg.Output.CSVPath) == "" {
 		log.Fatal("output.csv_path is required or pass -out")
 	}
@@ -139,8 +143,10 @@ func loadConfig(path string) (Config, string, error) {
 	}(f)
 
 	var cfg Config
+
 	dec := json.NewDecoder(f)
 	dec.UseNumber()
+
 	if err = dec.Decode(&cfg); err != nil {
 		return Config{}, "", err
 	}
@@ -148,6 +154,7 @@ func loadConfig(path string) (Config, string, error) {
 	if len(cfg.Contracts) == 0 {
 		return Config{}, "", errors.New("contracts is empty")
 	}
+
 	if len(cfg.Scenarios) == 0 {
 		return Config{}, "", errors.New("scenarios is empty")
 	}
@@ -155,35 +162,45 @@ func loadConfig(path string) (Config, string, error) {
 	if cfg.Output.StartBlockNumber == 0 {
 		cfg.Output.StartBlockNumber = 1000010
 	}
+
 	if cfg.Output.StartTimestamp == 0 {
 		cfg.Output.StartTimestamp = time.Now().Unix()
 	}
+
 	if cfg.Output.BlockStep == 0 {
 		cfg.Output.BlockStep = 1
 	}
+
 	if cfg.Output.TimestampStep == 0 {
 		cfg.Output.TimestampStep = 2
 	}
+
 	if cfg.Output.DefaultGasPrice == "" {
 		cfg.Output.DefaultGasPrice = "0"
 	}
+
 	if cfg.Output.DefaultGasUsed == "" {
 		cfg.Output.DefaultGasUsed = "0"
 	}
+
 	if cfg.Output.DefaultIsError == "" {
-		cfg.Output.DefaultIsError = "None"
+		cfg.Output.DefaultIsError = none
 	}
+
 	if cfg.Output.DefaultEIP2718Type == "" {
-		cfg.Output.DefaultEIP2718Type = "None"
+		cfg.Output.DefaultEIP2718Type = none
 	}
+
 	if cfg.Output.DefaultBaseFeePerGas == "" {
-		cfg.Output.DefaultBaseFeePerGas = "None"
+		cfg.Output.DefaultBaseFeePerGas = none
 	}
+
 	if cfg.Output.DefaultMaxFeePerGas == "" {
-		cfg.Output.DefaultMaxFeePerGas = "None"
+		cfg.Output.DefaultMaxFeePerGas = none
 	}
+
 	if cfg.Output.DefaultMaxPriorityFee == "" {
-		cfg.Output.DefaultMaxPriorityFee = "None"
+		cfg.Output.DefaultMaxPriorityFee = none
 	}
 
 	for alias, addr := range cfg.Accounts {
@@ -213,21 +230,26 @@ func newGenerator(cfg Config, baseDir string) (*generator, error) {
 		if strings.TrimSpace(c.ABIPath) == "" {
 			return nil, fmt.Errorf("contract %s abi_path is empty", name)
 		}
+
 		if strings.TrimSpace(c.Bytecode) == "" {
 			return nil, fmt.Errorf("contract %s bytecode is empty", name)
 		}
+
 		abiPath := c.ABIPath
 		if !filepath.IsAbs(abiPath) {
 			abiPath = filepath.Join(baseDir, abiPath)
 		}
+
 		b, err := os.ReadFile(abiPath)
 		if err != nil {
 			return nil, fmt.Errorf("read abi failed (%s): %w", name, err)
 		}
+
 		parsed, err := abi.JSON(strings.NewReader(string(b)))
 		if err != nil {
 			return nil, fmt.Errorf("parse abi failed (%s): %w", name, err)
 		}
+
 		g.contractRuntimeByName[name] = &runtimeContract{Spec: c, ABI: parsed}
 	}
 
@@ -251,6 +273,7 @@ func (g *generator) generate() error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -279,11 +302,14 @@ func (g *generator) execDeploy(scn string, idx int, st Step) error {
 	if strings.TrimSpace(st.GasLimit) != "" {
 		gasLimit = st.GasLimit
 	}
+
 	value := "0"
+
 	if strings.TrimSpace(st.Value) != "" {
 		if _, ok = new(big.Int).SetString(st.Value, 10); !ok {
 			return fmt.Errorf("scenario %s step %d: invalid value: %s", scn, idx, st.Value)
 		}
+
 		value = st.Value
 	}
 
@@ -302,9 +328,11 @@ func (g *generator) execDeploy(scn string, idx int, st Step) error {
 	if strings.TrimSpace(st.ID) != "" {
 		g.deployedByID[st.ID] = realContractAddr
 	}
+
 	g.contractAddrSet[strings.ToLower(realContractAddr.Hex())] = struct{}{}
 
 	g.step()
+
 	return nil
 }
 
@@ -323,6 +351,7 @@ func (g *generator) execCall(scn string, idx int, st Step) error {
 	if !ok {
 		return fmt.Errorf("scenario %s step %d: method not found: %s", scn, idx, st.Function)
 	}
+
 	if len(st.Params) != len(method.Inputs) {
 		return fmt.Errorf("scenario %s step %d: method %s expects %d params, got %d",
 			scn, idx, st.Function, len(method.Inputs), len(st.Params))
@@ -334,23 +363,30 @@ func (g *generator) execCall(scn string, idx int, st Step) error {
 		if err != nil {
 			return fmt.Errorf("scenario %s step %d: param[%d] convert failed: %w", scn, idx, i, err)
 		}
+
 		args = append(args, v)
 	}
 
-	data, err := rt.ABI.Pack(st.Function, args...)
-	if err != nil {
-		return fmt.Errorf("scenario %s step %d: abi pack failed: %w", scn, idx, err)
+	var data []byte
+	if rt != nil {
+		data, err = rt.ABI.Pack(st.Function, args...)
+		if err != nil {
+			return fmt.Errorf("scenario %s step %d: abi pack failed: %w", scn, idx, err)
+		}
 	}
 
 	gasLimit := "100000"
 	if strings.TrimSpace(st.GasLimit) != "" {
 		gasLimit = st.GasLimit
 	}
+
 	value := "0"
+
 	if strings.TrimSpace(st.Value) != "" {
 		if _, ok = new(big.Int).SetString(st.Value, 10); !ok {
 			return fmt.Errorf("scenario %s step %d: invalid value: %s", scn, idx, st.Value)
 		}
+
 		value = st.Value
 	}
 
@@ -366,6 +402,7 @@ func (g *generator) execCall(scn string, idx int, st Step) error {
 	g.rows = append(g.rows, row)
 
 	g.step()
+
 	return nil
 }
 
@@ -380,27 +417,33 @@ func (g *generator) resolveCallTarget(st Step) (common.Address, *runtimeContract
 		if !ok {
 			return common.Address{}, nil, fmt.Errorf("contract_ref not found: %s", st.ContractRef)
 		}
+
 		if strings.TrimSpace(st.Contract) == "" {
 			return addr, g.findRuntimeByDeployedAddress(addr), nil
 		}
+
 		rt := g.contractRuntimeByName[st.Contract]
 		if rt == nil {
 			return common.Address{}, nil, fmt.Errorf("contract not found: %s", st.Contract)
 		}
+
 		return addr, rt, nil
 	}
 
 	if strings.TrimSpace(st.Contract) == "" {
 		return common.Address{}, nil, errors.New("call step requires contract or contract_ref")
 	}
+
 	rt := g.contractRuntimeByName[st.Contract]
 	if rt == nil {
 		return common.Address{}, nil, fmt.Errorf("contract not found: %s", st.Contract)
 	}
+
 	addr, ok = g.lastDeployedByName[st.Contract]
 	if !ok {
 		return common.Address{}, nil, fmt.Errorf("contract %s has not been deployed yet", st.Contract)
 	}
+
 	return addr, rt, nil
 }
 
@@ -412,6 +455,7 @@ func (g *generator) findRuntimeByDeployedAddress(addr common.Address) *runtimeCo
 			return g.contractRuntimeByName[name]
 		}
 	}
+
 	return nil
 }
 
@@ -424,9 +468,11 @@ func (g *generator) resolveAddressToken(token string) (common.Address, error) {
 	if addr, ok := g.cfg.Accounts[token]; ok {
 		return common.HexToAddress(addr), nil
 	}
+
 	if addr, ok := g.deployedByID[token]; ok {
 		return addr, nil
 	}
+
 	if common.IsHexAddress(token) {
 		return common.HexToAddress(token), nil
 	}
@@ -441,6 +487,7 @@ func (g *generator) convertArg(raw any, t abi.Type) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("address must be string token")
 		}
+
 		return g.resolveAddressToken(s)
 
 	case abi.UintTy, abi.IntTy:
@@ -455,9 +502,11 @@ func (g *generator) convertArg(raw any, t abi.Type) (interface{}, error) {
 			if lv == "true" || lv == "1" {
 				return true, nil
 			}
+
 			if lv == "false" || lv == "0" {
 				return false, nil
 			}
+
 			return nil, fmt.Errorf("invalid bool: %s", v)
 		default:
 			return nil, fmt.Errorf("invalid bool type: %T", raw)
@@ -468,6 +517,7 @@ func (g *generator) convertArg(raw any, t abi.Type) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("string param must be string")
 		}
+
 		return s, nil
 
 	case abi.BytesTy:
@@ -475,10 +525,12 @@ func (g *generator) convertArg(raw any, t abi.Type) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("bytes param must be hex string")
 		}
+
 		h, err := normalizeHex(s)
 		if err != nil {
 			return nil, err
 		}
+
 		return hex.DecodeString(strings.TrimPrefix(h, "0x"))
 
 	case abi.FixedBytesTy:
@@ -486,19 +538,24 @@ func (g *generator) convertArg(raw any, t abi.Type) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("fixed bytes param must be hex string")
 		}
+
 		h, err := normalizeHex(s)
 		if err != nil {
 			return nil, err
 		}
+
 		b, err := hex.DecodeString(strings.TrimPrefix(h, "0x"))
 		if err != nil {
 			return nil, err
 		}
+
 		if len(b) > t.Size {
 			return nil, fmt.Errorf("fixed bytes too long: %d > %d", len(b), t.Size)
 		}
+
 		out := make([]byte, t.Size)
 		copy(out[t.Size-len(b):], b)
+
 		return out, nil
 
 	default:
@@ -513,12 +570,14 @@ func anyToBigInt(v any) (*big.Int, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid decimal int: %s", x)
 		}
+
 		return b, nil
 	case json.Number:
 		b, ok := new(big.Int).SetString(x.String(), 10)
 		if !ok {
 			return nil, fmt.Errorf("invalid json number: %s", x.String())
 		}
+
 		return b, nil
 	case float64:
 		// 避免科学计数法大数误差，推荐 JSON 里用字符串传 uint256
@@ -565,16 +624,20 @@ func (g *generator) isContractAddr(addr common.Address) bool {
 
 func normalizeHex(s string) (string, error) {
 	s = strings.TrimSpace(s)
+
 	s = strings.TrimPrefix(strings.TrimPrefix(s, "0x"), "0X")
 	if s == "" {
 		return "", errors.New("empty hex")
 	}
+
 	if len(s)%2 == 1 {
 		s = "0" + s
 	}
+
 	if _, err := hex.DecodeString(s); err != nil {
 		return "", fmt.Errorf("invalid hex: %w", err)
 	}
+
 	return "0x" + strings.ToLower(s), nil
 }
 
@@ -582,6 +645,7 @@ func bool01(b bool) string {
 	if b {
 		return "1"
 	}
+
 	return "0"
 }
 
@@ -598,6 +662,8 @@ func writeCSV(path string, rows [][]string) error {
 	if err = w.WriteAll(rows); err != nil {
 		return err
 	}
+
 	w.Flush()
+
 	return w.Error()
 }
