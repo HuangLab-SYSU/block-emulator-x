@@ -135,9 +135,10 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 			return nil
 		}
 
-		rAddr := common.Address(tx.Recipient)
+		rAddr, bAddr := common.Address(tx.Recipient), common.Address(tx.Broker)
 		setInitBalanceIfNotExist(s, rAddr)
 
+		s.SubBalance(bAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 		s.AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 
 	default:
