@@ -129,8 +129,8 @@ CALL contract_ref=deploy_token from=alice function=allowance params=alice|spende
 # Run Command Examples
 # ============================================================
 # use solc:
-# go run ./cmd/generatecontracttxfile/main.go -in ./scenario.txt -out ./dataset.csv -use-solc=true
+# go run ./cmd/generatecontracttxfile/usetxt/main.go -in ./scenario.txt -out ./dataset.csv -use-solc=true
 #
 # no solc:
-# go run ./cmd/generatecontracttxfile/main.go -in ./scenario.txt -out ./dataset.csv -use-solc=false
+# go run ./cmd/generatecontracttxfile/usetxt/main.go -in ./scenario.txt -out ./dataset.csv -use-solc=false
 # ============================================================
