@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SHARD_NUM=4
+SHARD_NUM=1
 NODE_NUM=4
 
 # Delete the old experiment directory.
