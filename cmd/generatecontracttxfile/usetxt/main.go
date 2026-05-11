@@ -100,6 +100,7 @@ func main() {
 	basePath := flag.String("solc-base-path", "", "solc --base-path (optional)")
 	includePath := flag.String("solc-include-path", "", "solc --include-path (optional)")
 	optimize := flag.Bool("optimize", true, "solc optimize")
+
 	flag.Parse()
 
 	if strings.TrimSpace(*in) == "" {
@@ -139,6 +140,7 @@ func main() {
 	if err = g.run(); err != nil {
 		log.Fatal(err)
 	}
+
 	if err = writeCSV(*out, g.rows); err != nil {
 		log.Fatal(err)
 	}
@@ -166,6 +168,7 @@ func parseScenarioTXT(path string) (*Program, string, error) {
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		lineNo++
+
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -179,6 +182,7 @@ func parseScenarioTXT(path string) (*Program, string, error) {
 			if len(fields) < 2 {
 				return nil, "", fmt.Errorf("line %d: SCENARIO missing name", lineNo)
 			}
+
 			curScenario = fields[1]
 
 		case "ACCOUNT":
@@ -186,9 +190,11 @@ func parseScenarioTXT(path string) (*Program, string, error) {
 			if len(fields) != 3 {
 				return nil, "", fmt.Errorf("line %d: ACCOUNT format error", lineNo)
 			}
+
 			if !common.IsHexAddress(fields[2]) {
 				return nil, "", fmt.Errorf("line %d: invalid account address %s", lineNo, fields[2])
 			}
+
 			p.Accounts[fields[1]] = strings.ToLower(fields[2])
 
 		case "CONTRACT":
@@ -199,6 +205,7 @@ func parseScenarioTXT(path string) (*Program, string, error) {
 			if len(fields) < 3 {
 				return nil, "", fmt.Errorf("line %d: CONTRACT format error", lineNo)
 			}
+
 			alias := fields[1]
 			kv := parseKV(fields[2:])
 			p.Contracts[alias] = &ContractDef{
@@ -211,6 +218,7 @@ func parseScenarioTXT(path string) (*Program, string, error) {
 
 		case "DEPLOY", "CALL":
 			kv := parseKV(fields[1:])
+
 			st := Step{
 				Scenario:    curScenario,
 				Type:        cmd,
@@ -225,12 +233,14 @@ func parseScenarioTXT(path string) (*Program, string, error) {
 			if kv["params"] != "" {
 				st.Params = splitParams(kv["params"])
 			}
+
 			p.Steps = append(p.Steps, st)
 
 		default:
 			return nil, "", fmt.Errorf("line %d: unknown command %s", lineNo, cmd)
 		}
 	}
+
 	if err = sc.Err(); err != nil {
 		return nil, "", err
 	}
@@ -242,6 +252,7 @@ func compileWithSolc(c *ContractDef, rootDir, basePath, includePath string, opti
 	if strings.TrimSpace(c.SolPath) == "" {
 		return fmt.Errorf("contract %s requires sol=... when -use-solc=true", c.Alias)
 	}
+
 	solPath := c.SolPath
 	if !filepath.IsAbs(solPath) {
 		solPath = filepath.Join(rootDir, solPath)
@@ -251,12 +262,15 @@ func compileWithSolc(c *ContractDef, rootDir, basePath, includePath string, opti
 	if optimize {
 		args = append(args, "--optimize")
 	}
+
 	if strings.TrimSpace(basePath) != "" {
 		args = append(args, "--base-path", basePath)
 	}
+
 	if strings.TrimSpace(includePath) != "" {
 		args = append(args, "--include-path", includePath)
 	}
+
 	args = append(args, "--combined-json", "abi,bin", solPath)
 
 	out, err := exec.Command("solc", args...).CombinedOutput()
@@ -273,12 +287,14 @@ func compileWithSolc(c *ContractDef, rootDir, basePath, includePath string, opti
 	if err != nil {
 		return err
 	}
+
 	item := cj.Contracts[targetKey]
 
 	abiText, err := normalizeABIText(item.ABI)
 	if err != nil {
 		return fmt.Errorf("normalize abi failed: %w", err)
 	}
+
 	if strings.TrimSpace(item.Bin) == "" {
 		return fmt.Errorf("empty bin for contract key %s", targetKey)
 	}
@@ -290,13 +306,15 @@ func compileWithSolc(c *ContractDef, rootDir, basePath, includePath string, opti
 
 	c.ABI = parsedABI
 	c.Bytecode = "0x" + strings.TrimPrefix(strings.ToLower(strings.TrimSpace(item.Bin)), "0x")
+
 	return nil
 }
 
 func selectContractKey(c *ContractDef, contracts map[string]struct {
 	ABI json.RawMessage `json:"abi"`
 	Bin string          `json:"bin"`
-}) (string, error) {
+},
+) (string, error) {
 	// Keep only deployable contracts (non-empty bin)
 	keys := make([]string, 0, len(contracts))
 	for k, v := range contracts {
@@ -304,6 +322,7 @@ func selectContractKey(c *ContractDef, contracts map[string]struct {
 			keys = append(keys, k)
 		}
 	}
+
 	if len(keys) == 0 {
 		return "", errors.New("no deployable contract found (bin empty)")
 	}
@@ -316,6 +335,7 @@ func selectContractKey(c *ContractDef, contracts map[string]struct {
 				return k, nil
 			}
 		}
+
 		return "", fmt.Errorf("contract %s not found in solc output", c.ContractName)
 	}
 
@@ -332,7 +352,10 @@ func selectContractKey(c *ContractDef, contracts map[string]struct {
 		return keys[0], nil
 	}
 
-	return "", fmt.Errorf("multiple deployable contracts found, please set name=... in CONTRACT line; candidates=%v", keys)
+	return "", fmt.Errorf(
+		"multiple deployable contracts found, please set name=... in CONTRACT line; candidates=%v",
+		keys,
+	)
 }
 
 func loadArtifacts(c *ContractDef, rootDir string) error {
@@ -344,6 +367,7 @@ func loadArtifacts(c *ContractDef, rootDir string) error {
 	if !filepath.IsAbs(abiPath) {
 		abiPath = filepath.Join(rootDir, abiPath)
 	}
+
 	abiBytes, err := os.ReadFile(abiPath)
 	if err != nil {
 		return fmt.Errorf("read abi failed: %w", err)
@@ -358,8 +382,10 @@ func loadArtifacts(c *ContractDef, rootDir string) error {
 		if err = json.Unmarshal(abiBytes, &obj); err != nil {
 			return fmt.Errorf("parse abi json failed: %w", err)
 		}
+
 		abiText = strings.TrimSpace(string(obj.ABI))
 	}
+
 	parsedABI, err := abi.JSON(strings.NewReader(abiText))
 	if err != nil {
 		return fmt.Errorf("parse abi failed: %w", err)
@@ -369,10 +395,12 @@ func loadArtifacts(c *ContractDef, rootDir string) error {
 	if !filepath.IsAbs(binPath) {
 		binPath = filepath.Join(rootDir, binPath)
 	}
+
 	binBytes, err := os.ReadFile(binPath)
 	if err != nil {
 		return fmt.Errorf("read bytecode failed: %w", err)
 	}
+
 	bin, err := normalizeHex(string(binBytes))
 	if err != nil {
 		return fmt.Errorf("invalid bytecode: %w", err)
@@ -380,6 +408,7 @@ func loadArtifacts(c *ContractDef, rootDir string) error {
 
 	c.ABI = parsedABI
 	c.Bytecode = bin
+
 	return nil
 }
 
@@ -394,16 +423,19 @@ func normalizeABIText(raw json.RawMessage) (string, error) {
 		if err := json.Unmarshal(raw, &unq); err != nil {
 			return "", err
 		}
+
 		unq = strings.TrimSpace(unq)
 		if unq == "" {
 			return "", errors.New("empty abi string")
 		}
+
 		return unq, nil
 	}
 	// ABI is an array/object directly
 	if strings.HasPrefix(s, "[") || strings.HasPrefix(s, "{") {
 		return s, nil
 	}
+
 	return "", fmt.Errorf("unknown abi format: %s", s)
 }
 
@@ -422,6 +454,7 @@ func (g *Generator) run() error {
 			return fmt.Errorf("step %d unknown type: %s", i+1, st.Type)
 		}
 	}
+
 	return nil
 }
 
@@ -453,12 +486,15 @@ func (g *Generator) execDeploy(st Step) error {
 	g.rows = append(g.rows, row)
 
 	g.lastByContract[st.Contract] = contractAddr
+
 	g.contractAddrSet[strings.ToLower(contractAddr.Hex())] = struct{}{}
 	if st.ID != "" {
 		g.deployedByID[st.ID] = contractAddr
 		g.deployID2Contract[st.ID] = st.Contract
 	}
+
 	g.step()
+
 	return nil
 }
 
@@ -478,9 +514,11 @@ func (g *Generator) execCall(st Step) error {
 		if !ok {
 			return fmt.Errorf("unknown contract_ref: %s", st.ContractRef)
 		}
+
 		to = addr
 		contractKey = g.deployID2Contract[st.ContractRef]
 	}
+
 	if st.Contract != "" {
 		contractKey = st.Contract
 		if to == (common.Address{}) {
@@ -488,9 +526,11 @@ func (g *Generator) execCall(st Step) error {
 			if !ok {
 				return fmt.Errorf("contract %s not deployed yet", st.Contract)
 			}
+
 			to = addr
 		}
 	}
+
 	if contractKey == "" {
 		return errors.New("CALL requires contract or contract_ref")
 	}
@@ -504,8 +544,15 @@ func (g *Generator) execCall(st Step) error {
 	if !ok {
 		return fmt.Errorf("method not found: %s.%s", contractKey, st.Function)
 	}
+
 	if len(method.Inputs) != len(st.Params) {
-		return fmt.Errorf("%s.%s params mismatch, want=%d got=%d", contractKey, st.Function, len(method.Inputs), len(st.Params))
+		return fmt.Errorf(
+			"%s.%s params mismatch, want=%d got=%d",
+			contractKey,
+			st.Function,
+			len(method.Inputs),
+			len(st.Params),
+		)
 	}
 
 	args := make([]interface{}, 0, len(st.Params))
@@ -514,6 +561,7 @@ func (g *Generator) execCall(st Step) error {
 		if err != nil {
 			return fmt.Errorf("param[%d] convert failed: %w", i, err)
 		}
+
 		args = append(args, val)
 	}
 
@@ -534,6 +582,7 @@ func (g *Generator) execCall(st Step) error {
 	g.rows = append(g.rows, row)
 
 	g.step()
+
 	return nil
 }
 
@@ -546,6 +595,7 @@ func (g *Generator) convertArg(raw string, t abi.Type) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid int: %s", raw)
 		}
+
 		return v, nil
 	case abi.BoolTy:
 		s := strings.ToLower(strings.TrimSpace(raw))
@@ -557,6 +607,7 @@ func (g *Generator) convertArg(raw string, t abi.Type) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return hex.DecodeString(strings.TrimPrefix(h, "0x"))
 	default:
 		return nil, fmt.Errorf("unsupported abi type: %s", t.String())
@@ -569,12 +620,15 @@ func (g *Generator) resolveAddress(token string) (common.Address, error) {
 	if v, ok := g.prog.Accounts[token]; ok {
 		return common.HexToAddress(v), nil
 	}
+
 	if v, ok := g.deployedByID[token]; ok {
 		return v, nil
 	}
+
 	if common.IsHexAddress(token) {
 		return common.HexToAddress(token), nil
 	}
+
 	return common.Address{}, fmt.Errorf("cannot resolve address token: %s", token)
 }
 
@@ -607,6 +661,7 @@ func (g *Generator) step() {
 
 func parseKV(parts []string) map[string]string {
 	m := map[string]string{}
+
 	for _, p := range parts {
 		kv := strings.SplitN(p, "=", 2)
 		if len(kv) == 2 {
@@ -615,6 +670,7 @@ func parseKV(parts []string) map[string]string {
 			m[k] = v
 		}
 	}
+
 	return m
 }
 
@@ -623,26 +679,33 @@ func splitParams(s string) []string {
 	if s == "" {
 		return nil
 	}
+
 	items := strings.Split(s, "|")
+
 	out := make([]string, 0, len(items))
 	for _, it := range items {
 		out = append(out, strings.TrimSpace(it))
 	}
+
 	return out
 }
 
 func normalizeHex(s string) (string, error) {
 	s = strings.TrimSpace(s)
+
 	s = strings.TrimPrefix(strings.TrimPrefix(s, "0x"), "0X")
 	if s == "" {
 		return "", errors.New("empty hex")
 	}
+
 	if len(s)%2 == 1 {
 		s = "0" + s
 	}
+
 	if _, err := hex.DecodeString(s); err != nil {
 		return "", err
 	}
+
 	return "0x" + strings.ToLower(s), nil
 }
 
@@ -650,6 +713,7 @@ func bool01(b bool) string {
 	if b {
 		return "1"
 	}
+
 	return "0"
 }
 
@@ -657,6 +721,7 @@ func defaultStr(s, d string) string {
 	if strings.TrimSpace(s) == "" {
 		return d
 	}
+
 	return s
 }
 
@@ -673,6 +738,8 @@ func writeCSV(path string, rows [][]string) error {
 	if err = w.WriteAll(rows); err != nil {
 		return err
 	}
+
 	w.Flush()
+
 	return w.Error()
 }
