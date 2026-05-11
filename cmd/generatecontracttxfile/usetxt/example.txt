@@ -1,0 +1,136 @@
+# ============================================================
+# Scenario TXT Template (Fill-in Example)
+# ============================================================
+# Rules:
+# 1) One command per line.
+# 2) Lines starting with '#' are comments.
+# 3) Keep key=value pairs separated by spaces.
+# 4) For CALL params, use '|' as separator, ordered by ABI.
+# ============================================================
+
+
+# ----------------------------
+# [A] Account Definitions
+# ----------------------------
+# Format:
+# ACCOUNT <alias> <0xAddress>
+#
+# alias: custom name used later in from=/params=
+# 0xAddress: EVM address (20-byte hex, starts with 0x)
+
+ACCOUNT deployer 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4
+ACCOUNT alice    0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
+ACCOUNT bob      0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db
+ACCOUNT spender  0x17F6AD8Ef982297579C203069C1DbfFE4348c372
+
+
+# ----------------------------
+# [B] Contract Definitions
+# ----------------------------
+
+# Option 1: use-solc=true (compiler mode)
+# Format:
+# CONTRACT <contract_alias> sol=<path_to_sol> [name=<contract_name_in_sol>]
+#
+# contract_alias: custom name referenced by DEPLOY/CALL
+# sol: path to .sol file
+# name: optional but recommended if one sol file has multiple contracts
+#
+# Use this line when running with: -use-solc=true
+
+CONTRACT Token sol=./contracts/Token.sol name=Token
+
+
+# Option 2: use-solc=false (artifact mode)
+# Format:
+# CONTRACT <contract_alias> abi=<path_to_abi_json> bytecode=<path_to_bytecode_file>
+#
+# abi: JSON ABI file path
+# bytecode: deployment bytecode file path (creation bytecode)
+#
+# Uncomment and use this instead of Option 1 when running with: -use-solc=false
+#
+# CONTRACT Token abi=./abi/Token.json bytecode=./bin/Token.bin
+
+
+# ----------------------------
+# [C] Scenario Group
+# ----------------------------
+# Format:
+# SCENARIO <scenario_name>
+#
+# This is only a logical group label.
+
+SCENARIO initial_distribution
+
+
+# ----------------------------
+# [D] Deploy Step
+# ----------------------------
+# Format:
+# DEPLOY id=<deploy_id> contract=<contract_alias> from=<account_alias_or_0x> [gas=<int>] [value=<wei_int>]
+#
+# id: deployment identifier; later CALL can reference it via contract_ref=
+# contract: must match CONTRACT alias above
+# from: account alias or 0x address
+# gas: optional, default 2000000
+# value: optional, default 0 (wei)
+
+DEPLOY id=deploy_token contract=Token from=deployer gas=2000000 value=0
+
+
+# ----------------------------
+# [E] Call Steps
+# ----------------------------
+# Format:
+# CALL contract_ref=<deploy_id> from=<account_alias_or_0x> function=<abi_method_name> [params=<p1|p2|...>] [gas=<int>] [value=<wei_int>]
+#
+# contract_ref: points to DEPLOY id, ensures calling the intended instance
+# from: caller alias or 0x address
+# function: ABI method name
+# params: required only if function has inputs; use '|' separator in ABI order
+# gas: optional, default 100000
+# value: optional, default 0 (wei)
+
+CALL contract_ref=deploy_token from=deployer function=transfer params=alice|10000000000000000000 gas=120000 value=0
+CALL contract_ref=deploy_token from=deployer function=transfer params=bob|5000000000000000000 gas=120000 value=0
+
+
+SCENARIO transfer_then_check_balance
+
+CALL contract_ref=deploy_token from=alice function=transfer params=bob|1000000000000000000 gas=120000 value=0
+CALL contract_ref=deploy_token from=alice function=balanceOf params=alice gas=70000 value=0
+CALL contract_ref=deploy_token from=alice function=balanceOf params=bob gas=70000 value=0
+
+
+SCENARIO approve_transferFrom_then_check
+
+CALL contract_ref=deploy_token from=alice function=approve params=spender|5000000000000000000 gas=120000 value=0
+CALL contract_ref=deploy_token from=spender function=transferFrom params=alice|bob|2000000000000000000 gas=150000 value=0
+CALL contract_ref=deploy_token from=alice function=balanceOf params=alice gas=70000 value=0
+CALL contract_ref=deploy_token from=alice function=balanceOf params=bob gas=70000 value=0
+CALL contract_ref=deploy_token from=alice function=allowance params=alice|spender gas=70000 value=0
+
+
+# ============================================================
+# Parameter Type Tips
+# ============================================================
+# address: use alias defined by ACCOUNT, or full 0x address
+# uint/int: decimal string (no scientific notation)
+# bool: true/false or 1/0
+# bytes: hex string like 0x1234abcd
+#
+# Functions with no parameters:
+# - You can omit params=
+# Example:
+# CALL contract_ref=deploy_token from=alice function=totalSupply gas=70000 value=0
+#
+# ============================================================
+# Run Command Examples
+# ============================================================
+# use solc:
+# go run ./cmd/generatecontracttxfile/main.go -in ./scenario.txt -out ./dataset.csv -use-solc=true
+#
+# no solc:
+# go run ./cmd/generatecontracttxfile/main.go -in ./scenario.txt -out ./dataset.csv -use-solc=false
+# ============================================================

@@ -1,0 +1,26 @@
+# ========== Accounts ==========
+ACCOUNT deployer 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4
+ACCOUNT alice    0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
+ACCOUNT bob      0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db
+
+# ========== Contract ==========
+# CONTRACT SimpleStorage sol=./test1.sol name=SimpleStorage
+CONTRACT SimpleStorage abi=./testabi.json bytecode=./testbytecode.bin
+
+SCENARIO deploy_and_basic_set_get
+DEPLOY id=kv1 contract=SimpleStorage from=deployer
+CALL contract_ref=kv1 from=deployer function=get params= gas=70000
+CALL contract_ref=kv1 from=deployer function=set params=42 gas=120000
+CALL contract_ref=kv1 from=deployer function=get params= gas=70000
+
+SCENARIO overwrite_value_and_check
+CALL contract_ref=kv1 from=deployer function=set params=100 gas=120000
+CALL contract_ref=kv1 from=deployer function=get params= gas=70000
+CALL contract_ref=kv1 from=alice function=set params=7 gas=120000
+CALL contract_ref=kv1 from=alice function=get params= gas=70000
+
+SCENARIO multi_user_set_get
+CALL contract_ref=kv1 from=bob function=get params= gas=70000
+CALL contract_ref=kv1 from=bob function=set params=999 gas=120000
+CALL contract_ref=kv1 from=bob function=get params= gas=70000
+CALL contract_ref=kv1 from=deployer function=get params= gas=70000
