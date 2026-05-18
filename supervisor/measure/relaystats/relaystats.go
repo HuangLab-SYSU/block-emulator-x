@@ -232,10 +232,10 @@ func (r *RelayStats) outputBriefEpochInfo(fp string) error {
 		"Epoch end time",
 		"Avg. TPS of this epoch (txs per second)",
 		"CTX ratio of this epoch",
-		"Avg. TCL of this epoch (second)",
-		"Avg. inner-shard TCL of this epoch (second)",
-		"Avg. relay1 TCL of this epoch (second)",
-		"Avg. relay2 TCL of this epoch (second)",
+		"Avg. TCL of this epoch (nanosecond)",
+		"Avg. inner-shard TCL of this epoch (nanosecond)",
+		"Avg. relay1 TCL of this epoch (nanosecond)",
+		"Avg. relay2 TCL of this epoch (nanosecond)",
 	}
 
 	epochIDs := slices.Sorted(maps.Keys(r.epochStartTime))
