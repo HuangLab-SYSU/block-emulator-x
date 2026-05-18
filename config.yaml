@@ -145,7 +145,7 @@ supervisor:
 
     ### -----------------------------------------------------------------------------------
     ### `tx_source_file` is the .csv source file of transactions.
-    ### This variable is valid when `tx_source_file` is `csv_source`.
+    ### This variable is valid when `tx_source_type` is `csv_source`.
     tx_source_file: "" # valid when tx_source_type = csv_source
     ### -----------------------------------------------------------------------------------
 
