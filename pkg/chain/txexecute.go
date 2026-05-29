@@ -25,7 +25,10 @@ const (
 	blockGasLimit = 1000000000000
 )
 
-var initBalance, _ = uint256.FromDecimal(account.InitBalanceStr)
+var (
+	normalInitBalance, _ = uint256.FromDecimal(account.NormalInitBalanceStr)
+	brokerInitBalance, _ = uint256.FromDecimal(account.BrokerInitBalanceStr)
+)
 
 func getBlockCtxByBlock(b *block.Block) gethvm.BlockContext {
 	return gethvm.BlockContext{
@@ -120,7 +123,8 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 		}
 
 		sAddr, bAddr := common.Address(tx.Sender), common.Address(tx.Broker)
-		setInitBalanceIfNotExist(s, sAddr, bAddr)
+		setInitBalanceIfNotExist(s, sAddr)
+		setBrokerInitBalanceIfNotExist(s, bAddr)
 
 		if !core.CanTransfer(s, sAddr, uVal) {
 			return fmt.Errorf("transfer failed: the balance of %x is not enough", tx.Sender)
@@ -137,6 +141,7 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 
 		rAddr, bAddr := common.Address(tx.Recipient), common.Address(tx.Broker)
 		setInitBalanceIfNotExist(s, rAddr)
+		setBrokerInitBalanceIfNotExist(s, bAddr)
 
 		s.SubBalance(bAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
 		s.AddBalance(rAddr, uVal, tracing.BalanceChangeReason(stateReasonTransaction))
@@ -151,7 +156,15 @@ func brokerTxExecute(v *vm.Executor, addrLoc map[account.Address]int64, shard in
 func setInitBalanceIfNotExist(s *state.StateDB, addresses ...common.Address) {
 	for _, address := range addresses {
 		if !s.Exist(address) {
-			s.SetBalance(address, initBalance, tracing.BalanceChangeReason(stateReasonBalanceInit))
+			s.SetBalance(address, normalInitBalance, tracing.BalanceChangeReason(stateReasonBalanceInit))
+		}
+	}
+}
+
+func setBrokerInitBalanceIfNotExist(s *state.StateDB, addresses ...common.Address) {
+	for _, address := range addresses {
+		if !s.Exist(address) {
+			s.SetBalance(address, brokerInitBalance, tracing.BalanceChangeReason(stateReasonBalanceInit))
 		}
 	}
 }

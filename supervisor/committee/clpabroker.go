@@ -230,13 +230,14 @@ func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *mes
 	// update the clpa module - shardEpoch
 	c.shardEpoch[bInfo.ShardID] = max(c.shardEpoch[bInfo.ShardID], bInfo.Epoch)
 
-	// update the stop module
-	if len(bInfo.InnerShardTxs)+len(bInfo.Broker1Txs)+len(bInfo.Broker2Txs) == 0 {
-		c.sl.stopCnt++
-		return
+	// update the stop module (only after all txs are injected)
+	if c.unsentTxNum <= 0 {
+		if len(bInfo.InnerShardTxs)+len(bInfo.Broker1Txs)+len(bInfo.Broker2Txs) == 0 {
+			c.sl.stopCnt++
+			return
+		}
+		c.sl.stopCnt = 0 // reset 0 if there are transactions in a block
 	}
-
-	c.sl.stopCnt = 0 // reset 0 if there are transactions in a block
 
 	// update the clpa module - graph
 	for _, tx := range bInfo.InnerShardTxs {

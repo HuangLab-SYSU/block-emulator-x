@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/HuangLab-SYSU/block-emulator-x/pkg/core/transaction"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/csvwrite"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/message"
 	"github.com/HuangLab-SYSU/block-emulator-x/pkg/network/rpcserver"
@@ -24,6 +25,7 @@ type txLifeCycle struct {
 	broker1BlockProposeTime, broker2BlockProposeTime time.Time
 	broker1CommitTime, broker2CommitTime             time.Time
 	isBrokerTx                                       bool
+	mechanism                                        string
 }
 
 const (
@@ -33,6 +35,7 @@ const (
 
 var detailTxInfoMeasures = []string{
 	"OriginalHash",
+	"Mechanism",
 	"Tx create time",
 	"Tx finally commit time",
 	"Is broker tx or not",
@@ -123,14 +126,27 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			continue
 		}
 
-		b.txLifecycles[string(th)] = &txLifeCycle{
+		mechanism := "InnerShard"
+		recordHash := th
+		if tx.TxType() == transaction.RelayTxType {
+			mechanism = "RelayFallback"
+			if len(tx.ROriginalHash) > 0 {
+				recordHash = tx.ROriginalHash
+			}
+		}
+
+		tl := &txLifeCycle{
 			originalTxCreateTime:         tx.CreateTime,
 			innerShardTxBlockProposeTime: bInfo.BlockProposeTime,
 			originalTxCommitTime:         bInfo.BlockCommitTime,
+			mechanism:                    mechanism,
 		}
 
 		b.innerShardTCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
-		delete(b.txLifecycles, string(th))
+
+		if err := b.writeTxInfo(recordHash, tl); err != nil {
+			slog.Error("writeTxInfo (inner-shard tx) failed", "err", err)
+		}
 	}
 
 	for _, tx := range bInfo.Broker1Txs {
@@ -142,6 +158,7 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			b.txLifecycles[strTxHash] = &txLifeCycle{
 				originalTxCreateTime: tx.OriginalTxCreateTime,
 				isBrokerTx:           true,
+				mechanism:            "Broker",
 			}
 		}
 
@@ -168,6 +185,7 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			b.txLifecycles[strTxHash] = &txLifeCycle{
 				originalTxCreateTime: tx.OriginalTxCreateTime,
 				isBrokerTx:           true,
+				mechanism:            "Broker",
 			}
 		}
 
@@ -205,6 +223,7 @@ func (b *BrokerStats) OutputResultAndClose() error {
 func (b *BrokerStats) writeTxInfo(txHash []byte, tl *txLifeCycle) error {
 	csvLine := []string{
 		hex.EncodeToString(txHash),
+		tl.mechanism,
 		utils.ConvertTime2Str(tl.originalTxCreateTime),
 		utils.ConvertTime2Str(tl.originalTxCommitTime),
 		fmt.Sprintf("%t", tl.isBrokerTx),
@@ -236,10 +255,10 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 		"Epoch end time",
 		"Avg. TPS of this epoch (txs per second)",
 		"CTX ratio of this epoch",
-		"Avg. TCL of this epoch (nanosecond)",
-		"Avg. inner-shard TCL of this epoch (nanosecond)",
-		"Avg. broker1 TCL of this epoch (nanosecond)",
-		"Avg. broker2 TCL of this epoch (nanosecond)",
+		"Avg. TCL of this epoch (second)",
+		"Avg. inner-shard TCL of this epoch (second)",
+		"Avg. broker1 TCL of this epoch (second)",
+		"Avg. broker2 TCL of this epoch (second)",
 	}
 
 	epochIDs := slices.Sorted(maps.Keys(b.epochStartTime))
