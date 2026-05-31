@@ -128,8 +128,10 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 
 		mechanism := "InnerShard"
 		recordHash := th
+
 		if tx.TxType() == transaction.RelayTxType {
 			mechanism = "RelayFallback"
+
 			if len(tx.ROriginalHash) > 0 {
 				recordHash = tx.ROriginalHash
 			}

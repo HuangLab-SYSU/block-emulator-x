@@ -207,6 +207,7 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 			relayTxs = append(relayTxs, tx)
 		}
 	}
+
 	s.mu.Unlock()
 
 	// create broker accounts
