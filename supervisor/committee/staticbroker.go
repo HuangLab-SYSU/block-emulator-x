@@ -60,6 +60,7 @@ func NewStaticBrokerCommittee(
 	for _, bAddr := range bs.GetBrokers() {
 		brokerBalances[bAddr] = make([]*big.Int, cfg.ShardNum)
 		pendingDeductions[bAddr] = make([]*big.Int, cfg.ShardNum)
+
 		for i := int64(0); i < cfg.ShardNum; i++ {
 			bal := new(big.Int)
 			bal.SetString(account.BrokerInitBalanceStr, 10)
@@ -132,6 +133,7 @@ func (s *StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.Wr
 			// Clear the pending deduction
 			pending := s.pendingDeductions[broker2Tx.Broker][bInfo.ShardID]
 			pending.Sub(pending, broker2Tx.Value)
+
 			if pending.Sign() < 0 {
 				pending.SetInt64(0)
 			}
@@ -154,9 +156,9 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 	innerTxs, crossTxs := s.classifyTxs(txs)
 
 	relayTxs := make([]transaction.Transaction, 0)
-	brokerRawTxs := make([]transaction.Transaction, 0)
 
 	s.mu.Lock()
+
 	for _, tx := range crossTxs {
 		senderShard := partition.DefaultAccountLoc(tx.Sender, s.cfg.ShardNum)
 		recipientShard := partition.DefaultAccountLoc(tx.Recipient, s.cfg.ShardNum)
@@ -175,16 +177,18 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 			pending := s.pendingDeductions[bAddr][recipientShard]
 
 			available := new(big.Int).Sub(balance, pending)
+
 			if available.Cmp(tx.Value) >= 0 {
 				// found a broker!
 				s.pendingDeductions[bAddr][recipientShard].Add(pending, tx.Value)
-				rawTx, err := s.bManager.CreateRawTx(tx, bAddr)
-				if err != nil {
+
+				if _, err := s.bManager.CreateRawTx(tx, bAddr); err != nil {
 					slog.ErrorContext(ctx, "create raw tx failed", "err", err)
 					continue
 				}
-				brokerRawTxs = append(brokerRawTxs, *rawTx)
+
 				foundBroker = true
+
 				break
 			}
 		}
@@ -255,7 +259,8 @@ func (s *StaticBrokerCommittee) getTxLoc(tx transaction.Transaction) int64 {
 	txType := tx.TxType()
 
 	// inner-shard tx or relay 1
-	if txType == transaction.NormalTxType || (txType == transaction.RelayTxType && tx.RelayStage == transaction.Relay1Tx) {
+	if txType == transaction.NormalTxType ||
+		(txType == transaction.RelayTxType && tx.RelayStage == transaction.Relay1Tx) {
 		return partition.DefaultAccountLoc(tx.Sender, shardNumber)
 	}
 	// relay 2

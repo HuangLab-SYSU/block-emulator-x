@@ -115,6 +115,7 @@ func (bto *BrokerTxBlockOp) splitTxs(
 			} else {
 				innerTxs = append(innerTxs, tx)
 			}
+
 			continue
 		}
 
@@ -138,7 +139,11 @@ func (bto *BrokerTxBlockOp) splitTxs(
 	return innerTxs, b1Txs, b2Txs, r1Txs
 }
 
-func (bto *BrokerTxBlockOp) deliverBlockInfo2Supervisor(ctx context.Context, innerTxs, b1Txs, b2Txs []transaction.Transaction, b block.Block) error {
+func (bto *BrokerTxBlockOp) deliverBlockInfo2Supervisor(
+	ctx context.Context,
+	innerTxs, b1Txs, b2Txs []transaction.Transaction,
+	b block.Block,
+) error {
 	bbm := &message.BrokerBlockInfoMsg{
 		InnerShardTxs:    innerTxs,
 		Broker1Txs:       b1Txs,

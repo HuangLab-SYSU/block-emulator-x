@@ -236,6 +236,7 @@ func (c *CLPABrokerCommittee) handleBlockInfoMsg(ctx context.Context, bInfo *mes
 			c.sl.stopCnt++
 			return
 		}
+
 		c.sl.stopCnt = 0 // reset 0 if there are transactions in a block
 	}
 
