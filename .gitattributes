@@ -1,1 +1,9 @@
 * text eol=lf
+
+# Treat binary assets as binary so Git does not try to normalize line endings.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
