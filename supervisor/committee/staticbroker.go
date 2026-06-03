@@ -103,12 +103,11 @@ func (s *StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.Wr
 
 	// Only count empty blocks toward stop after all txs are injected.
 	// Otherwise startup empty blocks cause the supervisor to exit before injection.
-	if s.unsentTxNum <= 0 {
-		if len(bInfo.InnerShardTxs)+len(bInfo.Broker1Txs)+len(bInfo.Broker2Txs) == 0 {
-			s.sl.stopCnt++
-		} else {
-			s.sl.stopCnt = 0 // reset 0 if there are transactions in a block
-		}
+	if s.unsentTxNum <= 0 &&
+		len(bInfo.InnerShardTxs)+len(bInfo.Broker1Txs)+len(bInfo.Broker2Txs) == 0 {
+		s.sl.stopCnt++
+	} else if s.unsentTxNum <= 0 {
+		s.sl.stopCnt = 0 // reset 0 if there are transactions in a block
 	}
 
 	// operate as a broker, confirm the transactions.
@@ -179,7 +178,7 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 			available := new(big.Int).Sub(balance, pending)
 
 			if available.Cmp(tx.Value) >= 0 {
-				// found a broker!
+				// Found a broker!
 				s.pendingDeductions[bAddr][recipientShard].Add(pending, tx.Value)
 
 				if _, err := s.bManager.CreateRawTx(tx, bAddr); err != nil {
