@@ -72,10 +72,10 @@ func (bto *BrokerTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader 
 		return nil
 	}
 
-	innerTxs, b1Txs, b2Txs, r1Txs := bto.splitTxs(ctx, b.TxList)
+	innerTxs, b1Txs, b2Txs, r1Txs, r2Txs := bto.splitTxs(ctx, b.TxList)
 
 	// deliver this block info to the supervisor
-	if err := bto.deliverBlockInfo2Supervisor(ctx, innerTxs, b1Txs, b2Txs, *b); err != nil {
+	if err := bto.deliverBlockInfo2Supervisor(ctx, innerTxs, b1Txs, b2Txs, r1Txs, r2Txs, *b); err != nil {
 		return fmt.Errorf("deliverBlockInfo2Supervisor failed: %w", err)
 	}
 
@@ -92,8 +92,17 @@ func (bto *BrokerTxBlockOp) BlockCommitAndDeliver(ctx context.Context, isLeader 
 func (bto *BrokerTxBlockOp) splitTxs(
 	ctx context.Context,
 	txs []transaction.Transaction,
-) ([]transaction.Transaction, []transaction.Transaction, []transaction.Transaction, []transaction.Transaction) {
-	innerTxs, b1Txs, b2Txs, r1Txs := make(
+) (
+	[]transaction.Transaction,
+	[]transaction.Transaction,
+	[]transaction.Transaction,
+	[]transaction.Transaction,
+	[]transaction.Transaction,
+) {
+	innerTxs, b1Txs, b2Txs, r1Txs, r2Txs := make(
+		[]transaction.Transaction,
+		0,
+	), make(
 		[]transaction.Transaction,
 		0,
 	), make(
@@ -108,12 +117,12 @@ func (bto *BrokerTxBlockOp) splitTxs(
 	)
 
 	for _, tx := range txs {
-		// if it is a relay fallback tx
+		// Relay fallback (static_broker only; clpa_broker never injects RelayTxType).
 		if tx.TxType() == transaction.RelayTxType {
 			if tx.RelayStage == transaction.Relay1Tx {
 				r1Txs = append(r1Txs, tx)
 			} else {
-				innerTxs = append(innerTxs, tx)
+				r2Txs = append(r2Txs, tx)
 			}
 
 			continue
@@ -136,18 +145,20 @@ func (bto *BrokerTxBlockOp) splitTxs(
 		}
 	}
 
-	return innerTxs, b1Txs, b2Txs, r1Txs
+	return innerTxs, b1Txs, b2Txs, r1Txs, r2Txs
 }
 
 func (bto *BrokerTxBlockOp) deliverBlockInfo2Supervisor(
 	ctx context.Context,
-	innerTxs, b1Txs, b2Txs []transaction.Transaction,
+	innerTxs, b1Txs, b2Txs, r1Txs, r2Txs []transaction.Transaction,
 	b block.Block,
 ) error {
 	bbm := &message.BrokerBlockInfoMsg{
 		InnerShardTxs:    innerTxs,
 		Broker1Txs:       b1Txs,
 		Broker2Txs:       b2Txs,
+		Relay1Txs:        r1Txs,
+		Relay2Txs:        r2Txs,
 		Epoch:            bto.c.GetEpochID(),
 		ShardID:          bto.c.GetShardID(),
 		BlockProposeTime: b.CreateTime,
