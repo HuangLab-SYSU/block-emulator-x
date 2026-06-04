@@ -75,19 +75,19 @@ func NewBrokerStats(outputDir string) (*BrokerStats, error) {
 	}
 
 	return &BrokerStats{
-		broker1TCLSum:    make(map[int]time.Duration),
-		broker2TCLSum:    make(map[int]time.Duration),
+		broker1TCLSum:       make(map[int]time.Duration),
+		broker2TCLSum:       make(map[int]time.Duration),
 		innerShardTCLSum:    make(map[int]time.Duration),
 		relayFallbackTCLSum: make(map[int]time.Duration),
 		innerShardTxNum:     make(map[int]int),
 		broker1TxNum:        make(map[int]int),
 		broker2TxNum:        make(map[int]int),
 		relayFallbackTxNum:  make(map[int]int),
-		epochStartTime:   make(map[int]time.Time),
-		epochEndTime:     make(map[int]time.Time),
-		txLifecycles:     make(map[string]*txLifeCycle),
-		outputDir:        outputDir,
-		cs:               cs,
+		epochStartTime:      make(map[int]time.Time),
+		epochEndTime:        make(map[int]time.Time),
+		txLifecycles:        make(map[string]*txLifeCycle),
+		outputDir:           outputDir,
+		cs:                  cs,
 	}, nil
 }
 
