@@ -160,7 +160,7 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			originalTxCreateTime:         tx.CreateTime,
 			innerShardTxBlockProposeTime: bInfo.BlockProposeTime,
 			originalTxCommitTime:         bInfo.BlockCommitTime,
-			mechanism:                    "RelayFallback",
+			mechanism:                    "FallbackToRelay",
 		}
 
 		b.relayFallbackTCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
@@ -272,7 +272,7 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 		"Inner-shard tx # in this epoch",
 		"Broker1 tx # in this epoch",
 		"Broker2 tx # in this epoch",
-		"Relay-fallback tx # in this epoch",
+		"Fallback-to-relay tx # in this epoch",
 		"Epoch start time",
 		"Epoch end time",
 		"Avg. TPS of this epoch (txs per second)",
@@ -281,7 +281,7 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 		"Avg. inner-shard TCL of this epoch (second)",
 		"Avg. broker1 TCL of this epoch (second)",
 		"Avg. broker2 TCL of this epoch (second)",
-		"Avg. relay-fallback TCL of this epoch (second)",
+		"Avg. fallback-to-relay TCL of this epoch (second)",
 	}
 
 	epochIDs := slices.Sorted(maps.Keys(b.epochStartTime))

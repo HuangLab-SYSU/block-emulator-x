@@ -193,7 +193,7 @@ func (s *StaticBrokerCommittee) readTxsAndSend(ctx context.Context) error {
 
 		if !foundBroker {
 			// fallback to relay
-			slog.Warn("All brokers out of balance! Falling back to Relay mechanism.",
+			slog.Warn("No broker has sufficient available balance; falling back to relay mode.",
 				"from shardID", senderShard,
 				"to shardID", recipientShard)
 
