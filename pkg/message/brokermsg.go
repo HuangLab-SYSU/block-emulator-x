@@ -13,9 +13,11 @@ const (
 
 type BrokerBlockInfoMsg struct {
 	InnerShardTxs, Broker1Txs, Broker2Txs []transaction.Transaction
-	Epoch                                 int64
-	BlockProposeTime, BlockCommitTime     time.Time
-	ShardID                               int64
+	// Relay1Txs and Relay2Txs are used when static_broker falls back to the relay mechanism.
+	Relay1Txs, Relay2Txs              []transaction.Transaction
+	Epoch                             int64
+	BlockProposeTime, BlockCommitTime time.Time
+	ShardID                           int64
 }
 
 type BrokerCLPATxSendAgainMsg struct {

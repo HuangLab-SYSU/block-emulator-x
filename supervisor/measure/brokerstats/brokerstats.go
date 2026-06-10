@@ -24,6 +24,7 @@ type txLifeCycle struct {
 	broker1BlockProposeTime, broker2BlockProposeTime time.Time
 	broker1CommitTime, broker2CommitTime             time.Time
 	isBrokerTx                                       bool
+	mechanism                                        string
 }
 
 const (
@@ -33,6 +34,7 @@ const (
 
 var detailTxInfoMeasures = []string{
 	"OriginalHash",
+	"Mechanism",
 	"Tx create time",
 	"Tx finally commit time",
 	"Is broker tx or not",
@@ -49,10 +51,12 @@ type BrokerStats struct {
 	// TCL, i.e., Transaction Commit Latency
 	broker1TCLSum, broker2TCLSum map[int]time.Duration // the commit latency sum of broker1/broker2 transactions in each epoch
 	innerShardTCLSum             map[int]time.Duration // the commit latency sum of inner-shard transactions in each epoch
+	relayFallbackTCLSum          map[int]time.Duration // the commit latency sum of relay-fallback transactions in each epoch
 
 	// The number of transactions for each epoch
 	innerShardTxNum            map[int]int // the number of inner-shard transactions in each epoch
 	broker1TxNum, broker2TxNum map[int]int // the number of broker1/broker2 transactions in each epoch
+	relayFallbackTxNum         map[int]int // relay-fallback transactions completed (relay2 stage)
 
 	epochStartTime, epochEndTime map[int]time.Time // the start/end time for each epoch
 
@@ -71,17 +75,19 @@ func NewBrokerStats(outputDir string) (*BrokerStats, error) {
 	}
 
 	return &BrokerStats{
-		broker1TCLSum:    make(map[int]time.Duration),
-		broker2TCLSum:    make(map[int]time.Duration),
-		innerShardTCLSum: make(map[int]time.Duration),
-		innerShardTxNum:  make(map[int]int),
-		broker1TxNum:     make(map[int]int),
-		broker2TxNum:     make(map[int]int),
-		epochStartTime:   make(map[int]time.Time),
-		epochEndTime:     make(map[int]time.Time),
-		txLifecycles:     make(map[string]*txLifeCycle),
-		outputDir:        outputDir,
-		cs:               cs,
+		broker1TCLSum:       make(map[int]time.Duration),
+		broker2TCLSum:       make(map[int]time.Duration),
+		innerShardTCLSum:    make(map[int]time.Duration),
+		relayFallbackTCLSum: make(map[int]time.Duration),
+		innerShardTxNum:     make(map[int]int),
+		broker1TxNum:        make(map[int]int),
+		broker2TxNum:        make(map[int]int),
+		relayFallbackTxNum:  make(map[int]int),
+		epochStartTime:      make(map[int]time.Time),
+		epochEndTime:        make(map[int]time.Time),
+		txLifecycles:        make(map[string]*txLifeCycle),
+		outputDir:           outputDir,
+		cs:                  cs,
 	}, nil
 }
 
@@ -123,14 +129,45 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			continue
 		}
 
-		b.txLifecycles[string(th)] = &txLifeCycle{
+		tl := &txLifeCycle{
 			originalTxCreateTime:         tx.CreateTime,
 			innerShardTxBlockProposeTime: bInfo.BlockProposeTime,
 			originalTxCommitTime:         bInfo.BlockCommitTime,
+			mechanism:                    "InnerShard",
 		}
 
 		b.innerShardTCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
-		delete(b.txLifecycles, string(th))
+
+		if err := b.writeTxInfo(th, tl); err != nil {
+			slog.Error("writeTxInfo (inner-shard tx) failed", "err", err)
+		}
+	}
+
+	b.relayFallbackTxNum[epochID] += len(bInfo.Relay2Txs)
+
+	for _, tx := range bInfo.Relay2Txs {
+		recordHash, err := tx.Hash()
+		if err != nil {
+			slog.Error("invalid hash", "CalcHash err", err)
+			continue
+		}
+
+		if len(tx.ROriginalHash) > 0 {
+			recordHash = tx.ROriginalHash
+		}
+
+		tl := &txLifeCycle{
+			originalTxCreateTime:         tx.CreateTime,
+			innerShardTxBlockProposeTime: bInfo.BlockProposeTime,
+			originalTxCommitTime:         bInfo.BlockCommitTime,
+			mechanism:                    "FallbackToRelay",
+		}
+
+		b.relayFallbackTCLSum[epochID] += bInfo.BlockCommitTime.Sub(tx.CreateTime)
+
+		if err := b.writeTxInfo(recordHash, tl); err != nil {
+			slog.Error("writeTxInfo (relay-fallback tx) failed", "err", err)
+		}
 	}
 
 	for _, tx := range bInfo.Broker1Txs {
@@ -142,6 +179,7 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			b.txLifecycles[strTxHash] = &txLifeCycle{
 				originalTxCreateTime: tx.OriginalTxCreateTime,
 				isBrokerTx:           true,
+				mechanism:            "Broker",
 			}
 		}
 
@@ -168,6 +206,7 @@ func (b *BrokerStats) UpdateMeasureRecord(msg *rpcserver.WrappedMsg) error {
 			b.txLifecycles[strTxHash] = &txLifeCycle{
 				originalTxCreateTime: tx.OriginalTxCreateTime,
 				isBrokerTx:           true,
+				mechanism:            "Broker",
 			}
 		}
 
@@ -205,6 +244,7 @@ func (b *BrokerStats) OutputResultAndClose() error {
 func (b *BrokerStats) writeTxInfo(txHash []byte, tl *txLifeCycle) error {
 	csvLine := []string{
 		hex.EncodeToString(txHash),
+		tl.mechanism,
 		utils.ConvertTime2Str(tl.originalTxCreateTime),
 		utils.ConvertTime2Str(tl.originalTxCommitTime),
 		fmt.Sprintf("%t", tl.isBrokerTx),
@@ -232,14 +272,16 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 		"Inner-shard tx # in this epoch",
 		"Broker1 tx # in this epoch",
 		"Broker2 tx # in this epoch",
+		"Fallback-to-relay tx # in this epoch",
 		"Epoch start time",
 		"Epoch end time",
 		"Avg. TPS of this epoch (txs per second)",
 		"CTX ratio of this epoch",
-		"Avg. TCL of this epoch (nanosecond)",
-		"Avg. inner-shard TCL of this epoch (nanosecond)",
-		"Avg. broker1 TCL of this epoch (nanosecond)",
-		"Avg. broker2 TCL of this epoch (nanosecond)",
+		"Avg. TCL of this epoch (second)",
+		"Avg. inner-shard TCL of this epoch (second)",
+		"Avg. broker1 TCL of this epoch (second)",
+		"Avg. broker2 TCL of this epoch (second)",
+		"Avg. fallback-to-relay TCL of this epoch (second)",
 	}
 
 	epochIDs := slices.Sorted(maps.Keys(b.epochStartTime))
@@ -248,11 +290,13 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 	for _, epochID := range epochIDs {
 		epochDuration := b.epochEndTime[epochID].Sub(b.epochStartTime[epochID]).Seconds()
 		ctxCnt := float64(b.broker1TxNum[epochID]+b.broker2TxNum[epochID]) / 2.0
-		totalTxCnt := float64(b.innerShardTxNum[epochID]) + ctxCnt
+		relayCnt := float64(b.relayFallbackTxNum[epochID])
+		totalTxCnt := float64(b.innerShardTxNum[epochID]) + ctxCnt + relayCnt
 
 		broker1TCL, broker2TCL := float64(b.broker1TCLSum[epochID]), float64(b.broker2TCLSum[epochID])
 		innerShardTCL := float64(b.innerShardTCLSum[epochID])
-		totalTCL := broker1TCL + broker2TCL + innerShardTCL
+		relayFallbackTCL := float64(b.relayFallbackTCLSum[epochID])
+		totalTCL := broker1TCL + broker2TCL + innerShardTCL + relayFallbackTCL
 
 		csvLine := []string{
 			fmt.Sprintf("%d", epochID),
@@ -260,17 +304,27 @@ func (b *BrokerStats) outputBriefEpochInfo(fp string) error {
 			fmt.Sprintf("%d", b.innerShardTxNum[epochID]),
 			fmt.Sprintf("%d", b.broker1TxNum[epochID]),
 			fmt.Sprintf("%d", b.broker2TxNum[epochID]),
+			fmt.Sprintf("%d", b.relayFallbackTxNum[epochID]),
 			b.epochStartTime[epochID].Format(time.RFC3339),
 			b.epochEndTime[epochID].Format(time.RFC3339),
 			fmt.Sprintf("%.2f", totalTxCnt/epochDuration),
 			fmt.Sprintf("%.2f", ctxCnt/totalTxCnt),
 			fmt.Sprintf("%.2f", totalTCL/totalTxCnt),
-			fmt.Sprintf("%.2f", innerShardTCL/float64(b.innerShardTxNum[epochID])),
-			fmt.Sprintf("%.2f", broker1TCL/float64(b.broker1TxNum[epochID])),
-			fmt.Sprintf("%.2f", broker2TCL/float64(b.broker2TxNum[epochID])),
+			avgDurationPerTx(b.innerShardTCLSum[epochID], b.innerShardTxNum[epochID]),
+			avgDurationPerTx(b.broker1TCLSum[epochID], b.broker1TxNum[epochID]),
+			avgDurationPerTx(b.broker2TCLSum[epochID], b.broker2TxNum[epochID]),
+			avgDurationPerTx(b.relayFallbackTCLSum[epochID], b.relayFallbackTxNum[epochID]),
 		}
 		measureVals = append(measureVals, csvLine)
 	}
 
 	return csvwrite.WriteAllToCSV(fp, measureName, measureVals)
+}
+
+func avgDurationPerTx(sum time.Duration, n int) string {
+	if n <= 0 {
+		return "0.00"
+	}
+
+	return fmt.Sprintf("%.2f", float64(sum)/float64(n))
 }

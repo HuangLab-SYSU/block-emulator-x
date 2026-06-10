@@ -8,7 +8,12 @@ import (
 	"math/big"
 )
 
-const InitBalanceStr = "1000000000000000000000000000000000000"
+const (
+	// NormalInitBalanceStr is the initial balance for ordinary accounts.
+	NormalInitBalanceStr = "1000000000000000000000000000000000000"
+	// BrokerInitBalanceStr is the initial balance for broker accounts.
+	BrokerInitBalanceStr = "1000000000000000000000000000000000000"
+)
 
 var ErrNotEnoughBalance = errors.New("not enough balance")
 
@@ -31,7 +36,7 @@ type State struct {
 func NewState(addr Address, loc uint64) *State {
 	var b big.Int
 
-	b.SetString(InitBalanceStr, 10)
+	b.SetString(NormalInitBalanceStr, 10)
 
 	return &State{
 		Address: addr,

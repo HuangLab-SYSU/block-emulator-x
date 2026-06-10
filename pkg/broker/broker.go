@@ -66,6 +66,10 @@ func (s *Manager) IsBroker(addr account.Address) bool {
 	return ok
 }
 
+func (s *Manager) GetBrokers() []account.Address {
+	return s.brokers
+}
+
 func (s *Manager) CreateRawTxsRandomBroker(txs []transaction.Transaction) ([]transaction.Transaction, error) {
 	rawTxs := make([]transaction.Transaction, len(txs))
 
@@ -187,6 +191,12 @@ func (s *Manager) ConfirmBrokerTx(tx transaction.Transaction) error {
 	}
 
 	return nil
+}
+
+func (s *Manager) IsFinished() bool {
+	return len(s.unconfirmedTxInfo) == 0 &&
+		len(s.readyBroker1TxHashes) == 0 &&
+		len(s.readyBroker2TxHashes) == 0
 }
 
 // createBroker1Tx creates broker1 tx with the given raw tx.
