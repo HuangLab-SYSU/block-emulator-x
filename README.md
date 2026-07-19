@@ -15,7 +15,7 @@ we have rewritten BlockEmulator since late 2025. Finally, we have BlockEmulator-
 
 > **The original version of BlockEmulator is referred to as BlockEmulator v1.0, and BlockEmulator-X is also called BlockEmulator v2.0.** **The major contributor of BlockEmulator-X is Mr. YE Guang (叶光). Show respect to him!**
 
-> In May 2026, we uploaded a detailed 217-page **Chinese-version User Manual**, named "_2026May13-(217页)使用指南-黄华威.pdf_". Please feel free to download it from the main folder. 
+> In July 2026, we uploaded a detailed 239-page **Chinese-version User Manual**, named "_2026Jul19-(239页)使用指南-黄华威.pdf_". Please feel free to download it from the main folder. 
 
 > -----------------------------------------------------
 
