@@ -56,6 +56,21 @@ func (cs *CLPAState) AddEdge(u, v Vertex) {
 	cs.netGraph.AddEdge(u, v)
 }
 
+// EraseEdges drops the accumulated edge set so that the next CLPA round is driven by the blocks of
+// a single epoch only.
+//
+// EdgeSet alone is cleared. VertexSet and vertexNumInShard have to be kept: shardWeight is
+// recomputed from EdgeSet on every round, and an account whose adjacency list is empty does not
+// move. Clearing VertexSet would stop vertexNumInShard from being updated, the guard against
+// emptying a shard in CLPAPartition would never fire, and the partition would silently stop
+// working while the logs and result files still looked normal.
+func (cs *CLPAState) EraseEdges() {
+	cs.mux.Lock()
+	defer cs.mux.Unlock()
+
+	cs.netGraph.EdgeSet = make(map[Vertex][]Vertex)
+}
+
 // GetVertexLocation gets the location of a vertex
 func (cs *CLPAState) GetVertexLocation(v Vertex) int {
 	cs.mux.Lock()
@@ -101,6 +116,18 @@ func (cs *CLPAState) computeEdges2Shard() {
 	}
 	// get the minShardWeight
 	cs.minShardWeight = slices.Min(cs.shardWeight)
+
+	// getShardScore divides by minShardWeight. A zero divisor does not panic, it poisons every
+	// candidate: a shard with weight 0 scores 0/0 = NaN, the others score x/0 = +Inf and
+	// 1-weightPenalty*Inf = -Inf. CLPAPartition compares candidates with a strict greater-than,
+	// which is false against both NaN and -Inf, so no account moves and the round broadcasts an
+	// empty table, outwardly indistinguishable from "CLPA converged". An epoch-scoped graph makes
+	// this reachable, since a single epoch may hold no edge at all; it has to be loud, not silent.
+	if cs.minShardWeight <= 0 {
+		slog.Error("minShardWeight <= 0: this CLPA round would move nobody",
+			"shardWeight", cs.shardWeight)
+		cs.minShardWeight = 1
+	}
 }
 
 // changeShardRecompute calculates each parameter when the locations of accounts are changed.
@@ -127,16 +154,21 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	cs.computeEdges2Shard()
 	slog.Info("before running CLPA", "cross-shard edge number: ", cs.crossShardEdgeNum)
 
-	originalLoc := make(map[[20]byte]int, len(cs.netGraph.VertexSet))
+	// Both loops below iterate EdgeSet, not VertexSet. Only a vertex with edges can move: with
+	// EdgeSet[v] empty the neighbour loop does not run, maxScoreShard stays vNowShard, and nothing
+	// is written. EdgeSet is cleared once per epoch while VertexSet only grows, so iterating the
+	// latter makes every repartition cost more as the run goes on. Both are map ranges, whose
+	// order is randomised either way, so the result is unchanged.
+	originalLoc := make(map[[20]byte]int, len(cs.netGraph.EdgeSet))
 	ret := make(map[[20]byte]int)
 	updateTimes := make(map[Vertex]int)
 
-	for v := range cs.netGraph.VertexSet {
+	for v := range cs.netGraph.EdgeSet {
 		originalLoc[v.Addr] = cs.getVertexLocation(v)
 	}
 
 	for range cs.maxIterations { // first loop, constraint the max iterations
-		for v := range cs.netGraph.VertexSet {
+		for v := range cs.netGraph.EdgeSet {
 			if updateTimes[v] >= updateThreshold {
 				continue
 			}
@@ -175,6 +207,8 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	}
 
 	// Accounts may be migrated back into the original shard, thus prune the useless result in 'ret'.
+	// originalLoc holds every address 'ret' can contain: 'ret' is written only when a vertex moves,
+	// and a vertex without edges never moves, so every address in 'ret' is a key of EdgeSet.
 	for acc, loc := range originalLoc {
 		if ret[acc] == loc { // If the shard-location of this account is not changed
 			delete(ret, acc)
