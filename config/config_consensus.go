@@ -23,6 +23,12 @@ type SupervisorCfg struct {
 	EpochDuration    int64  `json:"epoch_duration"     yaml:"epoch_duration"`
 	TxSourceCfg      `       json:"tx_source"          yaml:"tx_source"`
 	BrokerModuleCfg  `       json:"broker_module"      yaml:"broker_module"`
+
+	// CLPAOrderSeed seeds the visit order of the on-chain CLPA. A repartition sweeps the graph
+	// maxIterations times, and drawing Go's map order afresh per sweep makes the same graph produce
+	// different partition tables. With a seed, epoch e's partition uses
+	// SeededOrder(CLPAOrderSeed + e), and the whole table is decided by the seed and the graph.
+	CLPAOrderSeed int64 `json:"clpa_order_seed" yaml:"clpa_order_seed"`
 }
 
 type ConsensusNodeCfg struct {

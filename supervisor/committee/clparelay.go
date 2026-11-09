@@ -45,6 +45,8 @@ func NewCLPARelayCommittee(
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)
 	}
 
+	slog.Info("clpa visit order", "seed", cfg.CLPAOrderSeed)
+
 	return &CLPARelayCommittee{
 		conn: conn,
 		r:    r,
@@ -143,7 +145,7 @@ func (c *CLPARelayCommittee) ShouldStop() bool {
 func (c *CLPARelayCommittee) repartition(ctx context.Context) error {
 	slog.InfoContext(ctx, "repartition start")
 
-	modifiedMap, _ := c.state.CLPAPartition()
+	modifiedMap, _ := c.state.CLPAPartitionWithOrder(c.clpaVisitOrder(c.cfg.CLPAOrderSeed))
 	c.supervisorEpoch++
 
 	// The graph belongs to the new epoch from here on: the partition that read it has already been
