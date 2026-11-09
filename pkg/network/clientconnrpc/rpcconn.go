@@ -18,6 +18,7 @@ import (
 const (
 	msgBufferSize = 1 << 20
 	msgSizeLimit  = 100 * 1 << 20
+	rpcTimeout    = 10 * time.Second
 	connCloseTime = 10 * time.Second
 )
 
@@ -99,9 +100,13 @@ func (r *RPCConn) DrainMsgBuffer() []*rpcserver.WrappedMsg {
 }
 
 func (r *RPCConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg *rpcserver.WrappedMsg) {
+	start := time.Now()
+
 	err := r.sendMessage(ctx, dest, msg)
 	if err != nil {
-		slog.ErrorContext(ctx, "SendMsg2Dest failed", "dest", dest, "err", err)
+		slog.ErrorContext(ctx, "SendMsg2Dest failed",
+			"dest", dest, "type", msg.GetMsgType(), "payload_bytes", len(msg.GetPayload()),
+			"elapsed", time.Since(start), "err", err)
 	}
 }
 
@@ -109,9 +114,15 @@ func (r *RPCConn) SendMsg2Dest(ctx context.Context, dest nodetopo.NodeInfo, msg 
 func (r *RPCConn) Close() {
 	time.Sleep(connCloseTime)
 
-	// close all clients in the pool
-	for _, c := range r.clientPool {
-		_ = c.conn.Close()
+	r.connLock.Lock()
+	clients := r.clientPool
+	r.clientPool = nil
+	r.connLock.Unlock()
+
+	for dest, c := range clients {
+		if err := c.conn.Close(); err != nil {
+			slog.Warn("close gRPC client failed", "dest", dest, "err", err)
+		}
 	}
 }
 
@@ -121,33 +132,54 @@ func (r *RPCConn) sendMessage(ctx context.Context, dest nodetopo.NodeInfo, msg *
 		return r.add2LocalBuffer(msg)
 	}
 
-	r.connLock.Lock()
-	defer r.connLock.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, rpcTimeout)
+	defer cancel()
 
-	if _, ok := r.info2Host[dest]; !ok {
-		return fmt.Errorf("node %+v not exist in the p2p connection", dest)
-	}
-	// if there's no client, create one and reuse it.
-	if _, ok := r.clientPool[dest]; !ok {
-		conn, err := grpc.NewClient(r.info2Host[dest], grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(msgSizeLimit), grpc.MaxCallSendMsgSize(msgSizeLimit)))
-		if err != nil {
-			return fmt.Errorf("gRPC client fail to connect: %w", err)
-		}
-
-		r.clientPool[dest] = &clientConnection{conn, rpcserver.NewReplicaConnClient(conn)}
+	client, err := r.getClient(dest)
+	if err != nil {
+		return err
 	}
 
-	_, err := r.clientPool[dest].client.HandleMessage(ctx, &rpcserver.HandleMessageRequest{
+	request := &rpcserver.HandleMessageRequest{
 		Msg:  msg,
 		From: &rpcserver.NodePosition{ShardID: r.me.ShardID, NodeID: r.me.NodeID},
 		To:   &rpcserver.NodePosition{ShardID: dest.ShardID, NodeID: dest.NodeID},
-	})
-	if err != nil {
+	}
+	if _, err := client.HandleMessage(ctx, request); err != nil {
 		return fmt.Errorf("gRPC client fail to send message, type: %s, err: %w", msg.GetMsgType(), err)
 	}
 
 	return nil
+}
+
+// getClient holds the pool lock only while looking up or creating a connection.
+func (r *RPCConn) getClient(dest nodetopo.NodeInfo) (rpcserver.ReplicaConnClient, error) {
+	r.connLock.Lock()
+	defer r.connLock.Unlock()
+
+	if r.clientPool == nil {
+		return nil, fmt.Errorf("gRPC client pool is closed")
+	}
+
+	if c, ok := r.clientPool[dest]; ok {
+		return c.client, nil
+	}
+
+	host, ok := r.info2Host[dest]
+	if !ok {
+		return nil, fmt.Errorf("node %+v not exist in the p2p connection", dest)
+	}
+
+	conn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(msgSizeLimit), grpc.MaxCallSendMsgSize(msgSizeLimit)))
+	if err != nil {
+		return nil, fmt.Errorf("gRPC client fail to connect: %w", err)
+	}
+
+	client := rpcserver.NewReplicaConnClient(conn)
+	r.clientPool[dest] = &clientConnection{conn: conn, client: client}
+
+	return client, nil
 }
 
 func (r *RPCConn) add2LocalBuffer(msg *rpcserver.WrappedMsg) error {

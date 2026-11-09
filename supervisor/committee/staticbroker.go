@@ -118,7 +118,10 @@ func (s *StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.Wr
 			slog.ErrorContext(ctx, "broker confirm broker1 tx failed", "err", err)
 		} else {
 			// Broker receives money in the sender shard (bInfo.ShardID)
-			s.brokerBalances[broker1Tx.Broker][bInfo.ShardID].Add(s.brokerBalances[broker1Tx.Broker][bInfo.ShardID], broker1Tx.Value)
+			s.brokerBalances[broker1Tx.Broker][bInfo.ShardID].Add(
+				s.brokerBalances[broker1Tx.Broker][bInfo.ShardID],
+				broker1Tx.Value,
+			)
 		}
 	}
 
@@ -127,7 +130,10 @@ func (s *StaticBrokerCommittee) HandleMsg(ctx context.Context, msg *rpcserver.Wr
 			slog.ErrorContext(ctx, "broker confirm broker2 tx failed", "err", err)
 		} else {
 			// Broker pays money in the recipient shard (bInfo.ShardID)
-			s.brokerBalances[broker2Tx.Broker][bInfo.ShardID].Sub(s.brokerBalances[broker2Tx.Broker][bInfo.ShardID], broker2Tx.Value)
+			s.brokerBalances[broker2Tx.Broker][bInfo.ShardID].Sub(
+				s.brokerBalances[broker2Tx.Broker][bInfo.ShardID],
+				broker2Tx.Value,
+			)
 			// Clear the pending deduction
 			pending := s.pendingDeductions[broker2Tx.Broker][bInfo.ShardID]
 			pending.Sub(pending, broker2Tx.Value)
