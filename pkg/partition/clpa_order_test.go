@@ -216,16 +216,14 @@ func TestNilOrderStaysUpstream(t *testing.T) {
 // the same score, and only the edge insertion order changes, so the result must stay the same. On a
 // chain the adjacency list order is decided by the arrival order of the shard blocks.
 //
-// Graph: A sits in shard 0 with 6 neighbours inside it and one neighbour each in shard 1, 2 and 3;
-// each of the three out-of-shard shards holds a 6-vertex ring. Then W = (9, 7, 7, 7), and A scores
-// 1/9 · (1 − 0.5·7/7) = 0.0556 against all three of them.
+// Graph: A sits in shard 0 with no neighbour inside it, and one neighbour each in shard 1, 2 and 3;
+// each of those shards holds a 6-vertex ring, and shard 0 holds two more vertices joined by an edge
+// so that moving A out cannot empty the shard. Then W = (4, 4, 4, 4), and A scores
+// 1/3 · (1 − 0.5·4/4) = 0.1667 against shard 1, 2 and 3 alike, so the tie must go to shard 1.
 func TestCLPATieBreak(t *testing.T) {
 	sa := Vertex{Addr: testAddr(100)} // 100 mod 4 = 0
-	own := make([]Vertex, 6)
-
-	for j := range own {
-		own[j] = Vertex{Addr: testAddr(4 * (j + 1))} // 4, 8, …, 24, all in shard 0
-	}
+	sb := Vertex{Addr: testAddr(4)}   // 4 mod 4 = 0
+	sc := Vertex{Addr: testAddr(8)}   // 8 mod 4 = 0
 
 	ring := func(res int) []Vertex {
 		out := make([]Vertex, 6)
@@ -240,11 +238,9 @@ func TestCLPATieBreak(t *testing.T) {
 	// in every other respect.
 	build := func(crossOrder []Vertex) *CLPAState {
 		c := NewCLPAState(w, 1, shardNum)
+		c.AddEdge(sb, sc)
 		for _, other := range crossOrder {
 			c.AddEdge(sa, other)
-		}
-		for _, v := range own {
-			c.AddEdge(sa, v)
 		}
 		for _, rg := range [][]Vertex{sp, sq, sr} {
 			for j := range rg {

@@ -189,11 +189,11 @@ func (cs *CLPAState) CLPAPartitionWithOrder(order VisitOrder) (map[[20]byte]int,
 
 		vNowShard, maxScoreShard := cs.getVertexLocation(v), cs.getVertexLocation(v)
 
+		// The candidates are the shards the neighbours sit in, and a vertex's own shard is one of
+		// them whenever it has a neighbour inside that shard: it is scored by the same formula, and
+		// the vertex moves only when some shard scores strictly higher.
 		for _, u := range cs.netGraph.EdgeSet[v] {
 			uShard := cs.getVertexLocation(u)
-			if uShard == vNowShard {
-				continue
-			}
 			// calculate only once for each neighbor shard.
 			if _, computed := neighborShardScore[uShard]; !computed {
 				neighborShardScore[uShard] = cs.getShardScore(v, uShard)
