@@ -64,6 +64,24 @@ func (cs *CLPAState) GetVertexLocation(v Vertex) int {
 	return cs.getVertexLocation(v)
 }
 
+// SnapshotLocations returns a copy of the routing table: every account CLPA has placed, with the
+// shard it currently sits in.
+//
+// The copy is safe to read while the next repartition rewrites the live table. An address missing
+// from the map is not homeless: it falls back to DefaultAccountLoc(addr, K), the same rule
+// getVertexLocation applies, and the caller applies that fallback if needed.
+func (cs *CLPAState) SnapshotLocations() map[Vertex]int {
+	cs.mux.Lock()
+	defer cs.mux.Unlock()
+
+	out := make(map[Vertex]int, len(cs.partitionMap))
+	for v, loc := range cs.partitionMap {
+		out[v] = loc
+	}
+
+	return out
+}
+
 // computeEdges2Shard calculates shardWeight according to current graph.
 func (cs *CLPAState) computeEdges2Shard() {
 	cs.shardWeight = make([]float64, cs.shardNum)
@@ -189,6 +207,35 @@ func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
 	slog.Info("after running CLPA", "cross-shard edge number", cs.crossShardEdgeNum)
 
 	return ret, cs.crossShardEdgeNum
+}
+
+// SetLocations applies a location table computed outside this process (see
+// supervisor/committee/partitionfile.go). modified has the same meaning as the value
+// CLPAPartition returns: it lists only the accounts that change location, and every other account
+// keeps its place. An address never seen before still falls back to DefaultAccountLoc.
+//
+// shardWeight and crossShardEdgeNum are not recomputed: only CLPAPartition reads them, and this
+// mode never calls CLPAPartition.
+func (cs *CLPAState) SetLocations(modified map[[20]byte]int) {
+	cs.mux.Lock()
+	defer cs.mux.Unlock()
+
+	for addr, loc := range modified {
+		v := Vertex{Addr: addr}
+		old := cs.getVertexLocation(v)
+
+		if old == loc {
+			continue
+		}
+
+		cs.partitionMap[v] = loc
+
+		// Only accounts already in the graph are counted in vertexNumInShard.
+		if _, seen := cs.netGraph.VertexSet[v]; seen {
+			cs.vertexNumInShard[old]--
+			cs.vertexNumInShard[loc]++
+		}
+	}
 }
 
 // addVertex adds vertexes to the graph and locate it to a default shard.

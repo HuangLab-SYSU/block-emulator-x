@@ -23,6 +23,13 @@ type SupervisorCfg struct {
 	EpochDuration    int64  `json:"epoch_duration"     yaml:"epoch_duration"`
 	TxSourceCfg      `       json:"tx_source"          yaml:"tx_source"`
 	BrokerModuleCfg  `       json:"broker_module"      yaml:"broker_module"`
+
+	// EpochPartitionDir is the directory of externally computed incremental location tables.
+	// Empty means the supervisor runs CLPA itself on every repartition. When set, round r loads
+	// <dir>/epoch_%04d.bin, which holds only the accounts that change location; broadcasting,
+	// migration and epoch sync still follow the native path.
+	// See supervisor/committee/partitionfile.go for the file layout.
+	EpochPartitionDir string `json:"epoch_partition_dir" yaml:"epoch_partition_dir"`
 }
 
 type ConsensusNodeCfg struct {
