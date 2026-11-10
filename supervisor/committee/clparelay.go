@@ -28,6 +28,10 @@ type CLPARelayCommittee struct {
 	sl          stopLogic // sl is the logic of stop.
 	unsentTxNum int64
 
+	// droppedEdges counts the transactions rejected by the epoch filter since the last repartition,
+	// and is reported together with every repartition.
+	droppedEdges int64
+
 	cfg config.SupervisorCfg
 }
 
@@ -40,6 +44,8 @@ func NewCLPARelayCommittee(
 	if err != nil {
 		return nil, fmt.Errorf("NewTxSource failed: %w", err)
 	}
+
+	slog.Info("clpa visit order", "seed", cfg.CLPAOrderSeed)
 
 	return &CLPARelayCommittee{
 		conn: conn,
@@ -110,7 +116,17 @@ func (c *CLPARelayCommittee) HandleMsg(_ context.Context, msg *rpcserver.Wrapped
 		c.sl.stopCnt = 0 // reset 0 if there are transactions in a block
 	}
 
-	// update the clpa module - graph
+	// Accept only the blocks collected in the current epoch. bInfo.Epoch is the shard's own epoch
+	// number, which the shard advances after it commits the migration block, the same condition the
+	// epoch-sync check uses. A block of the previous epoch still in flight during the migration
+	// carries the old number and is rejected here, so it does not leak into the graph that was just
+	// cleared. The graph update is the last step of this function, so returning early skips no
+	// logic behind it.
+	if bInfo.Epoch != c.supervisorEpoch {
+		c.droppedEdges += int64(len(bInfo.InnerShardTxs) + len(bInfo.Relay2Txs))
+		return nil
+	}
+
 	for _, tx := range bInfo.InnerShardTxs {
 		c.state.AddEdge(partition.Vertex{Addr: tx.Sender}, partition.Vertex{Addr: tx.Recipient})
 	}
@@ -129,8 +145,15 @@ func (c *CLPARelayCommittee) ShouldStop() bool {
 func (c *CLPARelayCommittee) repartition(ctx context.Context) error {
 	slog.InfoContext(ctx, "repartition start")
 
-	modifiedMap, _ := c.state.CLPAPartition()
+	modifiedMap, _ := c.state.CLPAPartitionWithOrder(c.clpaVisitOrder(c.cfg.CLPAOrderSeed))
 	c.supervisorEpoch++
+
+	// The graph belongs to the new epoch from here on: the partition that read it has already been
+	// computed, so clear the edges that make it up; from now on HandleMsg accepts only blocks
+	// carrying supervisorEpoch. No lock is needed against HandleMsg: both are driven by the same
+	// tick loop.
+	c.state.EraseEdges()
+
 	cr := &message.CLPARepartitionStartMsg{
 		Epoch:       c.supervisorEpoch,
 		ModifiedMap: transferMapBytes2Addr(modifiedMap),
@@ -148,7 +171,15 @@ func (c *CLPARelayCommittee) repartition(ctx context.Context) error {
 
 	c.conn.GroupBroadcastMessage(ctx, allLeaders, w)
 
-	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch)
+	// Report the number of migrating accounts and the number of transactions dropped by the epoch
+	// filter: an empty table and a converged CLPA are indistinguishable in the log, and a filter
+	// count that stays at 0 means the filter is not taking effect.
+	dropped := c.droppedEdges
+	c.droppedEdges = 0
+
+	slog.InfoContext(ctx, "repartition finished", "epoch", c.supervisorEpoch,
+		"migrated", len(modifiedMap), "filtered_stale_edges", dropped)
+
 	// set epoch-synced to false
 	c.epochSynced = false
 	c.sl.stopCnt = 0

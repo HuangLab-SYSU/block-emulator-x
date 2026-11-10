@@ -48,6 +48,8 @@ func NewCLPABrokerCommittee(
 		return nil, fmt.Errorf("NewBrokerManager failed: %w", err)
 	}
 
+	slog.Info("clpa visit order", "seed", cfg.CLPAOrderSeed)
+
 	return &CLPABrokerCommittee{
 		r:    r,
 		conn: conn,
@@ -121,7 +123,7 @@ func (c *CLPABrokerCommittee) ShouldStop() bool {
 func (c *CLPABrokerCommittee) repartition(ctx context.Context) error {
 	slog.InfoContext(ctx, "repartition start")
 
-	modifiedMap, _ := c.state.CLPAPartition()
+	modifiedMap, _ := c.state.CLPAPartitionWithOrder(c.clpaVisitOrder(c.cfg.CLPAOrderSeed))
 	c.supervisorEpoch++
 	cr := &message.CLPARepartitionStartMsg{
 		Epoch:       c.supervisorEpoch,

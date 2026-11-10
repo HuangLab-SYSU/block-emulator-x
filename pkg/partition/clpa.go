@@ -1,6 +1,7 @@
 package partition
 
 import (
+	"bytes"
 	"log/slog"
 	"math"
 	"slices"
@@ -56,6 +57,21 @@ func (cs *CLPAState) AddEdge(u, v Vertex) {
 	cs.netGraph.AddEdge(u, v)
 }
 
+// EraseEdges drops the accumulated edge set so that the next CLPA round is driven by the blocks of
+// a single epoch only.
+//
+// EdgeSet alone is cleared. VertexSet and vertexNumInShard have to be kept: shardWeight is
+// recomputed from EdgeSet on every round, and an account whose adjacency list is empty does not
+// move. Clearing VertexSet would stop vertexNumInShard from being updated, the guard against
+// emptying a shard in CLPAPartition would never fire, and the partition would silently stop
+// working while the logs and result files still looked normal.
+func (cs *CLPAState) EraseEdges() {
+	cs.mux.Lock()
+	defer cs.mux.Unlock()
+
+	cs.netGraph.EdgeSet = make(map[Vertex][]Vertex)
+}
+
 // GetVertexLocation gets the location of a vertex
 func (cs *CLPAState) GetVertexLocation(v Vertex) int {
 	cs.mux.Lock()
@@ -101,6 +117,18 @@ func (cs *CLPAState) computeEdges2Shard() {
 	}
 	// get the minShardWeight
 	cs.minShardWeight = slices.Min(cs.shardWeight)
+
+	// getShardScore divides by minShardWeight. A zero divisor does not panic, it poisons every
+	// candidate: a shard with weight 0 scores 0/0 = NaN, the others score x/0 = +Inf and
+	// 1-weightPenalty*Inf = -Inf. CLPAPartition compares candidates with a strict greater-than,
+	// which is false against both NaN and -Inf, so no account moves and the round broadcasts an
+	// empty table, outwardly indistinguishable from "CLPA converged". An epoch-scoped graph makes
+	// this reachable, since a single epoch may hold no edge at all; it has to be loud, not silent.
+	if cs.minShardWeight <= 0 {
+		slog.Error("minShardWeight <= 0: this CLPA round would move nobody",
+			"shardWeight", cs.shardWeight)
+		cs.minShardWeight = 1
+	}
 }
 
 // changeShardRecompute calculates each parameter when the locations of accounts are changed.
@@ -124,57 +152,97 @@ func (cs *CLPAState) changeShardRecompute(v Vertex, old int) {
 
 // CLPAPartition runs CLPA.
 func (cs *CLPAState) CLPAPartition() (map[[20]byte]int, float64) {
+	return cs.CLPAPartitionWithOrder(nil)
+}
+
+// CLPAPartitionWithOrder runs CLPA, visiting the vertices of every sweep in the order given by
+// order. A nil order keeps the upstream behaviour: Go's map iteration order, drawn afresh for
+// every sweep.
+//
+// The visit order is the source of nondeterminism in this method; every other map range and every
+// score is independent of the order.
+func (cs *CLPAState) CLPAPartitionWithOrder(order VisitOrder) (map[[20]byte]int, float64) {
 	cs.computeEdges2Shard()
 	slog.Info("before running CLPA", "cross-shard edge number: ", cs.crossShardEdgeNum)
 
-	originalLoc := make(map[[20]byte]int, len(cs.netGraph.VertexSet))
+	// Both loops below iterate EdgeSet, not VertexSet. Only a vertex with edges can move: with
+	// EdgeSet[v] empty the neighbour loop does not run, maxScoreShard stays vNowShard, and nothing
+	// is written. EdgeSet is cleared once per epoch while VertexSet only grows, so iterating the
+	// latter makes every repartition cost more as the run goes on. Both are map ranges, whose
+	// order is randomised either way, so the result is unchanged.
+	originalLoc := make(map[[20]byte]int, len(cs.netGraph.EdgeSet))
 	ret := make(map[[20]byte]int)
 	updateTimes := make(map[Vertex]int)
 
-	for v := range cs.netGraph.VertexSet {
+	for v := range cs.netGraph.EdgeSet {
 		originalLoc[v.Addr] = cs.getVertexLocation(v)
 	}
 
-	for range cs.maxIterations { // first loop, constraint the max iterations
-		for v := range cs.netGraph.VertexSet {
-			if updateTimes[v] >= updateThreshold {
-				continue
-			}
+	// visit is the whole of one vertex's share of one sweep; the two drivers below share it.
+	visit := func(v Vertex) {
+		if updateTimes[v] >= updateThreshold {
+			return
+		}
 
-			neighborShardScore := make(map[int]float64)
-			maxScore := -9999.0
+		neighborShardScore := make(map[int]float64)
+		maxScore := -9999.0
 
-			vNowShard, maxScoreShard := cs.getVertexLocation(v), cs.getVertexLocation(v)
+		vNowShard, maxScoreShard := cs.getVertexLocation(v), cs.getVertexLocation(v)
 
-			for _, u := range cs.netGraph.EdgeSet[v] {
-				uShard := cs.getVertexLocation(u)
-				if uShard == vNowShard {
-					continue
+		// The candidates are the shards the neighbours sit in, and a vertex's own shard is one of
+		// them whenever it has a neighbour inside that shard: it is scored by the same formula, and
+		// the vertex moves only when some shard scores strictly higher.
+		for _, u := range cs.netGraph.EdgeSet[v] {
+			uShard := cs.getVertexLocation(u)
+			// calculate only once for each neighbor shard.
+			if _, computed := neighborShardScore[uShard]; !computed {
+				neighborShardScore[uShard] = cs.getShardScore(v, uShard)
+				if betterCandidate(neighborShardScore[uShard], uShard, maxScore, maxScoreShard) {
+					maxScore = neighborShardScore[uShard]
+					maxScoreShard = uShard
 				}
-				// calculate only once for each neighbor shard.
-				if _, computed := neighborShardScore[uShard]; !computed {
-					neighborShardScore[uShard] = cs.getShardScore(v, uShard)
-					if maxScore < neighborShardScore[uShard] {
-						maxScore = neighborShardScore[uShard]
-						maxScoreShard = uShard
-					}
-				}
 			}
+		}
 
-			if vNowShard != maxScoreShard && cs.vertexNumInShard[vNowShard] > 1 {
-				cs.partitionMap[v] = maxScoreShard
-				ret[v.Addr] = maxScoreShard
-				updateTimes[v]++
-				// re-calculate vertexNumInShard
-				cs.vertexNumInShard[vNowShard]--
-				cs.vertexNumInShard[maxScoreShard]++
-				// re-calculate Wk
-				cs.changeShardRecompute(v, vNowShard)
+		if vNowShard != maxScoreShard && cs.vertexNumInShard[vNowShard] > 1 {
+			cs.partitionMap[v] = maxScoreShard
+			ret[v.Addr] = maxScoreShard
+			updateTimes[v]++
+			// re-calculate vertexNumInShard
+			cs.vertexNumInShard[vNowShard]--
+			cs.vertexNumInShard[maxScoreShard]++
+			// re-calculate Wk
+			cs.changeShardRecompute(v, vNowShard)
+		}
+	}
+
+	if order == nil {
+		for range cs.maxIterations { // first loop, constraint the max iterations
+			for v := range cs.netGraph.EdgeSet {
+				visit(v)
+			}
+		}
+	} else {
+		// The key set cannot change during this call, so collecting it once matches collecting it
+		// per sweep. The sort makes the order reproducible: collecting the keys is itself a map
+		// range, so without it every round would start from a different permutation.
+		keys := make([]Vertex, 0, len(cs.netGraph.EdgeSet))
+		for v := range cs.netGraph.EdgeSet {
+			keys = append(keys, v)
+		}
+
+		slices.SortFunc(keys, func(a, b Vertex) int { return bytes.Compare(a.Addr[:], b.Addr[:]) })
+
+		for range cs.maxIterations { // first loop, constraint the max iterations
+			for _, v := range order(keys) {
+				visit(v)
 			}
 		}
 	}
 
 	// Accounts may be migrated back into the original shard, thus prune the useless result in 'ret'.
+	// originalLoc holds every address 'ret' can contain: 'ret' is written only when a vertex moves,
+	// and a vertex without edges never moves, so every address in 'ret' is a key of EdgeSet.
 	for acc, loc := range originalLoc {
 		if ret[acc] == loc { // If the shard-location of this account is not changed
 			delete(ret, acc)
@@ -201,6 +269,17 @@ func (cs *CLPAState) addVertex(v Vertex) {
 		cs.partitionMap[v] = loc
 		cs.vertexNumInShard[loc]++
 	}
+}
+
+// betterCandidate reports whether the candidate shard (score, shard) beats the current best
+// (bestScore, bestShard). On equal scores the lower shard id wins, which makes the comparison a
+// total order and the result independent of the adjacency list order.
+func betterCandidate(score float64, shard int, bestScore float64, bestShard int) bool {
+	if score != bestScore {
+		return score > bestScore
+	}
+
+	return shard < bestShard
 }
 
 // getShardScore calculate the earning score that moving vertex v to uShard.

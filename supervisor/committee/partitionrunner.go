@@ -15,6 +15,12 @@ type partitionRunner struct {
 	shardEpoch      []int64 // shardEpoch tells the epoch ID for each shard.
 }
 
+// clpaVisitOrder returns the visit order of the repartition about to run. supervisorEpoch has not
+// been incremented yet, so +1 is the epoch this partition actually takes effect in.
+func (p *partitionRunner) clpaVisitOrder(seed int64) partition.VisitOrder {
+	return partition.SeededOrder(seed + p.supervisorEpoch + 1)
+}
+
 // CheckEpochSyncAndMark tells whether all shards are in the correct epoch
 func (p *partitionRunner) CheckEpochSyncAndMark() bool {
 	// if the epoch is synced, return
